@@ -44,6 +44,8 @@ public partial class MainWindow : Window
     private const double CompactChargingWidth = 320.0;
     private const double CompactNotificationWidth = 220.0;
     private const double CompactUnlockWidth = 190.0;
+    private const double CompactSilentRingWidth = 200.0;
+    private const double CompactDndWidth = 240.0;
     private const double CompactHeight = 36.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
@@ -52,10 +54,20 @@ public partial class MainWindow : Window
     private bool _isChargingAlertActive = false;
     private bool _isNotificationAlertActive = false;
     private bool _isUnlockAlertActive = false;
+    private bool _isSilentRingAlertActive = false;
+    private bool _isDndAlertActive = false;
     private IslandNotification? _currentNotification = null;
+
+    private readonly DispatcherTimer _silentRingAlertTimer;
+    private readonly DispatcherTimer _dndAlertTimer;
+    private readonly FocusAssistWatcherService _focusAssistService;
+    private bool _lastMuteState = false;
+    private bool _muteStateInitialized = false;
 
     private bool HasActiveContent =>
         _isUnlockAlertActive ||
+        _isSilentRingAlertActive ||
+        _isDndAlertActive ||
         (_mediaManager?.CurrentTrack?.HasMedia ?? false) ||
         _isChargingAlertActive ||
         _isNotificationAlertActive;
@@ -65,6 +77,8 @@ public partial class MainWindow : Window
         get
         {
             if (_isUnlockAlertActive) return CompactUnlockWidth;
+            if (_isSilentRingAlertActive) return CompactSilentRingWidth;
+            if (_isDndAlertActive) return CompactDndWidth;
             if (_isChargingAlertActive) return CompactChargingWidth;
             if (_isNotificationAlertActive && _currentNotification != null) return CompactNotificationWidth;
             if (_mediaManager?.CurrentTrack?.HasMedia ?? false) return CompactMediaWidth;
@@ -93,6 +107,7 @@ public partial class MainWindow : Window
             _focusService = new FocusTimerService();
             _clipboardService = new ClipboardWatcherService();
             _notificationService = new NotificationWatcherService();
+            _focusAssistService = new FocusAssistWatcherService();
 
             _mediaManager.TrackChanged += OnTrackChanged;
             _volumeManager.VolumeChanged += OnVolumeChanged;
@@ -102,6 +117,8 @@ public partial class MainWindow : Window
             _clipboardService.ClipboardTextChanged += OnClipboardTextChanged;
             _notificationService.NotificationReceived += OnNotificationReceived;
             _notificationService.NotificationsChanged += OnNotificationsChanged;
+            _focusAssistService.FocusAssistChanged += OnFocusAssistChanged;
+            _focusAssistService.Start();
 
             _clockTimer = new DispatcherTimer
             {
@@ -202,6 +219,46 @@ public partial class MainWindow : Window
                         UpdateCompactViewVisibility();
                     };
                     CompactUnlockView.BeginAnimation(OpacityProperty, fadeOut);
+                }
+            };
+
+            _silentRingAlertTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(3.0)
+            };
+            _silentRingAlertTimer.Tick += (s, e) =>
+            {
+                _silentRingAlertTimer.Stop();
+                if (_isSilentRingAlertActive)
+                {
+                    _isSilentRingAlertActive = false;
+                    var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
+                    fadeOut.Completed += (s2, e2) =>
+                    {
+                        CompactSilentRingView.Visibility = Visibility.Collapsed;
+                        UpdateCompactViewVisibility();
+                    };
+                    CompactSilentRingView.BeginAnimation(OpacityProperty, fadeOut);
+                }
+            };
+
+            _dndAlertTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(3.0)
+            };
+            _dndAlertTimer.Tick += (s, e) =>
+            {
+                _dndAlertTimer.Stop();
+                if (_isDndAlertActive)
+                {
+                    _isDndAlertActive = false;
+                    var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
+                    fadeOut.Completed += (s2, e2) =>
+                    {
+                        CompactDndView.Visibility = Visibility.Collapsed;
+                        UpdateCompactViewVisibility();
+                    };
+                    CompactDndView.BeginAnimation(OpacityProperty, fadeOut);
                 }
             };
 
@@ -694,7 +751,148 @@ public partial class MainWindow : Window
             int volPct = (int)Math.Round(vol * 100.0);
             HardwareVolumeBar.Value = volPct;
             HardwareVolumeText.Text = $"{volPct}%";
+
+            if (!_muteStateInitialized)
+            {
+                _muteStateInitialized = true;
+                _lastMuteState = isMuted;
+                return;
+            }
+
+            if (isMuted != _lastMuteState)
+            {
+                _lastMuteState = isMuted;
+                ShowSilentRingAnimation(isMuted);
+            }
         });
+    }
+
+    private void OnFocusAssistChanged(FocusAssistState state)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            ShowDndAnimation(state);
+        });
+    }
+
+    public void ShowSilentRingAnimation(bool isSilent)
+    {
+        _isSilentRingAlertActive = true;
+        _silentRingAlertTimer.Stop();
+
+        // Clear any other temporary compact alerts
+        if (_isUnlockAlertActive)
+        {
+            _isUnlockAlertActive = false;
+            _unlockAlertTimer.Stop();
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+        }
+        if (_isDndAlertActive)
+        {
+            _isDndAlertActive = false;
+            _dndAlertTimer.Stop();
+            CompactDndView.Visibility = Visibility.Collapsed;
+        }
+
+        // Configure Silent vs Ring presentation matching Images 1 & 2
+        if (isSilent)
+        {
+            CompactSilentBadge.Visibility = Visibility.Visible;
+            CompactRingBadge.Visibility = Visibility.Collapsed;
+            CompactSilentRingText.Text = "Silent";
+            CompactSilentRingText.Foreground = new SolidColorBrush(Color.FromRgb(255, 69, 58)); // #FF453A iOS Coral Red
+        }
+        else
+        {
+            CompactSilentBadge.Visibility = Visibility.Collapsed;
+            CompactRingBadge.Visibility = Visibility.Visible;
+            CompactSilentRingText.Text = "Ring";
+            CompactSilentRingText.Foreground = Brushes.White;
+        }
+
+        // Hide other compact views and show Silent/Ring view
+        CompactClockView.Visibility = Visibility.Collapsed;
+        CompactMediaView.Visibility = Visibility.Collapsed;
+        CompactNotificationView.Visibility = Visibility.Collapsed;
+        CompactChargingView.Visibility = Visibility.Collapsed;
+        CompactUnlockView.Visibility = Visibility.Collapsed;
+        CompactDndView.Visibility = Visibility.Collapsed;
+
+        CompactSilentRingView.Opacity = 0.0;
+        CompactSilentRingView.Visibility = Visibility.Visible;
+
+        // If currently expanded, collapse into compact notch
+        if (_isExpanded)
+        {
+            _isExpanded = false;
+            ExpandedContainer.Visibility = Visibility.Collapsed;
+            CompactView.Visibility = Visibility.Visible;
+            CompactView.Opacity = 1.0;
+        }
+
+        AnimateIsland(CompactSilentRingWidth, CompactHeight);
+
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
+        CompactSilentRingView.BeginAnimation(OpacityProperty, fadeIn);
+
+        _silentRingAlertTimer.Start();
+    }
+
+    public void ShowDndAnimation(FocusAssistState state)
+    {
+        _isDndAlertActive = true;
+        _dndAlertTimer.Stop();
+
+        if (_isUnlockAlertActive)
+        {
+            _isUnlockAlertActive = false;
+            _unlockAlertTimer.Stop();
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+        }
+        if (_isSilentRingAlertActive)
+        {
+            _isSilentRingAlertActive = false;
+            _silentRingAlertTimer.Stop();
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+        }
+
+        if (state == FocusAssistState.Off)
+        {
+            CompactDndText.Text = "Focus Off";
+            CompactDndText.Foreground = Brushes.White;
+            CompactDndBadge.Background = new SolidColorBrush(Color.FromArgb(120, 175, 82, 222));
+        }
+        else
+        {
+            CompactDndText.Text = "Do Not Disturb";
+            CompactDndText.Foreground = new SolidColorBrush(Color.FromRgb(175, 82, 222)); // #AF52DE iOS Purple
+            CompactDndBadge.Background = new SolidColorBrush(Color.FromRgb(175, 82, 222));
+        }
+
+        CompactClockView.Visibility = Visibility.Collapsed;
+        CompactMediaView.Visibility = Visibility.Collapsed;
+        CompactNotificationView.Visibility = Visibility.Collapsed;
+        CompactChargingView.Visibility = Visibility.Collapsed;
+        CompactUnlockView.Visibility = Visibility.Collapsed;
+        CompactSilentRingView.Visibility = Visibility.Collapsed;
+
+        CompactDndView.Opacity = 0.0;
+        CompactDndView.Visibility = Visibility.Visible;
+
+        if (_isExpanded)
+        {
+            _isExpanded = false;
+            ExpandedContainer.Visibility = Visibility.Collapsed;
+            CompactView.Visibility = Visibility.Visible;
+            CompactView.Opacity = 1.0;
+        }
+
+        AnimateIsland(CompactDndWidth, CompactHeight);
+
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
+        CompactDndView.BeginAnimation(OpacityProperty, fadeIn);
+
+        _dndAlertTimer.Start();
     }
 
     private void OnChargingConnected()
@@ -1174,7 +1372,29 @@ public partial class MainWindow : Window
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Visible;
+        }
+        else if (_isSilentRingAlertActive)
+        {
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Visible;
+        }
+        else if (_isDndAlertActive)
+        {
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Visible;
         }
         else if (_isChargingAlertActive)
         {
@@ -1182,6 +1402,8 @@ public partial class MainWindow : Window
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Visible;
         }
         else if (_isNotificationAlertActive && _currentNotification != null)
@@ -1190,6 +1412,8 @@ public partial class MainWindow : Window
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Visible;
         }
         else if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
@@ -1198,6 +1422,8 @@ public partial class MainWindow : Window
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Visible;
         }
         else
@@ -1207,6 +1433,8 @@ public partial class MainWindow : Window
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
         }
 

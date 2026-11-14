@@ -300,6 +300,103 @@
                     <!-- Center: Spacious black pill surface -->
                     <Grid Grid.Column="1" />
                 </Grid>
+
+                <!-- 6. Silent / Ring Alert Mode (Matches User Uploaded Image 1 & 2) -->
+                <Grid x:Name="CompactSilentRingView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="6,0,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Coral/Red Capsule for Silent OR White Bell for Ring -->
+                    <Border x:Name="CompactSilentBadge"
+                            Grid.Column="0"
+                            Width="54" Height="28"
+                            CornerRadius="14"
+                            Background="#FF453A"
+                            VerticalAlignment="Center">
+                        <!-- Muted Bell Icon with Diagonal Strike Line -->
+                        <Canvas Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <!-- Bell -->
+                            <Path Fill="White"
+                                  Data="M 8,2 C 6.34,2 5,3.34 5,5 V 7.8 L 3.5,10.3 C 3.2,10.8 3.55,11.5 4.15,11.5 H 11.85 C 12.45,11.5 12.8,10.8 12.5,10.3 L 11,7.8 V 5 C 11,3.34 9.66,2 8,2 Z M 6.5,12.5 C 6.5,13.33 7.17,14 8,14 C 8.83,14 9.5,13.33 9.5,12.5 Z" />
+                            <!-- Diagonal Strike Line -->
+                            <Line X1="2" Y1="14" X2="14" Y2="2"
+                                  Stroke="#FF453A" StrokeThickness="2.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Line X1="2" Y1="14" X2="14" Y2="2"
+                                  Stroke="White" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                        </Canvas>
+                    </Border>
+
+                    <!-- Alternate Ring Icon (White unmuted bell) -->
+                    <Border x:Name="CompactRingBadge"
+                            Grid.Column="0"
+                            Width="28" Height="28"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed">
+                        <Canvas Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <!-- Crisp White Bell -->
+                            <Path Fill="White"
+                                  Data="M 9,1.5 C 6.8,1.5 5,3.3 5,5.5 V 8.8 L 3.3,11.7 C 2.9,12.4 3.4,13.2 4.2,13.2 H 13.8 C 14.6,13.2 15.1,12.4 14.7,11.7 L 13,8.8 V 5.5 C 13,3.3 11.2,1.5 9,1.5 Z M 7.2,14.5 C 7.2,15.5 8.0,16.2 9,16.2 C 10.0,16.2 10.8,15.5 10.8,14.5 Z" />
+                        </Canvas>
+                    </Border>
+
+                    <!-- Center: Notch Space -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Text "Silent" (in #FF453A) or "Ring" (in White) -->
+                    <TextBlock x:Name="CompactSilentRingText"
+                               Grid.Column="2"
+                               Text="Silent"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="#FF453A"
+                               VerticalAlignment="Center"
+                               Margin="0,0,4,0" />
+                </Grid>
+
+                <!-- 7. Focus / Do Not Disturb (DND) Alert Mode -->
+                <Grid x:Name="CompactDndView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="8,0,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Purple Moon / DND Capsule Badge -->
+                    <Border x:Name="CompactDndBadge"
+                            Grid.Column="0"
+                            Width="54" Height="28"
+                            CornerRadius="14"
+                            Background="#AF52DE"
+                            VerticalAlignment="Center">
+                        <!-- Crescent Moon Icon -->
+                        <Canvas Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Path Fill="White"
+                                  Data="M 12.3,10.2 C 7.5,10.2 3.6,6.3 3.6,1.5 C 3.6,1.0 3.7,0.5 3.8,0 C 1.5,1.2 0,3.6 0,6.4 C 0,10.5 3.3,13.8 7.4,13.8 C 10.2,13.8 12.6,12.3 13.8,10.0 C 13.3,10.1 12.8,10.2 12.3,10.2 Z" />
+                        </Canvas>
+                    </Border>
+
+                    <!-- Center: Notch Space -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Text "Do Not Disturb" (in #AF52DE) -->
+                    <TextBlock x:Name="CompactDndText"
+                               Grid.Column="2"
+                               Text="Do Not Disturb"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="#AF52DE"
+                               VerticalAlignment="Center"
+                               Margin="0,0,4,0" />
+                </Grid>
             </Grid>
 
             <!-- ============================================== -->

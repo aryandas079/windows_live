@@ -32,6 +32,24 @@ public class IslandNotification
 
     public KnownNotificationApp AppType => ResolveAppType();
 
+    public bool IsMessagingApp =>
+        AppType == KnownNotificationApp.WhatsApp ||
+        AppType == KnownNotificationApp.Telegram ||
+        AppType == KnownNotificationApp.Discord ||
+        AppType == KnownNotificationApp.Slack ||
+        AppType == KnownNotificationApp.Instagram ||
+        AppType == KnownNotificationApp.TwitterX ||
+        AppType == KnownNotificationApp.Facebook ||
+        AppName.Contains("WhatsApp", StringComparison.OrdinalIgnoreCase) ||
+        AppName.Contains("Telegram", StringComparison.OrdinalIgnoreCase) ||
+        AppName.Contains("Signal", StringComparison.OrdinalIgnoreCase) ||
+        AppName.Contains("Discord", StringComparison.OrdinalIgnoreCase) ||
+        AppName.Contains("Slack", StringComparison.OrdinalIgnoreCase) ||
+        AppName.Contains("Messenger", StringComparison.OrdinalIgnoreCase) ||
+        AppName.Contains("Teams", StringComparison.OrdinalIgnoreCase) ||
+        AppName.Contains("Messages", StringComparison.OrdinalIgnoreCase) ||
+        AppName.Contains("Chat", StringComparison.OrdinalIgnoreCase);
+
     public string DisplayTitle
     {
         get

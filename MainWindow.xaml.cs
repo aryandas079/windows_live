@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -46,6 +47,7 @@ public partial class MainWindow : Window
     private const double CompactHeight = 36.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
+    private const double ExpandedNotificationReplyHeight = 138.0;
 
     private bool _isChargingAlertActive = false;
     private bool _isNotificationAlertActive = false;
@@ -115,7 +117,15 @@ public partial class MainWindow : Window
             _notificationAlertTimer.Tick += (s, e) =>
             {
                 _notificationAlertTimer.Stop();
-                _isNotificationAlertActive = _notificationService.HasNotifications;
+
+                // If user is actively typing in the reply box, do not auto-disappear
+                if (NotificationReplyInput.IsFocused || !string.IsNullOrWhiteSpace(NotificationReplyInput.Text))
+                {
+                    return;
+                }
+
+                // Disappear after 5s
+                _isNotificationAlertActive = false;
                 if (_isExpanded && !IslandContainer.IsMouseOver && !_isPinned)
                 {
                     CollapseDock();
@@ -502,7 +512,11 @@ public partial class MainWindow : Window
             _activeCategory = IslandCategory.FocusTimer;
         }
 
-        AnimateIsland(ExpandedWidth, ExpandedHeight);
+        double targetHeight = (_activeCategory == IslandCategory.AppNotification && (_currentNotification?.IsMessagingApp ?? false))
+            ? ExpandedNotificationReplyHeight
+            : ExpandedHeight;
+
+        AnimateIsland(ExpandedWidth, targetHeight);
 
         var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(100));
         fadeOut.Completed += (s, e) =>
@@ -579,6 +593,14 @@ public partial class MainWindow : Window
         ViewLiveClipboard.Visibility = _activeCategory == IslandCategory.LiveClipboard ? Visibility.Visible : Visibility.Collapsed;
         ViewWindowSnapping.Visibility = _activeCategory == IslandCategory.WindowSnapping ? Visibility.Visible : Visibility.Collapsed;
         ViewTimerQuickSet.Visibility = _activeCategory == IslandCategory.TimerQuickSet ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_isExpanded)
+        {
+            double targetHeight = (_activeCategory == IslandCategory.AppNotification && (_currentNotification?.IsMessagingApp ?? false))
+                ? ExpandedNotificationReplyHeight
+                : ExpandedHeight;
+            AnimateIsland(ExpandedWidth, targetHeight);
+        }
     }
 
     private void OnTrackChanged(MediaTrackInfo track)
@@ -1191,6 +1213,126 @@ public partial class MainWindow : Window
 
         CompactNotifIcon.SetNotification(notif);
         ExpandedNotifIcon.SetNotification(notif);
+
+        if (notif.IsMessagingApp)
+        {
+            NotificationReplyRow.Visibility = Visibility.Visible;
+            NotificationReplyInput.Text = "";
+            NotificationReplyPlaceholder.Text = $"Reply to {notif.DisplayTitle}...";
+            NotificationReplyPlaceholder.Visibility = Visibility.Visible;
+
+            if (notif.AppType == KnownNotificationApp.WhatsApp)
+            {
+                NotificationSendButton.Background = new SolidColorBrush(Color.FromRgb(37, 211, 102));
+            }
+            else if (notif.AppType == KnownNotificationApp.Telegram)
+            {
+                NotificationSendButton.Background = new SolidColorBrush(Color.FromRgb(36, 161, 222));
+            }
+            else if (notif.AppType == KnownNotificationApp.Discord)
+            {
+                NotificationSendButton.Background = new SolidColorBrush(Color.FromRgb(88, 101, 242));
+            }
+            else if (notif.AppType == KnownNotificationApp.Facebook)
+            {
+                NotificationSendButton.Background = new SolidColorBrush(Color.FromRgb(24, 119, 242));
+            }
+            else
+            {
+                NotificationSendButton.Background = new SolidColorBrush(Color.FromRgb(0, 120, 212));
+            }
+        }
+        else
+        {
+            NotificationReplyRow.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void NotificationReplyInput_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            SendNotificationReply();
+        }
+        else if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            _isNotificationAlertActive = false;
+            CollapseDock();
+        }
+    }
+
+    private void NotificationReplyInput_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        NotificationReplyPlaceholder.Visibility = string.IsNullOrEmpty(NotificationReplyInput.Text)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        if (!string.IsNullOrEmpty(NotificationReplyInput.Text))
+        {
+            _notificationAlertTimer.Stop();
+        }
+    }
+
+    private void NotificationReplyInput_GotFocus(object sender, RoutedEventArgs e)
+    {
+        _notificationAlertTimer.Stop();
+    }
+
+    private void NotificationReplyInput_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(NotificationReplyInput.Text) && _isNotificationAlertActive)
+        {
+            _notificationAlertTimer.Stop();
+            _notificationAlertTimer.Interval = TimeSpan.FromSeconds(3.0);
+            _notificationAlertTimer.Start();
+        }
+    }
+
+    private void NotificationSendButton_Click(object sender, RoutedEventArgs e)
+    {
+        SendNotificationReply();
+    }
+
+    private void SendNotificationReply()
+    {
+        string text = NotificationReplyInput.Text.Trim();
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        App.Log($"Sending reply: '{text}' for notification App={_currentNotification?.AppName}");
+
+        if (_currentNotification != null)
+        {
+            try
+            {
+                if (_currentNotification.AppType == KnownNotificationApp.WhatsApp)
+                {
+                    Process.Start(new ProcessStartInfo($"whatsapp://send?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
+                }
+                else if (_currentNotification.AppType == KnownNotificationApp.Telegram)
+                {
+                    Process.Start(new ProcessStartInfo($"tg://msg?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
+                }
+                else
+                {
+                    Clipboard.SetText(text);
+                }
+
+                _notificationService.Dismiss(_currentNotification.Id);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"SendNotificationReply exception: {ex.Message}");
+            }
+        }
+
+        PlayUnlockSound();
+
+        NotificationReplyInput.Text = "";
+        _isNotificationAlertActive = false;
+        _notificationAlertTimer.Stop();
+        CollapseDock();
     }
 
     private void Start15MinTimer_Click(object sender, RoutedEventArgs e)

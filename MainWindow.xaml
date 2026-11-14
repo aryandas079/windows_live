@@ -427,48 +427,121 @@
                     <!-- ============================================== -->
                     <!-- 3. APP NOTIFICATION CARD (Spacious & Modern)   -->
                     <!-- ============================================== -->
-                    <Grid x:Name="ViewAppNotification" Visibility="Collapsed" VerticalAlignment="Center" Margin="2,4,2,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                    <Grid x:Name="ViewAppNotification" Visibility="Collapsed" VerticalAlignment="Center" Margin="2,2,2,2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-                        <!-- App Icon (46x46) -->
-                        <controls:AppIconControl x:Name="ExpandedNotifIcon"
-                                                 Grid.Column="0"
-                                                 Width="46" Height="46"
-                                                 CornerRadius="12"
-                                                 IconPadding="9"
-                                                 VerticalAlignment="Center"
-                                                 Margin="0,0,16,0" />
+                        <!-- Row 0: App Header (Icon, Title, Message, "now") -->
+                        <Grid Grid.Row="0" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                        <!-- Notification Content (Title & Message) -->
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock x:Name="NotificationTitleText"
-                                       Text="WhatsApp"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       TextTrimming="CharacterEllipsis"
-                                       TextWrapping="NoWrap" />
-                            <TextBlock x:Name="NotificationSubtext"
-                                       Text="New message received"
-                                       FontSize="13"
+                            <!-- App Icon (46x46) -->
+                            <controls:AppIconControl x:Name="ExpandedNotifIcon"
+                                                     Grid.Column="0"
+                                                     Width="46" Height="46"
+                                                     CornerRadius="12"
+                                                     IconPadding="9"
+                                                     VerticalAlignment="Center"
+                                                     Margin="0,0,16,0" />
+
+                            <!-- Notification Content (Title & Message) -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock x:Name="NotificationTitleText"
+                                           Text="WhatsApp"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap" />
+                                <TextBlock x:Name="NotificationSubtext"
+                                           Text="New message received"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           Margin="0,3,0,0" />
+                            </StackPanel>
+
+                            <!-- Right: "now" timestamp matching reference screenshots -->
+                            <TextBlock x:Name="NotificationTimeText"
+                                       Grid.Column="2"
+                                       Text="now"
+                                       FontSize="14"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                       TextTrimming="CharacterEllipsis"
-                                       TextWrapping="NoWrap"
-                                       Margin="0,3,0,0" />
-                        </StackPanel>
+                                       VerticalAlignment="Center"
+                                       Margin="16,0,4,0" />
+                        </Grid>
 
-                        <!-- Right: "now" timestamp matching reference screenshots -->
-                        <TextBlock x:Name="NotificationTimeText"
-                                   Grid.Column="2"
-                                   Text="now"
-                                   FontSize="14"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   VerticalAlignment="Center"
-                                   Margin="16,0,4,0" />
+                        <!-- Row 1: Quick Reply Box with Send Arrow (WhatsApp, Telegram, Messaging Apps) -->
+                        <Grid x:Name="NotificationReplyRow"
+                              Grid.Row="1"
+                              Visibility="Collapsed"
+                              Margin="0,10,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Modern Capsule Reply Input Box -->
+                            <Border Grid.Column="0"
+                                    Height="34"
+                                    CornerRadius="17"
+                                    Background="#1AFFFFFF"
+                                    BorderBrush="#33FFFFFF"
+                                    BorderThickness="1"
+                                    Padding="14,0,10,0">
+                                <Grid VerticalAlignment="Center">
+                                    <TextBlock x:Name="NotificationReplyPlaceholder"
+                                               Text="Reply..."
+                                               FontSize="13"
+                                               Foreground="#70FFFFFF"
+                                               VerticalAlignment="Center"
+                                               IsHitTestVisible="False" />
+                                    <TextBox x:Name="NotificationReplyInput"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Foreground="White"
+                                             CaretBrush="White"
+                                             FontSize="13"
+                                             VerticalAlignment="Center"
+                                             Padding="0"
+                                             KeyDown="NotificationReplyInput_KeyDown"
+                                             TextChanged="NotificationReplyInput_TextChanged"
+                                             GotFocus="NotificationReplyInput_GotFocus"
+                                             LostFocus="NotificationReplyInput_LostFocus" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Send Arrow Button (Circular 34x34) -->
+                            <Button x:Name="NotificationSendButton"
+                                    Grid.Column="1"
+                                    Width="34" Height="34"
+                                    Margin="8,0,0,0"
+                                    Padding="0"
+                                    Background="#25D366"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Click="NotificationSendButton_Click">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="17" />
+                                    </Style>
+                                </Button.Resources>
+                                <Viewbox Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Canvas Width="24" Height="24">
+                                        <!-- Crisp Send Arrow -->
+                                        <Path Fill="White"
+                                              Data="M 2.01,21 L 23,12 L 2.01,3 L 2,10 L 17,12 L 2,14 Z" />
+                                    </Canvas>
+                                </Viewbox>
+                            </Button>
+                        </Grid>
                     </Grid>
 
                     <!-- ============================================== -->

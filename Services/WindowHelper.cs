@@ -92,6 +92,30 @@ public static class WindowHelper
         return new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
     }
 
+    public static void SetActivationEnabled(Window window, bool enable)
+    {
+        var helper = new WindowInteropHelper(window);
+        IntPtr hWnd = helper.Handle;
+        if (hWnd == IntPtr.Zero) return;
+
+        IntPtr exStyle = GetWindowLongAuto(hWnd, GWL_EXSTYLE);
+        long style = exStyle.ToInt64();
+
+        if (enable)
+        {
+            // Remove WS_EX_NOACTIVATE so the window can receive physical keyboard input
+            style &= ~WS_EX_NOACTIVATE;
+        }
+        else
+        {
+            // Add WS_EX_NOACTIVATE so background clicks don't steal focus from other apps
+            style |= WS_EX_NOACTIVATE;
+        }
+
+        SetWindowLongAuto(hWnd, GWL_EXSTYLE, new IntPtr(style));
+        SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+
     public static void MakeToolWindow(Window window)
     {
         var helper = new WindowInteropHelper(window);

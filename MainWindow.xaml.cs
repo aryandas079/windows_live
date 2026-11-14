@@ -455,6 +455,17 @@ public partial class MainWindow : Window
             return (IntPtr)WindowHelper.HTTRANSPARENT;
         }
 
+        if (msg == 0x0021) // WM_MOUSEACTIVATE
+        {
+            // If the user clicks on the notification reply input or send button, activate the window so they can type immediately
+            if (_isExpanded && _activeCategory == IslandCategory.AppNotification && NotificationReplyRow.Visibility == Visibility.Visible)
+            {
+                WindowHelper.SetActivationEnabled(this, true);
+                handled = true;
+                return (IntPtr)1; // MA_ACTIVATE
+            }
+        }
+
         return IntPtr.Zero;
     }
 
@@ -534,6 +545,9 @@ public partial class MainWindow : Window
     {
         if (!_isExpanded) return;
         _isExpanded = false;
+
+        // Restore non-activating window mode when collapsing
+        WindowHelper.SetActivationEnabled(this, false);
 
         AnimateIsland(CurrentCompactWidth, CompactHeight);
 
@@ -1224,6 +1238,22 @@ public partial class MainWindow : Window
         }
     }
 
+    private void NotificationReplyBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        WindowHelper.SetActivationEnabled(this, true);
+        Activate();
+        NotificationReplyInput.Focus();
+        Keyboard.Focus(NotificationReplyInput);
+    }
+
+    private void NotificationReplyInput_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        WindowHelper.SetActivationEnabled(this, true);
+        Activate();
+        NotificationReplyInput.Focus();
+        Keyboard.Focus(NotificationReplyInput);
+    }
+
     private void NotificationReplyInput_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
@@ -1258,6 +1288,12 @@ public partial class MainWindow : Window
 
     private void NotificationReplyInput_LostFocus(object sender, RoutedEventArgs e)
     {
+        // When user leaves the input, restore WS_EX_NOACTIVATE unless still expanded with text
+        if (string.IsNullOrEmpty(NotificationReplyInput.Text))
+        {
+            WindowHelper.SetActivationEnabled(this, false);
+        }
+
         if (string.IsNullOrEmpty(NotificationReplyInput.Text) && _isNotificationAlertActive)
         {
             _notificationAlertTimer.Stop();
@@ -1282,13 +1318,31 @@ public partial class MainWindow : Window
         {
             try
             {
+                // Always put text on clipboard for instant paste convenience
+                try { Clipboard.SetText(text); } catch { }
+
                 if (_currentNotification.AppType == KnownNotificationApp.WhatsApp)
                 {
-                    Process.Start(new ProcessStartInfo($"whatsapp://send?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo($"whatsapp://send?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
+                    }
+                    catch
+                    {
+                        // Fallback to web whatsapp if protocol is not registered
+                        Process.Start(new ProcessStartInfo($"https://web.whatsapp.com/send?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
+                    }
                 }
                 else if (_currentNotification.AppType == KnownNotificationApp.Telegram)
                 {
-                    Process.Start(new ProcessStartInfo($"tg://msg?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo($"tg://msg_url?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
+                    }
+                    catch
+                    {
+                        Process.Start(new ProcessStartInfo($"https://t.me/share/url?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
+                    }
                 }
                 else
                 {

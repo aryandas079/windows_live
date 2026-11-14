@@ -494,28 +494,32 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- Modern Capsule Reply Input Box -->
-                            <Border Grid.Column="0"
-                                    Height="34"
-                                    CornerRadius="17"
-                                    Background="#1AFFFFFF"
-                                    BorderBrush="#33FFFFFF"
+                            <Border x:Name="NotificationReplyBorder"
+                                    Grid.Column="0"
+                                    Height="36"
+                                    CornerRadius="18"
+                                    Background="#222226"
+                                    BorderBrush="#3D3D42"
                                     BorderThickness="1"
-                                    Padding="14,0,10,0">
+                                    Padding="14,0,12,0"
+                                    PreviewMouseDown="NotificationReplyBox_PreviewMouseDown">
                                 <Grid VerticalAlignment="Center">
                                     <TextBlock x:Name="NotificationReplyPlaceholder"
                                                Text="Reply..."
                                                FontSize="13"
-                                               Foreground="#70FFFFFF"
+                                               Foreground="#8E8E93"
                                                VerticalAlignment="Center"
                                                IsHitTestVisible="False" />
                                     <TextBox x:Name="NotificationReplyInput"
                                              Background="Transparent"
                                              BorderThickness="0"
-                                             Foreground="White"
-                                             CaretBrush="White"
-                                             FontSize="13"
+                                             Foreground="#FFFFFF"
+                                             CaretBrush="#30D158"
+                                             FontSize="13.5"
                                              VerticalAlignment="Center"
+                                             VerticalContentAlignment="Center"
                                              Padding="0"
+                                             PreviewMouseDown="NotificationReplyInput_PreviewMouseDown"
                                              KeyDown="NotificationReplyInput_KeyDown"
                                              TextChanged="NotificationReplyInput_TextChanged"
                                              GotFocus="NotificationReplyInput_GotFocus"
@@ -523,21 +527,41 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Send Arrow Button (Circular 34x34) -->
+                            <!-- Sleek Circular Send Button (36x36) -->
                             <Button x:Name="NotificationSendButton"
                                     Grid.Column="1"
-                                    Width="34" Height="34"
+                                    Width="36" Height="36"
                                     Margin="8,0,0,0"
                                     Padding="0"
                                     Background="#25D366"
                                     BorderThickness="0"
                                     Cursor="Hand"
                                     Click="NotificationSendButton_Click">
-                                <Button.Resources>
-                                    <Style TargetType="Border">
-                                        <Setter Property="CornerRadius" Value="17" />
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="BtnBorder"
+                                                            Background="{TemplateBinding Background}"
+                                                            CornerRadius="18">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="BtnBorder" Property="Background" Value="#2BE671"/>
+                                                            <Setter Property="Opacity" Value="0.95"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsPressed" Value="True">
+                                                            <Setter TargetName="BtnBorder" Property="Background" Value="#1EBE5D"/>
+                                                            <Setter Property="Opacity" Value="0.8"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
                                     </Style>
-                                </Button.Resources>
+                                </Button.Style>
                                 <Viewbox Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Canvas Width="24" Height="24">
                                         <!-- Crisp Send Arrow -->

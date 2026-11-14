@@ -118,15 +118,15 @@ public partial class MainWindow : Window
             {
                 _notificationAlertTimer.Stop();
 
-                // If user is actively typing in the reply box, do not auto-disappear
+                // If user is actively typing in the reply box, give them time to finish
                 if (NotificationReplyInput.IsFocused || !string.IsNullOrWhiteSpace(NotificationReplyInput.Text))
                 {
                     return;
                 }
 
-                // Disappear after 5s
+                // Disappear after 5s if not responded/attended to
                 _isNotificationAlertActive = false;
-                if (_isExpanded && !IslandContainer.IsMouseOver && !_isPinned)
+                if (_isExpanded && _activeCategory == IslandCategory.AppNotification)
                 {
                     CollapseDock();
                 }
@@ -1074,11 +1074,17 @@ public partial class MainWindow : Window
     {
         e.Handled = true;
         _activeCategory = IslandCategory.AppNotification;
+        _isNotificationAlertActive = true;
         if (_currentNotification != null)
         {
             UpdateNotificationUI(_currentNotification);
         }
         ExpandDock();
+
+        // After clicking/opening notification dock, if no further action or reply within 5s, auto-dismiss and collapse
+        _notificationAlertTimer.Stop();
+        _notificationAlertTimer.Interval = TimeSpan.FromSeconds(5.0);
+        _notificationAlertTimer.Start();
     }
 
     private void OnNotificationReceived(IslandNotification notif)

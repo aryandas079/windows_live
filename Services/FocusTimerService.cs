@@ -9,7 +9,7 @@ public class FocusTimerService
     public event Action? Completed;
 
     private readonly DispatcherTimer _timer;
-    private TimeSpan _remaining = TimeSpan.FromMinutes(25);
+    private TimeSpan _remaining = TimeSpan.Zero;
     private bool _isRunning = false;
 
     public TimeSpan Remaining => _remaining;
@@ -18,6 +18,7 @@ public class FocusTimerService
 
     public FocusTimerService()
     {
+        _remaining = TimeSpan.Zero;
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += (s, e) =>
         {

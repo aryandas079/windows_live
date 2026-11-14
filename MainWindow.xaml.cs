@@ -70,8 +70,7 @@ public partial class MainWindow : Window
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
         _focusService.IsRunning ||
-        (_focusService.Remaining.TotalSeconds > 0) ||
-        (_mediaManager?.CurrentTrack?.HasMedia ?? false) ||
+        (_mediaManager?.CurrentTrack?.IsPlaying ?? false) ||
         _isChargingAlertActive ||
         _isNotificationAlertActive;
 
@@ -84,8 +83,8 @@ public partial class MainWindow : Window
             if (_isDndAlertActive) return CompactDndWidth;
             if (_isChargingAlertActive) return CompactChargingWidth;
             if (_isNotificationAlertActive && _currentNotification != null) return CompactNotificationWidth;
-            if (_focusService.IsRunning || _focusService.Remaining.TotalSeconds > 0) return CompactTimerWidth;
-            if (_mediaManager?.CurrentTrack?.HasMedia ?? false) return CompactMediaWidth;
+            if (_focusService.IsRunning) return CompactTimerWidth;
+            if (_mediaManager?.CurrentTrack?.IsPlaying ?? false) return CompactMediaWidth;
             return CompactDefaultWidth;
         }
     }
@@ -577,13 +576,13 @@ public partial class MainWindow : Window
         {
             _activeCategory = IslandCategory.AppNotification;
         }
-        else if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
-        {
-            _activeCategory = IslandCategory.MediaPlayback;
-        }
         else if (_focusService.IsRunning)
         {
             _activeCategory = IslandCategory.FocusTimer;
+        }
+        else if (_mediaManager?.CurrentTrack?.IsPlaying ?? false)
+        {
+            _activeCategory = IslandCategory.MediaPlayback;
         }
 
         double targetHeight = (_activeCategory == IslandCategory.AppNotification && (_currentNotification?.IsMessagingApp ?? false))
@@ -1468,7 +1467,7 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Visible;
         }
-        else if (_focusService.IsRunning || _focusService.Remaining.TotalSeconds > 0)
+        else if (_focusService.IsRunning)
         {
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
@@ -1479,7 +1478,7 @@ public partial class MainWindow : Window
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Visible;
         }
-        else if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
+        else if (_mediaManager?.CurrentTrack?.IsPlaying ?? false)
         {
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;

@@ -53,24 +53,10 @@ public partial class App : Application
         try
         {
             base.OnStartup(e);
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
             Log("Creating MainWindow...");
-            var ownerWindow = new Window
-            {
-                Width = 0,
-                Height = 0,
-                WindowStyle = WindowStyle.None,
-                ShowInTaskbar = false,
-                ShowActivated = false,
-                Visibility = Visibility.Collapsed
-            };
-            var ownerHelper = new System.Windows.Interop.WindowInteropHelper(ownerWindow);
-            ownerHelper.EnsureHandle();
-            Services.WindowHelper.MakeToolWindow(ownerWindow);
 
-            var win = new MainWindow
-            {
-                Owner = ownerWindow
-            };
+            var win = new MainWindow();
             MainWindow = win;
             Log("Calling win.Show()...");
             win.Show();

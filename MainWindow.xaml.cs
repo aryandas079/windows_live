@@ -48,70 +48,70 @@ public partial class MainWindow : Window
         {
             InitializeComponent();
             App.Log("MainWindow InitializeComponent finished");
+
+            _themeService = new ThemeService();
+            _themeService.ThemeChanged += OnThemeChanged;
+            ApplyThemeResources();
+
+            _appStateTracker = new AppStateTracker();
+            _appStateTracker.StateChanged += OnForegroundAppStateChanged;
+
+            _mediaManager = new MediaManager(Dispatcher);
+            _volumeManager = new VolumeManager();
+            _powerService = new PowerManagerService();
+            _focusService = new FocusTimerService();
+            _clipboardService = new ClipboardWatcherService();
+
+            _mediaManager.TrackChanged += OnTrackChanged;
+            _volumeManager.VolumeChanged += OnVolumeChanged;
+            _powerService.PowerStatusChanged += OnPowerStatusChanged;
+            _focusService.Tick += OnFocusTimerTick;
+            _clipboardService.ClipboardTextChanged += OnClipboardTextChanged;
+
+            _clockTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(1)
+            };
+            _clockTimer.Tick += (s, e) => UpdateClock();
+            _clockTimer.Start();
+
+            _autoCollapseTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(1200)
+            };
+            _autoCollapseTimer.Tick += (s, e) =>
+            {
+                _autoCollapseTimer.Stop();
+                if (!_isPinned && !IslandContainer.IsMouseOver)
+                {
+                    CollapseDock();
+                    if (_appStateTracker.CurrentState == ForegroundAppState.Maximized)
+                    {
+                        HideDockSmooth();
+                    }
+                }
+            };
+
+            SourceInitialized += (s, e) =>
+            {
+                App.Log("MainWindow SourceInitialized");
+                WindowHelper.MakeToolWindow(this);
+            };
+            Loaded += OnLoaded;
+            Closing += (s, e) => App.Log($"MainWindow Closing: Cancel={e.Cancel}");
+            Closed += (s, e) => App.Log("MainWindow Closed");
+            PositionWindow();
+
+            IslandContainer.MouseEnter += OnIslandMouseEnter;
+            IslandContainer.MouseLeave += OnIslandMouseLeave;
+            IslandContainer.MouseDown += OnIslandMouseDown;
+            App.Log("MainWindow constructor finished");
         }
         catch (Exception ex)
         {
-            App.Log($"EXCEPTION IN MainWindow.InitializeComponent: {ex}");
+            App.Log($"FATAL EXCEPTION in MainWindow constructor: {ex}");
             throw;
         }
-
-        _themeService = new ThemeService();
-        _themeService.ThemeChanged += OnThemeChanged;
-        ApplyThemeResources();
-
-        _appStateTracker = new AppStateTracker();
-        _appStateTracker.StateChanged += OnForegroundAppStateChanged;
-
-        _mediaManager = new MediaManager(Dispatcher);
-        _volumeManager = new VolumeManager();
-        _powerService = new PowerManagerService();
-        _focusService = new FocusTimerService();
-        _clipboardService = new ClipboardWatcherService();
-
-        _mediaManager.TrackChanged += OnTrackChanged;
-        _volumeManager.VolumeChanged += OnVolumeChanged;
-        _powerService.PowerStatusChanged += OnPowerStatusChanged;
-        _focusService.Tick += OnFocusTimerTick;
-        _clipboardService.ClipboardTextChanged += OnClipboardTextChanged;
-
-        _clockTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(1)
-        };
-        _clockTimer.Tick += (s, e) => UpdateClock();
-        _clockTimer.Start();
-
-        _autoCollapseTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(1200)
-        };
-        _autoCollapseTimer.Tick += (s, e) =>
-        {
-            _autoCollapseTimer.Stop();
-            if (!_isPinned && !IslandContainer.IsMouseOver)
-            {
-                CollapseDock();
-                if (_appStateTracker.CurrentState == ForegroundAppState.Maximized)
-                {
-                    HideDockSmooth();
-                }
-            }
-        };
-
-        SourceInitialized += (s, e) =>
-        {
-            App.Log("MainWindow SourceInitialized");
-            WindowHelper.MakeToolWindow(this);
-        };
-        Loaded += OnLoaded;
-        Closing += (s, e) => App.Log($"MainWindow Closing: Cancel={e.Cancel}");
-        Closed += (s, e) => App.Log("MainWindow Closed");
-        PositionWindow();
-
-        IslandContainer.MouseEnter += OnIslandMouseEnter;
-        IslandContainer.MouseLeave += OnIslandMouseLeave;
-        IslandContainer.MouseDown += OnIslandMouseDown;
-        App.Log("MainWindow constructor finished");
     }
 
     private void OnForegroundAppStateChanged(ForegroundAppState state)

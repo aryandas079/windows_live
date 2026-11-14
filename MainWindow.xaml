@@ -560,6 +560,54 @@
                                                AccentBrush="{DynamicResource AccentColorBrush}"
                                                IsPlaying="True" />
                 </Grid>
+
+                <!-- 10. Voice / Sound Recording Pill (Matches Reference Image media_1794687519215_9a21255f.png Exactly) -->
+                <!-- Left: Dynamic Red-Orange recording waveform bars in #FF453A -->
+                <!-- Center: Camera notch space -->
+                <!-- Right: Red-Orange live recording duration timer e.g. "02:42" in #FF453A -->
+                <Grid x:Name="CompactVoiceRecordingView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="12,0,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Dynamic Live Waveform Visualizer in Vibrant Red-Orange (#FF453A) -->
+                    <StackPanel x:Name="RecordingWaveformBars"
+                                Grid.Column="0"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Border x:Name="RecBar1" Width="3.5" Height="4" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar2" Width="3.5" Height="8" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar3" Width="3.5" Height="14" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar4" Width="3.5" Height="12" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar5" Width="3.5" Height="6" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar6" Width="3.5" Height="13" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar7" Width="3.5" Height="16" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar8" Width="3.5" Height="12" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar9" Width="3.5" Height="8" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar10" Width="3.5" Height="4" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar11" Width="3.5" Height="7" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar12" Width="3.5" Height="11" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                        <Border x:Name="RecBar13" Width="3.5" Height="4" CornerRadius="1.75" Background="#FF453A" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Center: Notch Space -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Live Duration (e.g. 02:42) in #FF453A -->
+                    <TextBlock x:Name="CompactRecordingDurationText"
+                               Grid.Column="2"
+                               Text="00:00"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="#FF453A"
+                               VerticalAlignment="Center"
+                               Margin="0,0,4,0" />
+                </Grid>
             </Grid>
 
             <!-- ============================================== -->
@@ -1013,6 +1061,31 @@
                                 <TextBlock Text="5m" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
                             </Grid>
                         </Button>
+                    </Grid>
+
+                    <!-- ============================================== -->
+                    <!-- 10. VOICE RECORDING EXPANDED MODE              -->
+                    <!-- ============================================== -->
+                    <Grid x:Name="ViewVoiceRecording" Visibility="Collapsed" VerticalAlignment="Center" Margin="4,8,4,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Recording Icon Badge -->
+                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="22" Background="#22FF453A" BorderBrush="#44FF453A" BorderThickness="1.5" Margin="0,0,12,0">
+                            <ui:SymbolIcon Symbol="Record24" FontSize="20" Foreground="#FF453A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="RecordingAppNameText" Text="Voice Recording Active" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock x:Name="RecordingDurationSubtext" Text="00:00 recorded" FontSize="12" Foreground="#FF453A" Margin="0,3,0,0" />
+                        </StackPanel>
+
+                        <Border Grid.Column="2" Background="#22FF453A" CornerRadius="12" Padding="10,4,10,4" VerticalAlignment="Center">
+                            <TextBlock Text="RECORDING" FontSize="11" FontWeight="Bold" Foreground="#FF453A" />
+                        </Border>
                     </Grid>
 
                 </Grid>

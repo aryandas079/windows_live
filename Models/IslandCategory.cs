@@ -11,5 +11,6 @@ public enum IslandCategory
     HardwareVolumeBrightness,
     LiveClipboard,
     WindowSnapping,
-    TimerQuickSet
+    TimerQuickSet,
+    VoiceRecording
 }

@@ -1449,7 +1449,23 @@ public partial class MainWindow : Window
 
     private void FocusToggleButton_Click(object sender, RoutedEventArgs e)
     {
-        _focusService.Toggle();
+        if (_windowsClockService.HasActiveTimer)
+        {
+            if (_windowsClockService.ActiveTimer?.IsRunning == true)
+            {
+                _windowsClockService.PauseActiveTimer();
+                FocusToggleButton.Content = "Resume";
+            }
+            else
+            {
+                _windowsClockService.ResumeActiveTimer();
+                FocusToggleButton.Content = "Pause";
+            }
+        }
+        else
+        {
+            _focusService.Toggle();
+        }
     }
 
     private void HardwareBrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

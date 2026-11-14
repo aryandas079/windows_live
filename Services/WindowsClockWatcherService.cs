@@ -25,7 +25,7 @@ public class WindowsClockWatcherService
     private DateTime _lastSettingsFileTime = DateTime.MinValue;
 
     public WindowsClockTimerInfo? ActiveTimer => _activeTimer;
-    public bool HasActiveTimer => _activeTimer != null && _activeTimer.IsRunning;
+    public bool HasActiveTimer => _activeTimer != null && (_activeTimer.IsRunning || _activeTimer.RemainingTime.TotalSeconds > 0);
 
     public WindowsClockWatcherService()
     {
@@ -34,7 +34,7 @@ public class WindowsClockWatcherService
 
         _pollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(500)
+            Interval = TimeSpan.FromMilliseconds(200)
         };
         _pollTimer.Tick += (s, e) => PollTimers();
     }
@@ -68,16 +68,8 @@ public class WindowsClockWatcherService
                 }
             }
 
-            // Check if settings.dat was modified
-            if (File.Exists(_settingsFilePath))
-            {
-                var writeTime = File.GetLastWriteTimeUtc(_settingsFilePath);
-                if (force || writeTime != _lastSettingsFileTime)
-                {
-                    _lastSettingsFileTime = writeTime;
-                    ReadClockSettings();
-                }
-            }
+            // Always poll Windows Clock settings to detect live starts, pauses, resets, or cancellations in real time
+            ReadClockSettings();
         }
         catch (Exception ex)
         {
@@ -96,6 +88,7 @@ public class WindowsClockWatcherService
 
             var timersContainer = appData.LocalSettings.Containers["Timers"];
             WindowsClockTimerInfo? latestRunning = null;
+            WindowsClockTimerInfo? latestPaused = null;
 
             foreach (var pair in timersContainer.Values)
             {
@@ -107,12 +100,11 @@ public class WindowsClockWatcherService
                     long startTicks = comp.ContainsKey("StartTime") && comp["StartTime"] is long st ? st : 0;
                     long updatedTicks = comp.ContainsKey("__Updated") && comp["__Updated"] is long up ? up : 0;
 
-                    // When a timer is actively running in Windows Clock:
-                    // StartTime > 0 (FILETIME when started) OR RemainingTime > 0
                     if (durationTicks > 0)
                     {
                         var duration = TimeSpan.FromTicks(durationTicks);
 
+                        // Running state: StartTime > 0
                         if (startTicks > 0)
                         {
                             DateTime startTime = DateTime.FromFileTimeUtc(startTicks);
@@ -134,37 +126,40 @@ public class WindowsClockWatcherService
                                 break;
                             }
                         }
-                        else if (remainingTicks > 0 && updatedTicks > 0)
+                        // Paused state: StartTime == 0 and RemainingTime > 0
+                        else if (remainingTicks > 0 && remainingTicks < durationTicks)
                         {
-                            // Paused or just updated with remaining time
-                            DateTime updatedTime = DateTime.FromFileTimeUtc(updatedTicks);
-                            TimeSpan remaining = TimeSpan.FromTicks(remainingTicks);
-                            var elapsed = DateTime.UtcNow - updatedTime;
-
-                            if (elapsed >= TimeSpan.Zero && elapsed < TimeSpan.FromSeconds(5))
+                            var remaining = TimeSpan.FromTicks(remainingTicks);
+                            latestPaused = new WindowsClockTimerInfo
                             {
-                                latestRunning = new WindowsClockTimerInfo
-                                {
-                                    Key = pair.Key,
-                                    Name = name,
-                                    Duration = duration,
-                                    RemainingTime = remaining,
-                                    EndTime = DateTime.Now + remaining,
-                                    IsRunning = true
-                                };
-                                break;
-                            }
+                                Key = pair.Key,
+                                Name = name,
+                                Duration = duration,
+                                RemainingTime = remaining,
+                                EndTime = DateTime.Now + remaining,
+                                IsRunning = false
+                            };
                         }
                     }
                 }
             }
 
-            if (latestRunning != null)
+            var resolvedTimer = latestRunning ?? latestPaused;
+
+            if (resolvedTimer != null)
             {
-                _activeTimer = latestRunning;
-                TimerStateChanged?.Invoke(_activeTimer);
+                bool changed = _activeTimer == null ||
+                               _activeTimer.Key != resolvedTimer.Key ||
+                               _activeTimer.IsRunning != resolvedTimer.IsRunning ||
+                               Math.Abs((_activeTimer.RemainingTime - resolvedTimer.RemainingTime).TotalSeconds) > 1.5;
+
+                if (changed || (_activeTimer != null && !_activeTimer.IsRunning))
+                {
+                    _activeTimer = resolvedTimer;
+                    TimerStateChanged?.Invoke(_activeTimer);
+                }
             }
-            else if (_activeTimer != null && !_activeTimer.IsRunning)
+            else if (_activeTimer != null)
             {
                 _activeTimer = null;
                 TimerStateChanged?.Invoke(null);

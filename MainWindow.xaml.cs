@@ -124,8 +124,14 @@ public partial class MainWindow : Window
                     return;
                 }
 
-                // Disappear after 5s if not responded/attended to
+                // Disappear after 5s once shown
                 _isNotificationAlertActive = false;
+                if (_currentNotification != null)
+                {
+                    _notificationService.Dismiss(_currentNotification.Id);
+                    _currentNotification = null;
+                }
+
                 if (_isExpanded && _activeCategory == IslandCategory.AppNotification)
                 {
                     CollapseDock();
@@ -503,14 +509,10 @@ public partial class MainWindow : Window
     private void ExpandDock()
     {
         if (_isExpanded) return;
-        if (!HasActiveContent && !_isNotificationAlertActive && !_notificationService.HasNotifications) return;
+        if (!HasActiveContent && !_isNotificationAlertActive) return;
         _isExpanded = true;
 
         if (_isNotificationAlertActive || _activeCategory == IslandCategory.AppNotification)
-        {
-            _activeCategory = IslandCategory.AppNotification;
-        }
-        else if (_notificationService.HasNotifications && !(_mediaManager?.CurrentTrack?.HasMedia ?? false))
         {
             _activeCategory = IslandCategory.AppNotification;
         }
@@ -1081,7 +1083,7 @@ public partial class MainWindow : Window
         }
         ExpandDock();
 
-        // After clicking/opening notification dock, if no further action or reply within 5s, auto-dismiss and collapse
+        // After clicking, if no reply or action within 5s, dismiss and collapse
         _notificationAlertTimer.Stop();
         _notificationAlertTimer.Interval = TimeSpan.FromSeconds(5.0);
         _notificationAlertTimer.Start();
@@ -1136,16 +1138,20 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            _currentNotification = _notificationService.LatestNotification;
-
-            if (_notificationService.HasNotifications)
+            if (!_isNotificationAlertActive)
             {
+                _currentNotification = null;
+            }
+            else
+            {
+                _currentNotification = _notificationService.LatestNotification;
                 if (_currentNotification != null)
                 {
                     UpdateNotificationUI(_currentNotification);
                 }
             }
-            else
+
+            if (!_notificationService.HasNotifications || !_isNotificationAlertActive)
             {
                 _isNotificationAlertActive = false;
                 _notificationAlertTimer.Stop();

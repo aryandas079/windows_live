@@ -226,31 +226,13 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Left: App Icon / Badge -->
-                    <Grid Grid.Column="0" VerticalAlignment="Center" Margin="4,0,0,0">
-                        <!-- Real App Icon if available -->
-                        <Border x:Name="CompactNotifImageBorder"
-                                Width="26" Height="26"
-                                CornerRadius="6"
-                                Visibility="Collapsed"
-                                ClipToBounds="True">
-                            <Image x:Name="CompactNotifAppImage" Stretch="UniformToFill" />
-                        </Border>
-
-                        <!-- Branded / Vector Icon (WhatsApp green by default) -->
-                        <Border x:Name="CompactNotifVectorBadge"
-                                Width="26" Height="26"
-                                CornerRadius="6"
-                                Background="#25D366"
-                                VerticalAlignment="Center">
-                            <Viewbox Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Canvas Width="24" Height="24">
-                                    <Path x:Name="CompactNotifVectorPath"
-                                          Fill="White"
-                                          Data="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19.01L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 14.99 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67M9.11 7.44C8.95 7.44 8.68 7.5 8.46 7.74C8.24 7.97 7.62 8.56 7.62 9.76C7.62 10.96 8.49 12.12 8.61 12.28C8.73 12.44 10.32 14.9 12.8 15.97C15.28 17.03 15.28 16.7 15.72 16.66C16.16 16.62 17.14 16.08 17.34 15.52C17.54 14.96 17.54 14.48 17.48 14.38C17.42 14.28 17.26 14.22 17.02 14.1C16.78 13.98 15.6 13.4 15.38 13.32C15.16 13.24 15 13.2 14.84 13.44C14.68 13.68 14.22 14.22 14.08 14.38C13.94 14.54 13.8 14.56 13.56 14.44C13.32 14.32 12.55 14.07 11.63 13.25C10.91 12.61 10.42 11.82 10.28 11.58C10.14 11.34 10.26 11.21 10.38 11.09C10.49 10.98 10.63 10.8 10.75 10.66C10.87 10.52 10.91 10.42 10.99 10.26C11.07 10.1 11.03 9.96 10.97 9.84C10.91 9.72 10.45 8.58 10.26 8.12C10.07 7.67 9.88 7.73 9.74 7.72C9.6 7.71 9.44 7.71 9.28 7.71L9.11 7.44Z" />
-                                </Canvas>
-                            </Viewbox>
-                        </Border>
-                    </Grid>
+                    <controls:AppIconControl x:Name="CompactNotifIcon"
+                                             Grid.Column="0"
+                                             Width="26" Height="26"
+                                             CornerRadius="7"
+                                             IconPadding="4"
+                                             VerticalAlignment="Center"
+                                             Margin="4,0,0,0" />
 
                     <!-- Center: black notch surface -->
                     <Grid Grid.Column="1" />
@@ -408,31 +390,13 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- App Icon (46x46) -->
-                        <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <!-- Real App Icon if available -->
-                            <Border x:Name="ExpandedNotifImageBorder"
-                                    Width="46" Height="46"
-                                    CornerRadius="12"
-                                    Visibility="Collapsed"
-                                    ClipToBounds="True">
-                                <Image x:Name="ExpandedNotifAppImage" Stretch="UniformToFill" />
-                            </Border>
-
-                            <!-- Branded Vector Badge (WhatsApp / App Fallback) -->
-                            <Border x:Name="ExpandedNotifVectorBadge"
-                                    Width="46" Height="46"
-                                    CornerRadius="12"
-                                    Background="#25D366"
-                                    VerticalAlignment="Center">
-                                <Viewbox Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Canvas Width="24" Height="24">
-                                        <Path x:Name="ExpandedNotifVectorPath"
-                                              Fill="White"
-                                              Data="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19.01L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 14.99 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67M9.11 7.44C8.95 7.44 8.68 7.5 8.46 7.74C8.24 7.97 7.62 8.56 7.62 9.76C7.62 10.96 8.49 12.12 8.61 12.28C8.73 12.44 10.32 14.9 12.8 15.97C15.28 17.03 15.28 16.7 15.72 16.66C16.16 16.62 17.14 16.08 17.34 15.52C17.54 14.96 17.54 14.48 17.48 14.38C17.42 14.28 17.26 14.22 17.02 14.1C16.78 13.98 15.6 13.4 15.38 13.32C15.16 13.24 15 13.2 14.84 13.44C14.68 13.68 14.22 14.22 14.08 14.38C13.94 14.54 13.8 14.56 13.56 14.44C13.32 14.32 12.55 14.07 11.63 13.25C10.91 12.61 10.42 11.82 10.28 11.58C10.14 11.34 10.26 11.21 10.38 11.09C10.49 10.98 10.63 10.8 10.75 10.66C10.87 10.52 10.91 10.42 10.99 10.26C11.07 10.1 11.03 9.96 10.97 9.84C10.91 9.72 10.45 8.58 10.26 8.12C10.07 7.67 9.88 7.73 9.74 7.72C9.6 7.71 9.44 7.71 9.28 7.71L9.11 7.44Z" />
-                                    </Canvas>
-                                </Viewbox>
-                            </Border>
-                        </Grid>
+                        <controls:AppIconControl x:Name="ExpandedNotifIcon"
+                                                 Grid.Column="0"
+                                                 Width="46" Height="46"
+                                                 CornerRadius="12"
+                                                 IconPadding="9"
+                                                 VerticalAlignment="Center"
+                                                 Margin="0,0,16,0" />
 
                         <!-- Notification Content (Title & Message) -->
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -452,23 +416,14 @@
                                        Margin="0,3,0,0" />
                         </StackPanel>
 
-                        <!-- Dismiss Button (Circular 36x36) -->
-                        <Button x:Name="DismissNotifButton"
-                                Grid.Column="2"
-                                Width="36" Height="36"
-                                Padding="0"
-                                Margin="12,0,0,0"
-                                Background="{DynamicResource SubtleHoverBrush}"
-                                BorderThickness="0"
-                                Cursor="Hand"
-                                Click="DismissNotifButton_Click">
-                            <Button.Resources>
-                                <Style TargetType="Border">
-                                    <Setter Property="CornerRadius" Value="18" />
-                                </Style>
-                            </Button.Resources>
-                            <ui:SymbolIcon Symbol="Dismiss24" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        </Button>
+                        <!-- Right: "now" timestamp matching reference screenshots -->
+                        <TextBlock x:Name="NotificationTimeText"
+                                   Grid.Column="2"
+                                   Text="now"
+                                   FontSize="14"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="16,0,4,0" />
                     </Grid>
 
                     <!-- ============================================== -->

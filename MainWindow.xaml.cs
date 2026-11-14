@@ -59,6 +59,7 @@ public partial class MainWindow : Window
         get
         {
             if (_isChargingAlertActive) return CompactChargingWidth;
+            if (_isNotificationAlertActive && _currentNotification != null) return CompactNotificationWidth;
             if (_mediaManager?.CurrentTrack?.HasMedia ?? false) return CompactMediaWidth;
             return CompactDefaultWidth;
         }
@@ -109,7 +110,7 @@ public partial class MainWindow : Window
             _notificationAlertTimer.Tick += (s, e) =>
             {
                 _notificationAlertTimer.Stop();
-                _isNotificationAlertActive = false;
+                _isNotificationAlertActive = _notificationService.HasNotifications;
                 if (_isExpanded && !IslandContainer.IsMouseOver && !_isPinned)
                 {
                     CollapseDock();
@@ -901,6 +902,13 @@ public partial class MainWindow : Window
             CompactNotificationView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Visible;
         }
+        else if (_isNotificationAlertActive && _currentNotification != null)
+        {
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Visible;
+        }
         else if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
         {
             CompactClockView.Visibility = Visibility.Collapsed;
@@ -925,49 +933,13 @@ public partial class MainWindow : Window
 
     private void UpdateNotificationUI(IslandNotification notif)
     {
-        NotificationTitleText.Text = notif.Title;
-        NotificationSubtext.Text = notif.Message;
-        CompactNotifCountText.Text = _notificationService.Count.ToString();
+        NotificationTitleText.Text = notif.DisplayTitle;
+        NotificationSubtext.Text = string.IsNullOrWhiteSpace(notif.Message) ? "Notification" : notif.Message;
+        NotificationTimeText.Text = "now";
+        CompactNotifCountText.Text = Math.Max(1, _notificationService.Count).ToString();
 
-        if (notif.AppLogo != null)
-        {
-            CompactNotifAppImage.Source = notif.AppLogo;
-            CompactNotifImageBorder.Visibility = Visibility.Visible;
-            CompactNotifVectorBadge.Visibility = Visibility.Collapsed;
-
-            ExpandedNotifAppImage.Source = notif.AppLogo;
-            ExpandedNotifImageBorder.Visibility = Visibility.Visible;
-            ExpandedNotifVectorBadge.Visibility = Visibility.Collapsed;
-        }
-        else
-        {
-            CompactNotifImageBorder.Visibility = Visibility.Collapsed;
-            CompactNotifVectorBadge.Visibility = Visibility.Visible;
-
-            ExpandedNotifImageBorder.Visibility = Visibility.Collapsed;
-            ExpandedNotifVectorBadge.Visibility = Visibility.Visible;
-
-            if (notif.IsWhatsApp)
-            {
-                CompactNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(37, 211, 102));
-                ExpandedNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(37, 211, 102));
-            }
-            else if (notif.IsTelegram)
-            {
-                CompactNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(36, 161, 222));
-                ExpandedNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(36, 161, 222));
-            }
-            else if (notif.IsDiscord)
-            {
-                CompactNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(88, 101, 242));
-                ExpandedNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(88, 101, 242));
-            }
-            else
-            {
-                CompactNotifVectorBadge.Background = _themeService.AccentBrush;
-                ExpandedNotifVectorBadge.Background = _themeService.AccentBrush;
-            }
-        }
+        CompactNotifIcon.SetNotification(notif);
+        ExpandedNotifIcon.SetNotification(notif);
     }
 
     private void Start15MinTimer_Click(object sender, RoutedEventArgs e)

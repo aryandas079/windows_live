@@ -1,0 +1,132 @@
+<UserControl x:Class="WindowsLive.Controls.AppIconControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             x:Name="RootIconControl">
+    <Grid>
+        <!-- 1. Instagram: Vibrant multi-stop gradient with camera glyph -->
+        <Border x:Name="IconInstagram" Visibility="Collapsed" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"
+                Padding="{Binding IconPadding, ElementName=RootIconControl}">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,1" EndPoint="1,0">
+                    <GradientStop Color="#FFD600" Offset="0.0" />
+                    <GradientStop Color="#FF543E" Offset="0.35" />
+                    <GradientStop Color="#D800B9" Offset="0.75" />
+                    <GradientStop Color="#7024C4" Offset="1.0" />
+                </LinearGradientBrush>
+            </Border.Background>
+            <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                    <Rectangle Width="18" Height="18" Canvas.Left="3" Canvas.Top="3" RadiusX="5" RadiusY="5" Stroke="White" StrokeThickness="1.8" Fill="Transparent" />
+                    <Ellipse Width="8" Height="8" Canvas.Left="8" Canvas.Top="8" Stroke="White" StrokeThickness="1.8" Fill="Transparent" />
+                    <Ellipse Width="2.2" Height="2.2" Canvas.Left="15.8" Canvas.Top="6" Fill="White" />
+                </Canvas>
+            </Viewbox>
+        </Border>
+
+        <!-- 2. Twitter / X: Pitch black with authentic white X logo -->
+        <Border x:Name="IconTwitterX" Visibility="Collapsed" Background="Transparent" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"
+                Padding="{Binding IconPadding, ElementName=RootIconControl}">
+            <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                    <Path Fill="White" Data="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </Canvas>
+            </Viewbox>
+        </Border>
+
+        <!-- 3. Facebook: Facebook blue #1877F2 with official white 'f' -->
+        <Border x:Name="IconFacebook" Visibility="Collapsed" Background="#1877F2" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"
+                Padding="{Binding IconPadding, ElementName=RootIconControl}">
+            <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                    <Path Fill="White" Data="M14 8.5V7c0-.8.6-1 1-1h2V3h-3c-3.3 0-4 2.4-4 4.5v1H7v3h3v9h4v-9h2.6l.4-3H14z" />
+                </Canvas>
+            </Viewbox>
+        </Border>
+
+        <!-- 4. WhatsApp: WhatsApp green #25D366 with phone receiver -->
+        <Border x:Name="IconWhatsApp" Visibility="Collapsed" Background="#25D366" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"
+                Padding="{Binding IconPadding, ElementName=RootIconControl}">
+            <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                    <Path Fill="White" Data="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19.01L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 14.99 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67M9.11 7.44C8.95 7.44 8.68 7.5 8.46 7.74C8.24 7.97 7.62 8.56 7.62 9.76C7.62 10.96 8.49 12.12 8.61 12.28C8.73 12.44 10.32 14.9 12.8 15.97C15.28 17.03 15.28 16.7 15.72 16.66C16.16 16.62 17.14 16.08 17.34 15.52C17.54 14.96 17.54 14.48 17.48 14.38C17.42 14.28 17.26 14.22 17.02 14.1C16.78 13.98 15.6 13.4 15.38 13.32C15.16 13.24 15 13.2 14.84 13.44C14.68 13.68 14.22 14.22 14.08 14.38C13.94 14.54 13.8 14.56 13.56 14.44C13.32 14.32 12.55 14.07 11.63 13.25C10.91 12.61 10.42 11.82 10.28 11.58C10.14 11.34 10.26 11.21 10.38 11.09C10.49 10.98 10.63 10.8 10.75 10.66C10.87 10.52 10.91 10.42 10.99 10.26C11.07 10.1 11.03 9.96 10.97 9.84C10.91 9.72 10.45 8.58 10.26 8.12C10.07 7.67 9.88 7.73 9.74 7.72C9.6 7.71 9.44 7.71 9.28 7.71L9.11 7.44Z" />
+                </Canvas>
+            </Viewbox>
+        </Border>
+
+        <!-- 5. Telegram: Sky-blue #24A1DE with paper airplane -->
+        <Border x:Name="IconTelegram" Visibility="Collapsed" Background="#24A1DE" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"
+                Padding="{Binding IconPadding, ElementName=RootIconControl}">
+            <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                    <Path Fill="White" Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
+                </Canvas>
+            </Viewbox>
+        </Border>
+
+        <!-- 6. Discord: Blurple #5865F2 with game controller face -->
+        <Border x:Name="IconDiscord" Visibility="Collapsed" Background="#5865F2" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"
+                Padding="{Binding IconPadding, ElementName=RootIconControl}">
+            <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                    <Path Fill="White" Data="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.08-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.01.02.05.03.08.02 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z" />
+                </Canvas>
+            </Viewbox>
+        </Border>
+
+        <!-- 7. YouTube: Brand Red #FF0000 with play triangle -->
+        <Border x:Name="IconYouTube" Visibility="Collapsed" Background="#FF0000" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"
+                Padding="{Binding IconPadding, ElementName=RootIconControl}">
+            <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                    <Path Fill="White" Data="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z" />
+                </Canvas>
+            </Viewbox>
+        </Border>
+
+        <!-- 8. Windows System: Windows blue #0078D4 with 4 squares -->
+        <Border x:Name="IconSystem" Visibility="Collapsed" Background="#0078D4" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"
+                Padding="{Binding IconPadding, ElementName=RootIconControl}">
+            <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                    <Rectangle Width="8.5" Height="8.5" Canvas.Left="2.5" Canvas.Top="2.5" RadiusX="1" RadiusY="1" Fill="White" />
+                    <Rectangle Width="8.5" Height="8.5" Canvas.Left="13" Canvas.Top="2.5" RadiusX="1" RadiusY="1" Fill="White" />
+                    <Rectangle Width="8.5" Height="8.5" Canvas.Left="2.5" Canvas.Top="13" RadiusX="1" RadiusY="1" Fill="White" />
+                    <Rectangle Width="8.5" Height="8.5" Canvas.Left="13" Canvas.Top="13" RadiusX="1" RadiusY="1" Fill="White" />
+                </Canvas>
+            </Viewbox>
+        </Border>
+
+        <!-- 9. Mail / Outlook: Blue #0078D4 with envelope -->
+        <Border x:Name="IconMail" Visibility="Collapsed" Background="#0078D4" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"
+                Padding="{Binding IconPadding, ElementName=RootIconControl}">
+            <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                    <Path Fill="White" Data="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
+                </Canvas>
+            </Viewbox>
+        </Border>
+
+        <!-- 10. Real App Logo Bitmap (Extracted from Windows Toast) -->
+        <Border x:Name="IconCustomImage" Visibility="Collapsed" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}">
+            <Image x:Name="RealAppImage" Stretch="UniformToFill" />
+        </Border>
+
+        <!-- 11. Generic Notification Fallback -->
+        <Border x:Name="IconGeneric" Visibility="Visible" Background="#5B5FC7" ClipToBounds="True"
+                CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"
+                Padding="{Binding IconPadding, ElementName=RootIconControl}">
+            <ui:SymbolIcon Symbol="Alert24" FontSize="14" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+    </Grid>
+</UserControl>

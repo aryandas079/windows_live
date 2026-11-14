@@ -1,0 +1,402 @@
+﻿<Window x:Class="WindowsLive.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:controls="clr-namespace:WindowsLive.Controls"
+        mc:Ignorable="d"
+        Title="Windows Live Dynamic Island"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        Width="640" Height="250"
+        FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
+
+    <Grid x:Name="RootGrid" Background="Transparent" VerticalAlignment="Top" HorizontalAlignment="Center">
+        <!-- Top Edge Hover Zone for Maximized Apps -->
+        <Border x:Name="TopEdgeHotspot"
+                Height="5"
+                Width="380"
+                VerticalAlignment="Top"
+                HorizontalAlignment="Center"
+                Background="#01000000"
+                MouseEnter="TopEdgeHotspot_MouseEnter" />
+
+        <!-- Island Container -->
+        <Grid x:Name="IslandContainer"
+              Width="240" Height="40"
+              VerticalAlignment="Top"
+              HorizontalAlignment="Center"
+              Cursor="Hand">
+
+            <!-- Ambient Glow / Drop Shadow Layer -->
+            <controls:DynamicIslandNotch x:Name="IslandShadow"
+                                         IsNotchMode="True"
+                                         EarFillet="14"
+                                         CornerRadius="18"
+                                         Fill="#000000"
+                                         StrokeThickness="0">
+                <controls:DynamicIslandNotch.Effect>
+                    <DropShadowEffect x:Name="IslandShadowEffect" Color="#000000" BlurRadius="22" Opacity="0.45" ShadowDepth="4" Direction="270" />
+                </controls:DynamicIslandNotch.Effect>
+            </controls:DynamicIslandNotch>
+
+            <!-- Base Dock Surface (Follows System Light/Dark Theme & Border) -->
+            <controls:DynamicIslandNotch x:Name="IslandNotch"
+                                         IsNotchMode="True"
+                                         EarFillet="14"
+                                         CornerRadius="18"
+                                         Fill="{DynamicResource SurfaceDarkBrush}"
+                                         Stroke="{DynamicResource SurfaceBorderBrush}"
+                                         StrokeThickness="1" />
+
+            <!-- COMPACT VIEW (Idle / Collapsed State) -->
+            <Grid x:Name="CompactView"
+                  Height="38"
+                  VerticalAlignment="Top"
+                  Margin="16,0,16,0"
+                  Opacity="1.0">
+
+                <!-- 1. Default Mode: Clock & Date (When no media is playing) -->
+                <Grid x:Name="CompactClockView"
+                      Visibility="Visible"
+                      VerticalAlignment="Center"
+                      HorizontalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Time -->
+                    <TextBlock x:Name="CompactTimeText"
+                               Grid.Column="0"
+                               Text="2:15 PM"
+                               FontSize="13.5"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               VerticalAlignment="Center" />
+
+                    <!-- Subtle Separator Dot -->
+                    <Ellipse Grid.Column="1"
+                             Width="3.5" Height="3.5"
+                             Fill="{DynamicResource TextSecondaryBrush}"
+                             Opacity="0.6"
+                             Margin="9,0,9,0"
+                             VerticalAlignment="Center" />
+
+                    <!-- Date -->
+                    <TextBlock x:Name="CompactDateText"
+                               Grid.Column="2"
+                               Text="Sat, Nov 14"
+                               FontSize="12"
+                               FontWeight="Normal"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- 2. Media Mode: Music Player Pill (When media is active) -->
+                <Grid x:Name="CompactMediaView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Circular Cover Art with System Accent Progress Ring -->
+                    <controls:CircularProgressArt x:Name="CompactProgressArt"
+                                                  Grid.Column="0"
+                                                  Width="30" Height="30"
+                                                  Margin="0,0,10,0"
+                                                  VerticalAlignment="Center"
+                                                  AccentBrush="{DynamicResource AccentColorBrush}" />
+
+                    <!-- Center: Now Playing Ticker & Artist -->
+                    <StackPanel Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Margin="2,0,8,0">
+                        <TextBlock x:Name="CompactTitleText"
+                                   Text="Now Playing"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center" />
+                        <TextBlock x:Name="CompactArtistText"
+                                   Text="Artist Name"
+                                   FontSize="10.5"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Right: Animated 5-Bar System Accent Equalizer -->
+                    <controls:EqualizerControl x:Name="CompactEqualizer"
+                                               Grid.Column="2"
+                                               VerticalAlignment="Center"
+                                               Margin="4,0,2,0"
+                                               AccentBrush="{DynamicResource AccentColorBrush}"
+                                               IsPlaying="True" />
+                </Grid>
+            </Grid>
+
+            <!-- EXPANDED VIEW (Interactive Card State) -->
+            <Grid x:Name="ExpandedView"
+                  Opacity="0.0"
+                  Visibility="Collapsed"
+                  Margin="18,10,18,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" /> <!-- Top Header / Meta -->
+                    <RowDefinition Height="Auto" /> <!-- Main Track Info (Artwork + Details) -->
+                    <RowDefinition Height="Auto" /> <!-- Full-width Scrubber Bar -->
+                    <RowDefinition Height="Auto" /> <!-- Playback Controls & Volume / Battery -->
+                </Grid.RowDefinitions>
+
+                <!-- ROW 0: Top Header Bar -->
+                <Grid Grid.Row="0" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- App Source Pill Badge -->
+                    <Border Grid.Column="0"
+                            Background="{DynamicResource SubtleHoverBrush}"
+                            BorderBrush="{DynamicResource SurfaceBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="8,2,8,2"
+                            VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon Symbol="MusicNote224" FontSize="11" Foreground="{DynamicResource AccentColorBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="ExpandedSourceText" Text="Spotify" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Current Time -->
+                    <TextBlock x:Name="TimeText"
+                               Grid.Column="1"
+                               Text="12:45 PM"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+
+                    <!-- Top Right Quick Actions -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Dock Style Toggle (Notch / Floating Capsule) -->
+                        <Button x:Name="StyleToggleButton"
+                                Style="{StaticResource WinUI3IconButton}"
+                                Padding="4"
+                                ToolTip="Toggle Notch / Floating Capsule mode"
+                                Click="StyleToggleButton_Click">
+                            <ui:SymbolIcon Symbol="ShapeSubtract24" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </Button>
+
+                        <!-- Pin Dock Button -->
+                        <Button x:Name="PinButton"
+                                Style="{StaticResource WinUI3IconButton}"
+                                Padding="4"
+                                Margin="3,0,0,0"
+                                ToolTip="Pin island expanded"
+                                Click="PinButton_Click">
+                            <ui:SymbolIcon x:Name="PinIcon" Symbol="Pin24" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </Button>
+
+                        <!-- Collapse Button -->
+                        <Button x:Name="CollapseButton"
+                                Style="{StaticResource WinUI3IconButton}"
+                                Padding="4"
+                                Margin="3,0,0,0"
+                                ToolTip="Collapse to compact notch"
+                                Click="CollapseButton_Click">
+                            <ui:SymbolIcon Symbol="ChevronUp24" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ROW 1: Album Art + Track Details (Clean Top Layout) -->
+                <Grid Grid.Row="1" Margin="0,0,0,6" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Large Album Artwork Thumbnail -->
+                    <Border Grid.Column="0"
+                            Width="52" Height="52"
+                            CornerRadius="10"
+                            Background="{DynamicResource CardBackgroundBrush}"
+                            BorderBrush="{DynamicResource SurfaceBorderBrush}"
+                            BorderThickness="1"
+                            ClipToBounds="True"
+                            Margin="0,0,14,0"
+                            VerticalAlignment="Center">
+                        <Grid>
+                            <Image x:Name="ExpandedAlbumImage" Stretch="UniformToFill" />
+                            <!-- Fallback Artwork if no image -->
+                            <Ellipse x:Name="ExpandedDefaultOrb" Width="34" Height="34" Fill="{DynamicResource AccentColorBrush}" />
+                            <ui:SymbolIcon x:Name="ExpandedOrbSymbol" Symbol="MusicNote224" FontSize="16" Foreground="{DynamicResource PlayButtonForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Track Title and Artist / Album Info -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <!-- Track Title -->
+                        <TextBlock x:Name="ExpandedTitleText"
+                                   Text="Song Title"
+                                   FontSize="15"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <!-- Artist / Album -->
+                        <TextBlock x:Name="ExpandedArtistText"
+                                   Text="Artist Name • Album Title"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Margin="0,3,0,0" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- ROW 2: Dedicated Full-Width Scrubber Track & Timestamps -->
+                <Grid Grid.Row="2" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="PositionText"
+                               Grid.Column="0"
+                               Text="1:15"
+                               FontSize="10.5"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,10,0" />
+
+                    <Slider x:Name="TrackSlider"
+                            Grid.Column="1"
+                            Style="{StaticResource WinUI3Slider}"
+                            Minimum="0"
+                            Maximum="100"
+                            Value="35"
+                            PreviewMouseDown="TrackSlider_PreviewMouseDown"
+                            PreviewMouseUp="TrackSlider_PreviewMouseUp"
+                            ValueChanged="TrackSlider_ValueChanged" />
+
+                    <TextBlock x:Name="DurationText"
+                               Grid.Column="2"
+                               Text="3:40"
+                               FontSize="10.5"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               Margin="10,0,0,0" />
+                </Grid>
+
+                <!-- ROW 3: Centered WinUI 3 Playback Controls & Balanced Volume / Status -->
+                <Grid Grid.Row="3" Margin="0,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Secondary Controls (Shuffle / Repeat) -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <!-- Shuffle Button -->
+                        <Button x:Name="ShuffleButton"
+                                Style="{StaticResource WinUI3IconButton}"
+                                ToolTip="Shuffle"
+                                Margin="0,0,8,0"
+                                Click="ShuffleButton_Click">
+                            <ui:SymbolIcon Symbol="ArrowShuffle24" FontSize="16" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </Button>
+
+                        <!-- Repeat Track -->
+                        <Button x:Name="RepeatButton"
+                                Style="{StaticResource WinUI3IconButton}"
+                                ToolTip="Repeat"
+                                Click="RepeatButton_Click">
+                            <ui:SymbolIcon Symbol="ArrowRepeatAll24" FontSize="16" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Center: Primary Playback Controls (Prev, Big Play/Pause, Next) -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <!-- Previous Track -->
+                        <Button x:Name="PreviousButton"
+                                Style="{StaticResource WinUI3IconButton}"
+                                ToolTip="Previous Track"
+                                Margin="0,0,12,0"
+                                Click="PreviousButton_Click">
+                            <ui:SymbolIcon Symbol="Previous24" FontSize="18" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        </Button>
+
+                        <!-- Play / Pause Circular Accent Button -->
+                        <Button x:Name="PlayPauseButton"
+                                Style="{StaticResource WinUI3PlayButton}"
+                                ToolTip="Play / Pause"
+                                Margin="0,0,12,0"
+                                Width="38" Height="38"
+                                Click="PlayPauseButton_Click">
+                            <ui:SymbolIcon x:Name="PlayPauseIcon" Symbol="Pause24" FontSize="18" Foreground="{DynamicResource PlayButtonForegroundBrush}" />
+                        </Button>
+
+                        <!-- Next Track -->
+                        <Button x:Name="NextButton"
+                                Style="{StaticResource WinUI3IconButton}"
+                                ToolTip="Next Track"
+                                Click="NextButton_Click">
+                            <ui:SymbolIcon Symbol="Next24" FontSize="18" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Right: Sound Volume Slider & Battery Status Chip -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <!-- Volume Mute / Unmute Button -->
+                        <Button x:Name="VolumeButton"
+                                Style="{StaticResource WinUI3IconButton}"
+                                Padding="4"
+                                ToolTip="Toggle Mute"
+                                Margin="0,0,4,0"
+                                Click="VolumeButton_Click">
+                            <ui:SymbolIcon x:Name="VolumeIcon" Symbol="Speaker224" FontSize="15" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </Button>
+
+                        <!-- Volume Slider -->
+                        <Slider x:Name="VolumeSlider"
+                                Style="{StaticResource WinUI3Slider}"
+                                Width="65"
+                                Minimum="0"
+                                Maximum="100"
+                                Value="75"
+                                Margin="0,0,10,0"
+                                ValueChanged="VolumeSlider_ValueChanged" />
+
+                        <!-- Battery Chip -->
+                        <Border x:Name="BatteryChip"
+                                Background="{DynamicResource SubtleHoverBrush}"
+                                BorderBrush="{DynamicResource SurfaceBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="6,2,6,2"
+                                VerticalAlignment="Center"
+                                ToolTip="Battery Status">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:SymbolIcon x:Name="BatteryIcon" Symbol="BatteryCharge24" FontSize="12" Foreground="{DynamicResource AccentColorBrush}" Margin="0,0,4,0" />
+                                <TextBlock x:Name="BatteryText" Text="79%" FontSize="10.5" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

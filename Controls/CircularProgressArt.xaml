@@ -1,0 +1,49 @@
+<UserControl x:Class="WindowsLive.Controls.CircularProgressArt"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             Width="30" Height="30">
+    <Grid>
+        <!-- Background Track Ring -->
+        <Ellipse Width="26" Height="26"
+                 Stroke="{DynamicResource SubtleHoverBrush}"
+                 StrokeThickness="2"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center" />
+
+        <!-- Progress Arc -->
+        <Path x:Name="ProgressArcPath"
+              Stroke="{Binding AccentBrush, RelativeSource={RelativeSource AncestorType=UserControl}}"
+              StrokeThickness="2.2"
+              StrokeStartLineCap="Round"
+              StrokeEndLineCap="Round"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center" />
+
+        <!-- Disc Container -->
+        <Border Width="20" Height="20"
+                CornerRadius="10"
+                ClipToBounds="True"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
+            <Grid>
+                <!-- Default Glowing Orb -->
+                <Ellipse x:Name="DefaultOrb" Fill="{Binding AccentBrush, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
+                <!-- Album Art Image (if available) -->
+                <Image x:Name="AlbumArtImage"
+                       Stretch="UniformToFill"
+                       Visibility="Collapsed" />
+
+                <!-- Fallback WinUI 3 Fluent Music Note -->
+                <ui:SymbolIcon x:Name="MusicSymbol"
+                               Symbol="MusicNote224"
+                               FontSize="10"
+                               Foreground="{DynamicResource PlayButtonForegroundBrush}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="Visible" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

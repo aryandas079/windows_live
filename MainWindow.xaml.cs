@@ -62,14 +62,19 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _silentRingAlertTimer;
     private readonly DispatcherTimer _dndAlertTimer;
     private readonly FocusAssistWatcherService _focusAssistService;
+    private readonly WindowsClockWatcherService _windowsClockService;
     private bool _lastMuteState = false;
     private bool _muteStateInitialized = false;
+
+    private bool IsAnyTimerActive =>
+        _focusService.IsRunning ||
+        _windowsClockService.HasActiveTimer;
 
     private bool HasActiveContent =>
         _isUnlockAlertActive ||
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
-        _focusService.IsRunning ||
+        IsAnyTimerActive ||
         (_mediaManager?.CurrentTrack?.IsPlaying ?? false) ||
         _isChargingAlertActive ||
         _isNotificationAlertActive;
@@ -83,7 +88,7 @@ public partial class MainWindow : Window
             if (_isDndAlertActive) return CompactDndWidth;
             if (_isChargingAlertActive) return CompactChargingWidth;
             if (_isNotificationAlertActive && _currentNotification != null) return CompactNotificationWidth;
-            if (_focusService.IsRunning) return CompactTimerWidth;
+            if (IsAnyTimerActive) return CompactTimerWidth;
             if (_mediaManager?.CurrentTrack?.IsPlaying ?? false) return CompactMediaWidth;
             return CompactDefaultWidth;
         }
@@ -111,6 +116,7 @@ public partial class MainWindow : Window
             _clipboardService = new ClipboardWatcherService();
             _notificationService = new NotificationWatcherService();
             _focusAssistService = new FocusAssistWatcherService();
+            _windowsClockService = new WindowsClockWatcherService();
 
             _mediaManager.TrackChanged += OnTrackChanged;
             _volumeManager.VolumeChanged += OnVolumeChanged;
@@ -122,6 +128,8 @@ public partial class MainWindow : Window
             _notificationService.NotificationsChanged += OnNotificationsChanged;
             _focusAssistService.FocusAssistChanged += OnFocusAssistChanged;
             _focusAssistService.Start();
+            _windowsClockService.TimerStateChanged += OnWindowsClockTimerChanged;
+            _windowsClockService.Start();
 
             _clockTimer = new DispatcherTimer
             {
@@ -1192,11 +1200,33 @@ public partial class MainWindow : Window
     {
         e.Handled = true;
         _focusService.Stop();
+        _windowsClockService.CancelCurrentTimer();
         if (_isExpanded && _activeCategory == IslandCategory.FocusTimer)
         {
             CollapseDock();
         }
         UpdateCompactViewVisibility();
+    }
+
+    private void OnWindowsClockTimerChanged(WindowsClockTimerInfo? info)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (info != null && info.IsRunning)
+            {
+                int mins = info.RemainingTime.Hours > 0
+                    ? (int)info.RemainingTime.TotalMinutes
+                    : info.RemainingTime.Minutes;
+                CompactLiveTimerCountdownText.Text = $"{mins}:{info.RemainingTime.Seconds:D2}";
+                FocusCountdownText.Text = $"{mins}:{info.RemainingTime.Seconds:D2} remaining";
+
+                CompactTimerPauseBar1.Visibility = Visibility.Visible;
+                CompactTimerPauseBar2.Visibility = Visibility.Visible;
+                CompactTimerPlayTriangle.Visibility = Visibility.Collapsed;
+            }
+
+            UpdateCompactViewVisibility();
+        });
     }
 
     private void OnClipboardTextChanged(string text)
@@ -1467,7 +1497,7 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Visible;
         }
-        else if (_focusService.IsRunning)
+        else if (IsAnyTimerActive)
         {
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;

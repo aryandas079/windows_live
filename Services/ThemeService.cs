@@ -62,7 +62,8 @@ public class ThemeService
         }
         catch { }
 
-        IsDarkTheme = !isLight;
+        // Authentic Dynamic Island is always OLED dark by default
+        IsDarkTheme = true;
         TransparencyEnabled = transparency;
 
         // 2. Fetch system accent color
@@ -101,16 +102,16 @@ public class ThemeService
         // 3. Totally Opaque Surface Brushes (Solid 255 alpha)
         if (IsDarkTheme)
         {
-            // Dark Mode palette (OLED solid dark matching rockstar image)
-            SurfaceDarkBrush = new SolidColorBrush(Color.FromRgb(18, 18, 20));
-            SurfaceBorderBrush = new SolidColorBrush(Color.FromArgb(43, 255, 255, 255));
-            SubtleHoverBrush = new SolidColorBrush(Color.FromArgb(31, 255, 255, 255));
+            // Dark Mode palette (OLED solid dark matching authentic Dynamic Island)
+            SurfaceDarkBrush = new SolidColorBrush(Color.FromRgb(10, 10, 12));
+            SurfaceBorderBrush = new SolidColorBrush(Color.FromArgb(48, 255, 255, 255));
+            SubtleHoverBrush = new SolidColorBrush(Color.FromArgb(38, 255, 255, 255));
             TextPrimaryBrush = new SolidColorBrush(Color.FromRgb(255, 255, 255));
             TextSecondaryBrush = new SolidColorBrush(Color.FromArgb(160, 255, 255, 255));
-            CardBackgroundBrush = new SolidColorBrush(Color.FromRgb(30, 30, 34));
+            CardBackgroundBrush = new SolidColorBrush(Color.FromRgb(24, 24, 28));
             PlayButtonBackgroundBrush = new SolidColorBrush(Colors.White);
-            PlayButtonForegroundBrush = new SolidColorBrush(Color.FromRgb(18, 18, 20));
-            CircleButtonBackgroundBrush = new SolidColorBrush(Color.FromArgb(45, 255, 255, 255));
+            PlayButtonForegroundBrush = new SolidColorBrush(Color.FromRgb(10, 10, 12));
+            CircleButtonBackgroundBrush = new SolidColorBrush(Color.FromArgb(48, 255, 255, 255));
         }
         else
         {

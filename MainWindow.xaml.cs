@@ -33,11 +33,11 @@ public partial class MainWindow : Window
     private bool _isNotchMode = true;
     private bool _isDraggingSlider = false;
 
-    private const double CompactClockWidth = 190.0;
-    private const double CompactMediaWidth = 240.0;
-    private const double CompactHeight = 38.0;
-    private const double ExpandedWidth = 370.0;
-    private const double ExpandedHeight = 68.0;
+    private const double CompactClockWidth = 200.0;
+    private const double CompactMediaWidth = 270.0;
+    private const double CompactHeight = 44.0;
+    private const double ExpandedWidth = 460.0;
+    private const double ExpandedHeight = 86.0;
 
     private double CurrentCompactWidth => (_mediaManager?.CurrentTrack?.HasMedia ?? false) ? CompactMediaWidth : CompactClockWidth;
 

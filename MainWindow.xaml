@@ -13,7 +13,7 @@
         Topmost="True"
         ShowInTaskbar="False"
         ShowActivated="False"
-        Width="640" Height="250"
+        Width="700" Height="260"
         FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
 
     <Grid x:Name="RootGrid" Background="Transparent" VerticalAlignment="Top" HorizontalAlignment="Center">
@@ -141,8 +141,7 @@
             <Grid x:Name="ExpandedContainer"
                   Opacity="0.0"
                   Visibility="Collapsed"
-                  Margin="14,0,14,0"
-                  Height="74"
+                  Margin="22,12,22,14"
                   VerticalAlignment="Center">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
@@ -163,35 +162,35 @@
 
                         <!-- Left: Large Rounded Artwork (Matches Image 1 lime/album square) -->
                         <Border Grid.Column="0"
-                                Width="44" Height="44"
-                                CornerRadius="10"
+                                Width="50" Height="50"
+                                CornerRadius="12"
                                 Background="{DynamicResource CardBackgroundBrush}"
                                 BorderBrush="{DynamicResource SurfaceBorderBrush}"
                                 BorderThickness="1"
                                 ClipToBounds="True"
-                                Margin="0,0,14,0"
+                                Margin="0,0,18,0"
                                 VerticalAlignment="Center">
                             <Grid>
                                 <Rectangle x:Name="ExpandedDefaultOrb" Fill="{DynamicResource AccentColorBrush}" />
                                 <Image x:Name="ExpandedAlbumImage" Stretch="UniformToFill" Visibility="Collapsed" />
-                                <ui:SymbolIcon x:Name="ExpandedOrbSymbol" Symbol="MusicNote224" FontSize="18" Foreground="{DynamicResource PlayButtonForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <ui:SymbolIcon x:Name="ExpandedOrbSymbol" Symbol="MusicNote224" FontSize="20" Foreground="{DynamicResource PlayButtonForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Grid>
                         </Border>
 
-                        <!-- Center: Clean Bold Title & Artist -->
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <!-- Center: Clean Bold Title & Artist with generous spacious margins -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,24,0">
                             <TextBlock x:Name="ExpandedTitleText"
                                        Text="rockstar"
-                                       FontSize="15"
-                                       FontWeight="Bold"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                        TextTrimming="CharacterEllipsis" />
                             <TextBlock x:Name="ExpandedArtistText"
                                        Text="Post Malone"
-                                       FontSize="12"
+                                       FontSize="13"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        TextTrimming="CharacterEllipsis"
-                                       Margin="0,3,0,0" />
+                                       Margin="0,4,0,0" />
                         </StackPanel>
 
                         <!-- Right: Clean Clustered Controls (Prev, Big Circular Play/Pause, Next) -->
@@ -199,29 +198,29 @@
                             <!-- Previous -->
                             <Button x:Name="PreviousButton"
                                     Style="{StaticResource WinUI3CircularSubtleButton}"
-                                    Width="32" Height="32"
+                                    Width="36" Height="36"
                                     ToolTip="Previous"
-                                    Margin="0,0,6,0"
+                                    Margin="0,0,10,0"
                                     Click="PreviousButton_Click">
-                                <ui:SymbolIcon Symbol="Previous24" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <ui:SymbolIcon Symbol="Previous24" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}" />
                             </Button>
 
-                            <!-- Circular Play / Pause Button (Solid white / dark circle matching rockstar Post Malone image) -->
+                            <!-- Circular Play / Pause Button (Large 44x44 Solid White circle) -->
                             <Button x:Name="PlayPauseButton"
                                     Style="{StaticResource WinUI3PlayButton}"
-                                    Width="38" Height="38"
-                                    Margin="0,0,6,0"
+                                    Width="44" Height="44"
+                                    Margin="0,0,10,0"
                                     Click="PlayPauseButton_Click">
-                                <ui:SymbolIcon x:Name="PlayPauseIcon" Symbol="Pause24" FontSize="16" Foreground="{DynamicResource PlayButtonForegroundBrush}" />
+                                <ui:SymbolIcon x:Name="PlayPauseIcon" Symbol="Pause24" FontSize="18" Foreground="{DynamicResource PlayButtonForegroundBrush}" />
                             </Button>
 
                             <!-- Next -->
                             <Button x:Name="NextButton"
                                     Style="{StaticResource WinUI3CircularSubtleButton}"
-                                    Width="32" Height="32"
+                                    Width="36" Height="36"
                                     ToolTip="Next"
                                     Click="NextButton_Click">
-                                <ui:SymbolIcon Symbol="Next24" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <ui:SymbolIcon Symbol="Next24" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}" />
                             </Button>
                         </StackPanel>
                     </Grid>

@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _autoCollapseTimer;
     private readonly DispatcherTimer _chargingAlertTimer;
     private readonly DispatcherTimer _notificationAlertTimer;
+    private readonly DispatcherTimer _unlockAlertTimer;
     private readonly DispatcherTimer _topMostTimer;
 
     private IslandCategory _activeCategory = IslandCategory.MediaPlayback;
@@ -41,15 +42,18 @@ public partial class MainWindow : Window
     private const double CompactMediaWidth = 240.0;
     private const double CompactChargingWidth = 320.0;
     private const double CompactNotificationWidth = 220.0;
+    private const double CompactUnlockWidth = 190.0;
     private const double CompactHeight = 36.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
 
     private bool _isChargingAlertActive = false;
     private bool _isNotificationAlertActive = false;
+    private bool _isUnlockAlertActive = false;
     private IslandNotification? _currentNotification = null;
 
     private bool HasActiveContent =>
+        _isUnlockAlertActive ||
         (_mediaManager?.CurrentTrack?.HasMedia ?? false) ||
         _isChargingAlertActive ||
         _isNotificationAlertActive;
@@ -58,6 +62,7 @@ public partial class MainWindow : Window
     {
         get
         {
+            if (_isUnlockAlertActive) return CompactUnlockWidth;
             if (_isChargingAlertActive) return CompactChargingWidth;
             if (_isNotificationAlertActive && _currentNotification != null) return CompactNotificationWidth;
             if (_mediaManager?.CurrentTrack?.HasMedia ?? false) return CompactMediaWidth;
@@ -163,6 +168,29 @@ public partial class MainWindow : Window
                     CompactChargingView.BeginAnimation(OpacityProperty, fadeOut);
                 }
             };
+
+            _unlockAlertTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(3.0)
+            };
+            _unlockAlertTimer.Tick += (s, e) =>
+            {
+                _unlockAlertTimer.Stop();
+                if (_isUnlockAlertActive)
+                {
+                    _isUnlockAlertActive = false;
+                    var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(180));
+                    fadeOut.Completed += (s2, e2) =>
+                    {
+                        CompactUnlockView.Visibility = Visibility.Collapsed;
+                        UpdateCompactViewVisibility();
+                    };
+                    CompactUnlockView.BeginAnimation(OpacityProperty, fadeOut);
+                }
+            };
+
+            // Listen for Windows device unlock events
+            Microsoft.Win32.SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
 
             // Aggressive Topmost Enforcement: keeps dock stubbornly above all other windows
             _topMostTimer = new DispatcherTimer
@@ -355,6 +383,12 @@ public partial class MainWindow : Window
             HardwareBrightnessText.Text = $"{b}%";
         }
         catch { }
+
+        // Trigger unlock animation on initial launch
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            TriggerUnlockAnimation();
+        }), System.Windows.Threading.DispatcherPriority.Background);
 
         App.Log("MainWindow OnLoaded finished");
     }
@@ -681,6 +715,105 @@ public partial class MainWindow : Window
         ShowChargingAnimation();
     }
 
+    private void SystemEvents_SessionSwitch(object sender, Microsoft.Win32.SessionSwitchEventArgs e)
+    {
+        if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                TriggerUnlockAnimation();
+            });
+        }
+    }
+
+    public void TriggerUnlockAnimation()
+    {
+        _isUnlockAlertActive = true;
+        _unlockAlertTimer.Stop();
+
+        // If currently expanded, collapse into compact notch
+        if (_isExpanded)
+        {
+            _isExpanded = false;
+            ExpandedContainer.Visibility = Visibility.Collapsed;
+            CompactView.Visibility = Visibility.Visible;
+            CompactView.Opacity = 1.0;
+        }
+
+        // Hide other compact views and activate unlock view
+        CompactClockView.Visibility = Visibility.Collapsed;
+        CompactMediaView.Visibility = Visibility.Collapsed;
+        CompactNotificationView.Visibility = Visibility.Collapsed;
+        CompactChargingView.Visibility = Visibility.Collapsed;
+        CompactUnlockView.Opacity = 0.0;
+        CompactUnlockView.Visibility = Visibility.Visible;
+
+        // Reset shackle transforms to closed/locked state
+        LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+        LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+        LockShackleTranslate.Y = 0;
+        LockShackleRotate.Angle = 0;
+
+        // Animate island container width to 190.0 (compact height 36.0)
+        AnimateIsland(CompactUnlockWidth, CompactHeight);
+
+        // Smooth fade-in of the unlock view
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120));
+        CompactUnlockView.BeginAnimation(OpacityProperty, fadeIn);
+
+        // Play subtle slick unlock click sound
+        PlayUnlockSound();
+
+        // Animate shackle popping up and swinging open slickly
+        var liftAnim = new DoubleAnimation
+        {
+            From = 0.0,
+            To = -3.5,
+            Duration = TimeSpan.FromMilliseconds(220),
+            BeginTime = TimeSpan.FromMilliseconds(70),
+            EasingFunction = new BackEase { Amplitude = 0.45, EasingMode = EasingMode.EaseOut }
+        };
+
+        var rotateAnim = new DoubleAnimation
+        {
+            From = 0.0,
+            To = -30.0,
+            Duration = TimeSpan.FromMilliseconds(250),
+            BeginTime = TimeSpan.FromMilliseconds(80),
+            EasingFunction = new BackEase { Amplitude = 0.5, EasingMode = EasingMode.EaseOut }
+        };
+
+        LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, liftAnim);
+        LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, rotateAnim);
+
+        // Stay on screen for 3.0 seconds, then return to normal
+        _unlockAlertTimer.Start();
+    }
+
+    private static void PlayUnlockSound()
+    {
+        try
+        {
+            string navSound = @"C:\Windows\Media\Windows Navigation Start.wav";
+            string unlockSound = @"C:\Windows\Media\Windows Unlock.wav";
+
+            string? soundFile = System.IO.File.Exists(navSound) ? navSound : (System.IO.File.Exists(unlockSound) ? unlockSound : null);
+            if (soundFile != null)
+            {
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        using var player = new System.Media.SoundPlayer(soundFile);
+                        player.Play();
+                    }
+                    catch { }
+                });
+            }
+        }
+        catch { }
+    }
+
     private void OnPowerStatusChanged()
     {
         Dispatcher.Invoke(() =>
@@ -895,11 +1028,20 @@ public partial class MainWindow : Window
 
     private void UpdateCompactViewVisibility()
     {
-        if (_isChargingAlertActive)
+        if (_isUnlockAlertActive)
         {
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Visible;
+        }
+        else if (_isChargingAlertActive)
+        {
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Visible;
         }
         else if (_isNotificationAlertActive && _currentNotification != null)
@@ -907,6 +1049,7 @@ public partial class MainWindow : Window
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Visible;
         }
         else if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
@@ -914,6 +1057,7 @@ public partial class MainWindow : Window
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Visible;
         }
         else
@@ -922,6 +1066,7 @@ public partial class MainWindow : Window
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
         }
 

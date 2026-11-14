@@ -547,9 +547,13 @@ public partial class MainWindow : Window
     {
         _autoCollapseTimer.Stop();
         IslandContainer.Cursor = HasActiveContent ? Cursors.Hand : Cursors.Arrow;
-        if (!_isExpanded && HasActiveContent)
+        if (!_isExpanded)
         {
-            ExpandDock();
+            // Only expand on hover if there is active live content (music playing, active timer, active alert)
+            if (_isNotificationAlertActive || IsAnyTimerActive || (_mediaManager?.CurrentTrack?.IsPlaying ?? false))
+            {
+                ExpandDock();
+            }
         }
     }
 
@@ -584,13 +588,19 @@ public partial class MainWindow : Window
         {
             _activeCategory = IslandCategory.AppNotification;
         }
-        else if (_focusService.IsRunning)
+        else if (IsAnyTimerActive)
         {
             _activeCategory = IslandCategory.FocusTimer;
         }
         else if (_mediaManager?.CurrentTrack?.IsPlaying ?? false)
         {
             _activeCategory = IslandCategory.MediaPlayback;
+        }
+        else
+        {
+            // Do not expand blank placeholder card when no background task is active
+            _isExpanded = false;
+            return;
         }
 
         double targetHeight = (_activeCategory == IslandCategory.AppNotification && (_currentNotification?.IsMessagingApp ?? false))

@@ -34,11 +34,11 @@ public partial class MainWindow : Window
     private bool _isDraggingSlider = false;
     private bool _isHoverRevealed = false;
 
-    private const double CompactClockWidth = 240.0;
-    private const double CompactMediaWidth = 340.0;
-    private const double CompactHeight = 40.0;
-    private const double ExpandedWidth = 540.0;
-    private const double ExpandedHeight = 185.0;
+    private const double CompactClockWidth = 220.0;
+    private const double CompactMediaWidth = 300.0;
+    private const double CompactHeight = 36.0;
+    private const double ExpandedWidth = 440.0;
+    private const double ExpandedHeight = 145.0;
 
     private double CurrentCompactWidth => (_mediaManager?.CurrentTrack?.HasMedia ?? false) ? CompactMediaWidth : CompactClockWidth;
 

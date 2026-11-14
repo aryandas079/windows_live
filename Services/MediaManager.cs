@@ -172,6 +172,17 @@ public class MediaManager
                 thumbnailImage = await LoadThumbnailAsync(props.Thumbnail);
             }
 
+            // If thumbnail was not ready yet, retry once after a brief delay
+            if (thumbnailImage == null && props != null)
+            {
+                await Task.Delay(200);
+                var retryProps = await _currentSession.TryGetMediaPropertiesAsync();
+                if (retryProps?.Thumbnail != null)
+                {
+                    thumbnailImage = await LoadThumbnailAsync(retryProps.Thumbnail);
+                }
+            }
+
             string source = _currentSession.SourceAppUserModelId ?? "Media Player";
             if (source.Contains("Spotify", StringComparison.OrdinalIgnoreCase)) source = "Spotify";
             else if (source.Contains("Chrome", StringComparison.OrdinalIgnoreCase)) source = "Chrome";
@@ -227,18 +238,25 @@ public class MediaManager
     {
         try
         {
-            using var stream = await thumbnailRef.OpenReadAsync();
-            using var netStream = stream.AsStreamForRead();
+            using var ras = await thumbnailRef.OpenReadAsync();
+            if (ras == null || ras.Size == 0) return null;
+
+            using var netStream = ras.AsStreamForRead();
+            using var ms = new MemoryStream();
+            await netStream.CopyToAsync(ms);
+            ms.Position = 0;
+
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.StreamSource = netStream;
+            bitmap.StreamSource = ms;
             bitmap.EndInit();
             bitmap.Freeze();
             return bitmap;
         }
-        catch
+        catch (Exception ex)
         {
+            App.Log($"LoadThumbnailAsync error: {ex.Message}");
             return null;
         }
     }

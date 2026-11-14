@@ -542,10 +542,7 @@ public partial class MainWindow : Window
         {
             if (track.HasMedia)
             {
-                if (_activeCategory != IslandCategory.AppNotification)
-                {
-                    _activeCategory = IslandCategory.MediaPlayback;
-                }
+                _activeCategory = IslandCategory.MediaPlayback;
 
                 CompactEqualizer.IsPlaying = track.IsPlaying;
 
@@ -561,6 +558,8 @@ public partial class MainWindow : Window
 
                     CompactAlbumImage.Source = track.Thumbnail;
                     CompactAlbumImage.Visibility = Visibility.Visible;
+                    CompactDefaultOrb.Visibility = Visibility.Collapsed;
+                    CompactOrbSymbol.Visibility = Visibility.Collapsed;
                 }
                 else
                 {
@@ -571,6 +570,8 @@ public partial class MainWindow : Window
 
                     CompactAlbumImage.Source = null;
                     CompactAlbumImage.Visibility = Visibility.Collapsed;
+                    CompactDefaultOrb.Visibility = Visibility.Visible;
+                    CompactOrbSymbol.Visibility = Visibility.Visible;
                 }
 
                 PlayPauseIcon.Symbol = track.IsPlaying ? SymbolRegular.Pause24 : SymbolRegular.Play24;
@@ -828,6 +829,15 @@ public partial class MainWindow : Window
 
     private void OnNotificationReceived(IslandNotification notif)
     {
+        // Don't hijack media playback when media apps send notifications for track changes
+        if (notif.AppName.Contains("Music", StringComparison.OrdinalIgnoreCase) ||
+            notif.AppName.Contains("Spotify", StringComparison.OrdinalIgnoreCase) ||
+            notif.AppName.Contains("Media", StringComparison.OrdinalIgnoreCase) ||
+            (_mediaManager?.CurrentTrack?.HasMedia ?? false))
+        {
+            return;
+        }
+
         Dispatcher.Invoke(() =>
         {
             _currentNotification = notif;

@@ -259,38 +259,41 @@
                                Margin="0,0,8,0" />
                 </Grid>
 
-                <!-- 5. Device Unlock Mode: Matches Image (Animated Opening Padlock on Left) -->
+                <!-- 5. Device Unlock Mode: Matches iOS Dynamic Island (Full Opening Animation from Zero) -->
                 <Grid x:Name="CompactUnlockView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="14,0,14,0">
+                      Margin="16,0,16,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Slick Animated Padlock (Matches User Uploaded Reference) -->
-                    <Viewbox Grid.Column="0" Width="18" Height="20" HorizontalAlignment="Left" VerticalAlignment="Center">
-                        <Canvas Width="22" Height="24">
-                            <!-- Shackle (Arch): Smoothly transitions from Image 1 (Locked) to Image 2 (Unlocked) -->
-                            <Canvas x:Name="LockShackleContainer" Width="16" Height="14" Canvas.Left="3" Canvas.Top="1">
+                    <!-- Left: Slick Premium Animated Padlock -->
+                    <Viewbox Grid.Column="0" Width="18" Height="22" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Canvas Width="24" Height="26">
+                            <!-- Padlock Body: Smooth curved metal body -->
+                            <Rectangle Canvas.Left="3.5" Canvas.Top="10.5"
+                                       Width="17" Height="13.5"
+                                       RadiusX="3.8" RadiusY="3.8"
+                                       Fill="White" />
+
+                            <!-- Shackle (Arch): Pivots and unlatches cleanly out of the body -->
+                            <!-- Anchor pivot at the left leg base (X=7.5, Y=11.5) so it twists/swings open gracefully -->
+                            <Canvas x:Name="LockShackleContainer" Width="24" Height="26" Canvas.Left="0" Canvas.Top="0"
+                                    RenderTransformOrigin="0.3125,0.4423">
                                 <Canvas.RenderTransform>
                                     <TransformGroup>
                                         <TranslateTransform x:Name="LockShackleTranslate" X="0" Y="0" />
+                                        <RotateTransform x:Name="LockShackleRotate" Angle="0" />
                                     </TransformGroup>
                                 </Canvas.RenderTransform>
                                 <Path Stroke="White"
-                                      StrokeThickness="2.2"
+                                      StrokeThickness="2.6"
                                       StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round"
-                                      Data="M 4.5,13.0 V 5.2 C 4.5,2.6 6.3,1.2 8.0,1.2 C 9.7,1.2 11.5,2.6 11.5,5.2 V 11.0" />
+                                      Data="M 7.5,12.5 V 6.8 C 7.5,3.6 9.4,1.8 12.0,1.8 C 14.6,1.8 16.5,3.6 16.5,6.8 V 12.5" />
                             </Canvas>
-
-                            <!-- Padlock Body -->
-                            <Rectangle Canvas.Left="3" Canvas.Top="9.0"
-                                       Width="14" Height="11.5"
-                                       RadiusX="3.2" RadiusY="3.2"
-                                       Fill="White" />
                         </Canvas>
                     </Viewbox>
 

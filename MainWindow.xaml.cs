@@ -795,42 +795,52 @@ public partial class MainWindow : Window
         // Reset shackle transforms to closed/locked state (Image 1)
         LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, null);
         LockShackleTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+        LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, null);
         LockShackleTranslate.X = 0;
         LockShackleTranslate.Y = 0;
+        LockShackleRotate.Angle = 0;
 
         // Animate island container width to 190.0 (compact height 36.0)
         AnimateIsland(CompactUnlockWidth, CompactHeight);
 
-        // Smooth fade-in of the unlock view
-        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120));
+        // Smooth fade-in of the unlock view in fully locked state
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
         CompactUnlockView.BeginAnimation(OpacityProperty, fadeIn);
 
-        // Play crisp mechanical unlock click sound strictly through device speakers
-        PlayUnlockSound();
-
-        // Smooth transition from Image 1 (Locked) to Image 2 (Unlocked):
-        // 1. Shackle lifts up out of the body
+        // 1. Shackle lifts straight up out of the padlock body (unlatching from zero)
         var liftAnim = new DoubleAnimation
         {
             From = 0.0,
-            To = -3.5,
-            Duration = TimeSpan.FromMilliseconds(260),
-            BeginTime = TimeSpan.FromMilliseconds(50),
-            EasingFunction = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut }
+            To = -4.0,
+            Duration = TimeSpan.FromMilliseconds(240),
+            BeginTime = TimeSpan.FromMilliseconds(220),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
 
-        // 2. Shackle shifts outward to the right into the exact Image 2 position
-        var shiftAnim = new DoubleAnimation
+        // 2. Shackle swings/rotates cleanly outward to the right into the open unlocked position (Image 2)
+        var rotateAnim = new DoubleAnimation
         {
             From = 0.0,
-            To = 4.5,
-            Duration = TimeSpan.FromMilliseconds(280),
-            BeginTime = TimeSpan.FromMilliseconds(50),
-            EasingFunction = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut }
+            To = 38.0,
+            Duration = TimeSpan.FromMilliseconds(320),
+            BeginTime = TimeSpan.FromMilliseconds(320),
+            EasingFunction = new BackEase { Amplitude = 0.45, EasingMode = EasingMode.EaseOut }
         };
 
+        // 3. Play crisp mechanical unlock click sound strictly through device speakers synchronized with the shackle pop
+        var soundTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(220)
+        };
+        soundTimer.Tick += (s, e) =>
+        {
+            soundTimer.Stop();
+            PlayUnlockSound();
+        };
+        soundTimer.Start();
+
         LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, liftAnim);
-        LockShackleTranslate.BeginAnimation(TranslateTransform.XProperty, shiftAnim);
+        LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, rotateAnim);
 
         // Stay on screen for 3.0 seconds, then return to normal
         _unlockAlertTimer.Start();

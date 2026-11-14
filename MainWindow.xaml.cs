@@ -24,9 +24,11 @@ public partial class MainWindow : Window
     private readonly AppStateTracker _appStateTracker;
     private readonly FocusTimerService _focusService;
     private readonly ClipboardWatcherService _clipboardService;
+    private readonly NotificationWatcherService _notificationService;
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _autoCollapseTimer;
     private readonly DispatcherTimer _chargingAlertTimer;
+    private readonly DispatcherTimer _notificationAlertTimer;
     private readonly DispatcherTimer _topMostTimer;
 
     private IslandCategory _activeCategory = IslandCategory.MediaPlayback;
@@ -39,15 +41,20 @@ public partial class MainWindow : Window
     private const double CompactClockChargingWidth = 255.0;
     private const double CompactMediaWidth = 270.0;
     private const double CompactChargingWidth = 320.0;
+    private const double CompactNotificationWidth = 220.0;
     private const double CompactHeight = 44.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
 
     private bool _isChargingAlertActive = false;
+    private bool _isNotificationAlertActive = false;
+    private IslandNotification? _currentNotification = null;
 
     private bool HasActiveContent =>
         (_mediaManager?.CurrentTrack?.HasMedia ?? false) ||
         _isChargingAlertActive ||
+        _isNotificationAlertActive ||
+        _notificationService.HasNotifications ||
         (_focusService?.IsRunning ?? false);
 
     private double CurrentCompactWidth
@@ -55,6 +62,7 @@ public partial class MainWindow : Window
         get
         {
             if (_isChargingAlertActive) return CompactChargingWidth;
+            if (_notificationService.HasNotifications) return CompactNotificationWidth;
             if (_mediaManager?.CurrentTrack?.HasMedia ?? false) return CompactMediaWidth;
             return (_powerService.IsCharging && _powerService.HasBattery) ? CompactClockChargingWidth : CompactClockWidth;
         }
@@ -80,6 +88,7 @@ public partial class MainWindow : Window
             _powerService = new PowerManagerService();
             _focusService = new FocusTimerService();
             _clipboardService = new ClipboardWatcherService();
+            _notificationService = new NotificationWatcherService();
 
             _mediaManager.TrackChanged += OnTrackChanged;
             _volumeManager.VolumeChanged += OnVolumeChanged;
@@ -87,6 +96,8 @@ public partial class MainWindow : Window
             _powerService.ChargingConnected += OnChargingConnected;
             _focusService.Tick += OnFocusTimerTick;
             _clipboardService.ClipboardTextChanged += OnClipboardTextChanged;
+            _notificationService.NotificationReceived += OnNotificationReceived;
+            _notificationService.NotificationsChanged += OnNotificationsChanged;
 
             _clockTimer = new DispatcherTimer
             {
@@ -94,6 +105,24 @@ public partial class MainWindow : Window
             };
             _clockTimer.Tick += (s, e) => UpdateClock();
             _clockTimer.Start();
+
+            _notificationAlertTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(5.0)
+            };
+            _notificationAlertTimer.Tick += (s, e) =>
+            {
+                _notificationAlertTimer.Stop();
+                _isNotificationAlertActive = false;
+                if (_isExpanded && !IslandContainer.IsMouseOver && !_isPinned)
+                {
+                    CollapseDock();
+                }
+                else
+                {
+                    UpdateCompactViewVisibility();
+                }
+            };
 
             _autoCollapseTimer = new DispatcherTimer
             {
@@ -127,23 +156,7 @@ public partial class MainWindow : Window
                     fadeOut.Completed += (s2, e2) =>
                     {
                         CompactChargingView.Visibility = Visibility.Collapsed;
-
-                        if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
-                        {
-                            CompactMediaView.Visibility = Visibility.Visible;
-                        }
-                        else
-                        {
-                            CompactClockView.Visibility = Visibility.Visible;
-                        }
-
-                        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(150));
-                        if (CompactMediaView.Visibility == Visibility.Visible)
-                            CompactMediaView.BeginAnimation(OpacityProperty, fadeIn);
-                        else
-                            CompactClockView.BeginAnimation(OpacityProperty, fadeIn);
-
-                        AnimateIsland(CurrentCompactWidth, CompactHeight);
+                        UpdateCompactViewVisibility();
                     };
                     CompactChargingView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -330,6 +343,7 @@ public partial class MainWindow : Window
         IslandContainer.Height = CompactHeight;
         _volumeManager.PollVolumeState(forceNotify: true);
         OnTrackChanged(_mediaManager.CurrentTrack);
+        _ = _notificationService.StartAsync();
 
         // Initialize Brightness level
         try
@@ -434,6 +448,19 @@ public partial class MainWindow : Window
         if (_isExpanded || !HasActiveContent) return;
         _isExpanded = true;
 
+        if (_notificationService.HasNotifications && (_isNotificationAlertActive || _activeCategory == IslandCategory.AppNotification || !(_mediaManager?.CurrentTrack?.HasMedia ?? false)))
+        {
+            _activeCategory = IslandCategory.AppNotification;
+        }
+        else if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
+        {
+            _activeCategory = IslandCategory.MediaPlayback;
+        }
+        else if (_focusService.IsRunning)
+        {
+            _activeCategory = IslandCategory.FocusTimer;
+        }
+
         AnimateIsland(ExpandedWidth, ExpandedHeight);
 
         var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(100));
@@ -465,6 +492,7 @@ public partial class MainWindow : Window
         {
             ExpandedContainer.Visibility = Visibility.Collapsed;
             CompactView.Visibility = Visibility.Visible;
+            UpdateCompactViewVisibility();
             var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120));
             CompactView.BeginAnimation(OpacityProperty, fadeIn);
         };
@@ -518,13 +546,9 @@ public partial class MainWindow : Window
         {
             if (track.HasMedia)
             {
-                // Dynamic trigger: active media sets default expanded view to media playback
-                _activeCategory = IslandCategory.MediaPlayback;
-
-                if (!_isChargingAlertActive)
+                if (_activeCategory != IslandCategory.AppNotification)
                 {
-                    CompactClockView.Visibility = Visibility.Collapsed;
-                    CompactMediaView.Visibility = Visibility.Visible;
+                    _activeCategory = IslandCategory.MediaPlayback;
                 }
 
                 CompactEqualizer.IsPlaying = track.IsPlaying;
@@ -555,22 +579,13 @@ public partial class MainWindow : Window
 
                 PlayPauseIcon.Symbol = track.IsPlaying ? SymbolRegular.Pause24 : SymbolRegular.Play24;
 
-                if (!_isExpanded && Math.Abs(IslandContainer.Width - CompactMediaWidth) > 1.0)
-                {
-                    AnimateIsland(CompactMediaWidth, CompactHeight);
-                }
+                UpdateCompactViewVisibility();
             }
             else
             {
-                if (_isExpanded)
+                if (_isExpanded && _activeCategory == IslandCategory.MediaPlayback)
                 {
                     CollapseDock();
-                }
-
-                if (!_isChargingAlertActive)
-                {
-                    CompactMediaView.Visibility = Visibility.Collapsed;
-                    CompactClockView.Visibility = Visibility.Visible;
                 }
 
                 ExpandedTitleText.Text = "No Media Playing";
@@ -582,10 +597,7 @@ public partial class MainWindow : Window
                 PlayPauseIcon.Symbol = SymbolRegular.Play24;
                 CompactEqualizer.IsPlaying = false;
 
-                if (!_isExpanded && Math.Abs(IslandContainer.Width - CurrentCompactWidth) > 1.0)
-                {
-                    AnimateIsland(CurrentCompactWidth, CompactHeight);
-                }
+                UpdateCompactViewVisibility();
             }
 
             UpdateControlThemeColors();
@@ -800,6 +812,155 @@ public partial class MainWindow : Window
     {
         _focusService.Start(25);
         SwitchCategory(IslandCategory.FocusTimer);
+    }
+
+    private void DismissNotifButton_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_currentNotification != null)
+        {
+            _notificationService.Dismiss(_currentNotification.Id);
+        }
+    }
+
+    private void CompactNotificationView_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _activeCategory = IslandCategory.AppNotification;
+        ExpandDock();
+    }
+
+    private void OnNotificationReceived(IslandNotification notif)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _currentNotification = notif;
+            _isNotificationAlertActive = true;
+            UpdateNotificationUI(notif);
+            _activeCategory = IslandCategory.AppNotification;
+
+            // Expand to show notification banner (like iOS dynamic island)
+            ExpandDock();
+
+            _notificationAlertTimer.Stop();
+            _notificationAlertTimer.Start();
+        });
+    }
+
+    private void OnNotificationsChanged()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _currentNotification = _notificationService.LatestNotification;
+
+            if (_notificationService.HasNotifications)
+            {
+                if (_currentNotification != null)
+                {
+                    UpdateNotificationUI(_currentNotification);
+                }
+            }
+            else
+            {
+                _isNotificationAlertActive = false;
+                _notificationAlertTimer.Stop();
+
+                if (_isExpanded && _activeCategory == IslandCategory.AppNotification)
+                {
+                    CollapseDock();
+                }
+            }
+
+            UpdateCompactViewVisibility();
+        });
+    }
+
+    private void UpdateCompactViewVisibility()
+    {
+        if (_isChargingAlertActive)
+        {
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Visible;
+        }
+        else if (_notificationService.HasNotifications)
+        {
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Visible;
+            if (_currentNotification != null)
+            {
+                UpdateNotificationUI(_currentNotification);
+            }
+        }
+        else if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
+        {
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactClockView.Visibility = Visibility.Visible;
+        }
+
+        if (!_isExpanded)
+        {
+            AnimateIsland(CurrentCompactWidth, CompactHeight);
+        }
+    }
+
+    private void UpdateNotificationUI(IslandNotification notif)
+    {
+        NotificationTitleText.Text = notif.Title;
+        NotificationSubtext.Text = notif.Message;
+        CompactNotifCountText.Text = _notificationService.Count.ToString();
+
+        if (notif.AppLogo != null)
+        {
+            CompactNotifAppImage.Source = notif.AppLogo;
+            CompactNotifImageBorder.Visibility = Visibility.Visible;
+            CompactNotifVectorBadge.Visibility = Visibility.Collapsed;
+
+            ExpandedNotifAppImage.Source = notif.AppLogo;
+            ExpandedNotifImageBorder.Visibility = Visibility.Visible;
+            ExpandedNotifVectorBadge.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            CompactNotifImageBorder.Visibility = Visibility.Collapsed;
+            CompactNotifVectorBadge.Visibility = Visibility.Visible;
+
+            ExpandedNotifImageBorder.Visibility = Visibility.Collapsed;
+            ExpandedNotifVectorBadge.Visibility = Visibility.Visible;
+
+            if (notif.IsWhatsApp)
+            {
+                CompactNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(37, 211, 102));
+                ExpandedNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(37, 211, 102));
+            }
+            else if (notif.IsTelegram)
+            {
+                CompactNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(36, 161, 222));
+                ExpandedNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(36, 161, 222));
+            }
+            else if (notif.IsDiscord)
+            {
+                CompactNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(88, 101, 242));
+                ExpandedNotifVectorBadge.Background = new SolidColorBrush(Color.FromRgb(88, 101, 242));
+            }
+            else
+            {
+                CompactNotifVectorBadge.Background = _themeService.AccentBrush;
+                ExpandedNotifVectorBadge.Background = _themeService.AccentBrush;
+            }
+        }
     }
 
     private void Start15MinTimer_Click(object sender, RoutedEventArgs e)

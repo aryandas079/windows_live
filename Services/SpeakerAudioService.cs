@@ -175,48 +175,63 @@ public static class SpeakerAudioService
                     cbSize = 0
                 };
 
-                using var doneEvent = new ManualResetEvent(false);
-                IntPtr hWaveOut;
-                int openResult = waveOutOpen(out hWaveOut, deviceIndex, ref wfx, doneEvent.SafeWaitHandle.DangerousGetHandle(), IntPtr.Zero, CALLBACK_EVENT);
+                IntPtr hWaveOut = IntPtr.Zero;
+                int openResult = waveOutOpen(out hWaveOut, deviceIndex, ref wfx, IntPtr.Zero, IntPtr.Zero, 0);
 
                 if (openResult != MMSYSERR_NOERROR)
                 {
                     // Fallback to default wave mapper
-                    openResult = waveOutOpen(out hWaveOut, -1, ref wfx, doneEvent.SafeWaitHandle.DangerousGetHandle(), IntPtr.Zero, CALLBACK_EVENT);
+                    openResult = waveOutOpen(out hWaveOut, -1, ref wfx, IntPtr.Zero, IntPtr.Zero, 0);
                 }
 
-                if (openResult != MMSYSERR_NOERROR) return;
+                if (openResult != MMSYSERR_NOERROR || hWaveOut == IntPtr.Zero)
+                {
+                    // Fallback safely to SoundPlayer
+                    using var player = new System.Media.SoundPlayer(wavFilePath);
+                    player.Play();
+                    return;
+                }
 
-                GCHandle pcmHandle = GCHandle.Alloc(wavBytes, GCHandleType.Pinned);
+                byte[] pcmData = new byte[pcmLength];
+                Buffer.BlockCopy(wavBytes, pcmStart, pcmData, 0, pcmLength);
+
+                IntPtr pData = Marshal.AllocHGlobal(pcmLength);
+                Marshal.Copy(pcmData, 0, pData, pcmLength);
+
+                var header = new WAVEHDR
+                {
+                    lpData = pData,
+                    dwBufferLength = pcmLength,
+                    dwFlags = 0,
+                    dwLoops = 0
+                };
+
                 try
                 {
-                    IntPtr pData = pcmHandle.AddrOfPinnedObject() + pcmStart;
-                    var header = new WAVEHDR
-                    {
-                        lpData = pData,
-                        dwBufferLength = pcmLength,
-                        dwFlags = 0,
-                        dwLoops = 0
-                    };
-
                     waveOutPrepareHeader(hWaveOut, ref header, Marshal.SizeOf(typeof(WAVEHDR)));
                     waveOutWrite(hWaveOut, ref header, Marshal.SizeOf(typeof(WAVEHDR)));
 
                     // Wait for the short audio buffer to finish playing
-                    int timeoutMs = (int)((pcmLength / (double)wfx.nAvgBytesPerSec) * 1000.0) + 150;
-                    doneEvent.WaitOne(timeoutMs);
+                    int timeoutMs = (int)((pcmLength / (double)wfx.nAvgBytesPerSec) * 1000.0) + 120;
+                    Thread.Sleep(timeoutMs);
 
                     waveOutUnprepareHeader(hWaveOut, ref header, Marshal.SizeOf(typeof(WAVEHDR)));
                 }
                 finally
                 {
-                    pcmHandle.Free();
+                    Marshal.FreeHGlobal(pData);
                     waveOutClose(hWaveOut);
                 }
             }
             catch (Exception ex)
             {
                 App.Log($"SpeakerAudioService PlayUnlockSoundOnSpeakers error: {ex.Message}");
+                try
+                {
+                    using var player = new System.Media.SoundPlayer(wavFilePath);
+                    player.Play();
+                }
+                catch { }
             }
         });
     }

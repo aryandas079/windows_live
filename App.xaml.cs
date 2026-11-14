@@ -42,8 +42,16 @@ public partial class App : Application
                 {
                     if (p.Id != currentPid)
                     {
-                        reallyRunning = true;
-                        break;
+                        try
+                        {
+                            // A zombie/dead process has no threads
+                            if (p.Threads.Count > 0 && !p.HasExited)
+                            {
+                                reallyRunning = true;
+                                break;
+                            }
+                        }
+                        catch { }
                     }
                 }
 
@@ -55,7 +63,7 @@ public partial class App : Application
                 }
                 else
                 {
-                    Log("Stale mutex detected from killed process; continuing.");
+                    Log("Stale mutex or zombie process detected; continuing startup.");
                 }
             }
         }

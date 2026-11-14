@@ -73,6 +73,10 @@ public partial class MainWindow : Window
         _focusService.IsRunning ||
         _windowsClockService.HasActiveTimer;
 
+    // A song stays active in the dock while playing OR paused until the media app or browser tab is closed (HasMedia becomes false)
+    private bool IsMusicActive =>
+        _mediaManager?.CurrentTrack?.HasMedia ?? false;
+
     private bool IsMusicPlaying =>
         _mediaManager?.CurrentTrack?.IsPlaying ?? false;
 
@@ -84,14 +88,14 @@ public partial class MainWindow : Window
         !_isChargingAlertActive &&
         !_isNotificationAlertActive &&
         IsAnyTimerActive &&
-        IsMusicPlaying;
+        IsMusicActive;
 
     private bool HasActiveContent =>
         _isUnlockAlertActive ||
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
         IsAnyTimerActive ||
-        IsMusicPlaying ||
+        IsMusicActive ||
         _isChargingAlertActive ||
         _isNotificationAlertActive;
 
@@ -104,9 +108,9 @@ public partial class MainWindow : Window
             if (_isDndAlertActive) return CompactDndWidth;
             if (_isChargingAlertActive) return CompactChargingWidth;
             if (_isNotificationAlertActive && _currentNotification != null) return CompactNotificationWidth;
-            if (IsAnyTimerActive && IsMusicPlaying) return CompactSplitLeadingWidth;
+            if (IsAnyTimerActive && IsMusicActive) return CompactSplitLeadingWidth;
             if (IsAnyTimerActive) return CompactTimerWidth;
-            if (IsMusicPlaying) return CompactMediaWidth;
+            if (IsMusicActive) return CompactMediaWidth;
             return CompactDefaultWidth;
         }
     }
@@ -181,7 +185,7 @@ public partial class MainWindow : Window
                 if (_activeCategory == IslandCategory.AppNotification)
                 {
                     if (IsAnyTimerActive) _activeCategory = IslandCategory.FocusTimer;
-                    else if (_mediaManager?.CurrentTrack?.IsPlaying ?? false) _activeCategory = IslandCategory.MediaPlayback;
+                    else if (IsMusicActive) _activeCategory = IslandCategory.MediaPlayback;
                     else _activeCategory = IslandCategory.MediaPlayback;
                 }
 
@@ -586,9 +590,9 @@ public partial class MainWindow : Window
         IslandContainer.Cursor = HasActiveContent ? Cursors.Hand : Cursors.Arrow;
         if (!_isExpanded)
         {
-            // Only expand on hover if there is live content to interact with (active timer or music playing)
+            // Only expand on hover if there is live content to interact with (active timer or music active/paused)
             // Notifications only show once on arrival and NEVER re-open on hover after disappearing
-            if (IsAnyTimerActive || (_mediaManager?.CurrentTrack?.IsPlaying ?? false))
+            if (IsAnyTimerActive || IsMusicActive)
             {
                 ExpandDock();
             }
@@ -639,7 +643,7 @@ public partial class MainWindow : Window
         {
             _activeCategory = IslandCategory.FocusTimer;
         }
-        else if (IsMusicPlaying)
+        else if (IsMusicActive)
         {
             _activeCategory = IslandCategory.MediaPlayback;
         }
@@ -1671,7 +1675,7 @@ public partial class MainWindow : Window
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Visible;
         }
-        else if (IsMusicPlaying)
+        else if (IsMusicActive)
         {
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;

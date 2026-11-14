@@ -26,6 +26,8 @@ public partial class MainWindow : Window
     private readonly ClipboardWatcherService _clipboardService;
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _autoCollapseTimer;
+    private readonly DispatcherTimer _chargingAlertTimer;
+    private readonly DispatcherTimer _topMostTimer;
 
     private IslandCategory _activeCategory = IslandCategory.MediaPlayback;
     private bool _isExpanded = false;
@@ -65,6 +67,7 @@ public partial class MainWindow : Window
             _mediaManager.TrackChanged += OnTrackChanged;
             _volumeManager.VolumeChanged += OnVolumeChanged;
             _powerService.PowerStatusChanged += OnPowerStatusChanged;
+            _powerService.ChargingConnected += OnChargingConnected;
             _focusService.Tick += OnFocusTimerTick;
             _clipboardService.ClipboardTextChanged += OnClipboardTextChanged;
 
@@ -89,6 +92,48 @@ public partial class MainWindow : Window
                     {
                         HideDockSmooth();
                     }
+                }
+            };
+
+            _chargingAlertTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(4.5)
+            };
+            _chargingAlertTimer.Tick += (s, e) =>
+            {
+                _chargingAlertTimer.Stop();
+                if (!_isPinned && !IslandContainer.IsMouseOver && _activeCategory == IslandCategory.ChargingAnimation)
+                {
+                    if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
+                    {
+                        _activeCategory = IslandCategory.MediaPlayback;
+                        ShowActiveCategoryView();
+                    }
+                    CollapseDock();
+                }
+            };
+
+            // Aggressive Topmost Enforcement: keeps dock stubbornly above all other windows
+            _topMostTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(800)
+            };
+            _topMostTimer.Tick += (s, e) =>
+            {
+                if (_appStateTracker.CurrentState != ForegroundAppState.Maximized &&
+                    _appStateTracker.CurrentState != ForegroundAppState.FullScreen)
+                {
+                    WindowHelper.EnsureTopMost(this);
+                }
+            };
+            _topMostTimer.Start();
+
+            Deactivated += (s, e) =>
+            {
+                if (_appStateTracker.CurrentState != ForegroundAppState.Maximized &&
+                    _appStateTracker.CurrentState != ForegroundAppState.FullScreen)
+                {
+                    WindowHelper.EnsureTopMost(this);
                 }
             };
 
@@ -262,6 +307,21 @@ public partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (msg == 0x0046) // WM_WINDOWPOSCHANGING: keep topmost unconditionally unless maximized/fullscreen
+        {
+            if (_appStateTracker.CurrentState != ForegroundAppState.Maximized &&
+                _appStateTracker.CurrentState != ForegroundAppState.FullScreen)
+            {
+                try
+                {
+                    var wp = System.Runtime.InteropServices.Marshal.PtrToStructure<WindowHelper.WINDOWPOS>(lParam);
+                    wp.hwndInsertAfter = (IntPtr)(-1); // HWND_TOPMOST
+                    System.Runtime.InteropServices.Marshal.StructureToPtr(wp, lParam, false);
+                }
+                catch { }
+            }
+        }
+
         if (msg == WindowHelper.WM_NCHITTEST)
         {
             int x = (short)(lParam.ToInt64() & 0xFFFF);
@@ -356,6 +416,11 @@ public partial class MainWindow : Window
 
         AnimateIsland(CurrentCompactWidth, CompactHeight);
 
+        // Restore shadow effect in case charging green pulse was active
+        IslandShadowEffect.Color = _themeService.IsDarkTheme ? Colors.Black : Color.FromArgb(255, 60, 60, 70);
+        IslandShadowEffect.Opacity = _themeService.IsDarkTheme ? 0.55 : 0.25;
+        IslandShadowEffect.BlurRadius = _themeService.IsDarkTheme ? 22 : 18;
+
         var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(100));
         fadeOut.Completed += (s, e) =>
         {
@@ -398,6 +463,7 @@ public partial class MainWindow : Window
     private void ShowActiveCategoryView()
     {
         ViewMediaPlayback.Visibility = _activeCategory == IslandCategory.MediaPlayback ? Visibility.Visible : Visibility.Collapsed;
+        ViewChargingAlert.Visibility = _activeCategory == IslandCategory.ChargingAnimation ? Visibility.Visible : Visibility.Collapsed;
         ViewDeviceBattery.Visibility = _activeCategory == IslandCategory.DeviceBattery ? Visibility.Visible : Visibility.Collapsed;
         ViewAppNotification.Visibility = _activeCategory == IslandCategory.AppNotification ? Visibility.Visible : Visibility.Collapsed;
         ViewFocusTimer.Visibility = _activeCategory == IslandCategory.FocusTimer ? Visibility.Visible : Visibility.Collapsed;
@@ -487,13 +553,86 @@ public partial class MainWindow : Window
         });
     }
 
+    private void OnChargingConnected()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            ShowChargingAnimation();
+        });
+    }
+
+    public void ShowChargingAnimation()
+    {
+        _activeCategory = IslandCategory.ChargingAnimation;
+        ShowActiveCategoryView();
+
+        ChargingSubtextPercent.Text = $"{_powerService.BatteryPercent}%";
+        ChargingBadgePercentText.Text = $"{_powerService.BatteryPercent}%";
+        double fillWidth = Math.Max(4.0, (_powerService.BatteryPercent / 100.0) * 26.0);
+        ChargingBatteryFill.Width = fillWidth;
+
+        // Vivid neon emerald glow on the notch
+        IslandShadowEffect.Color = Color.FromRgb(48, 209, 88);
+        IslandShadowEffect.Opacity = 0.75;
+        IslandShadowEffect.BlurRadius = 24;
+
+        if (!_isExpanded)
+        {
+            _isExpanded = true;
+            AnimateIsland(420.0, 82.0);
+
+            var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(100));
+            fadeOut.Completed += (s, e) =>
+            {
+                CompactView.Visibility = Visibility.Collapsed;
+                ExpandedContainer.Visibility = Visibility.Visible;
+                ShowActiveCategoryView();
+                var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120));
+                ExpandedContainer.BeginAnimation(OpacityProperty, fadeIn);
+            };
+            CompactView.BeginAnimation(OpacityProperty, fadeOut);
+        }
+        else
+        {
+            AnimateIsland(420.0, 82.0);
+        }
+
+        // Pulse animation on the lightning bolt
+        var pulseAnim = new DoubleAnimation(0.3, 1.0, new Duration(TimeSpan.FromMilliseconds(400)))
+        {
+            AutoReverse = true,
+            RepeatBehavior = new RepeatBehavior(5)
+        };
+        ChargingBoltIcon.BeginAnimation(UIElement.OpacityProperty, pulseAnim);
+
+        _chargingAlertTimer.Stop();
+        _chargingAlertTimer.Start();
+    }
+
+    private void CompactChargingPill_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        ShowChargingAnimation();
+    }
+
     private void OnPowerStatusChanged()
     {
         Dispatcher.Invoke(() =>
         {
+            CompactBatteryPercentText.Text = $"{_powerService.BatteryPercent}%";
+            CompactChargingPill.Visibility = _powerService.IsCharging ? Visibility.Visible : Visibility.Collapsed;
+
             if (_powerService.HasBattery)
             {
                 BatteryDeviceName.Text = $"PC Battery ({_powerService.BatteryPercent}%)";
+            }
+
+            if (_activeCategory == IslandCategory.ChargingAnimation)
+            {
+                ChargingSubtextPercent.Text = $"{_powerService.BatteryPercent}%";
+                ChargingBadgePercentText.Text = $"{_powerService.BatteryPercent}%";
+                double fillWidth = Math.Max(4.0, (_powerService.BatteryPercent / 100.0) * 26.0);
+                ChargingBatteryFill.Width = fillWidth;
             }
         });
     }

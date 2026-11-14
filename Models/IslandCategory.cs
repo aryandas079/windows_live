@@ -3,6 +3,7 @@ namespace WindowsLive.Models;
 public enum IslandCategory
 {
     MediaPlayback,
+    ChargingAnimation,
     DeviceBattery,
     AppNotification,
     FocusTimer,

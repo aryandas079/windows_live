@@ -10,11 +10,17 @@ public partial class App : Application
     private static Mutex? _singleInstanceMutex;
     private static readonly string LogFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app_debug.log");
 
+    private static readonly object _logLock = new();
     public static void Log(string message)
     {
         try
         {
-            File.AppendAllText(LogFile, $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n");
+            lock (_logLock)
+            {
+                using var fs = new FileStream(LogFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                using var sw = new StreamWriter(fs);
+                sw.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] {message}");
+            }
         }
         catch { }
     }
@@ -29,10 +35,33 @@ public partial class App : Application
             _singleInstanceMutex = new Mutex(true, mutexName, out bool createdNew);
             if (!createdNew)
             {
-                Log("Another instance is already running (mutex locked); exiting.");
-                Shutdown();
-                return;
+                var currentPid = Environment.ProcessId;
+                var existingProcesses = System.Diagnostics.Process.GetProcessesByName("WindowsLive");
+                bool reallyRunning = false;
+                foreach (var p in existingProcesses)
+                {
+                    if (p.Id != currentPid)
+                    {
+                        reallyRunning = true;
+                        break;
+                    }
+                }
+
+                if (reallyRunning)
+                {
+                    Log("Another instance is already running; exiting.");
+                    Shutdown();
+                    return;
+                }
+                else
+                {
+                    Log("Stale mutex detected from killed process; continuing.");
+                }
             }
+        }
+        catch (AbandonedMutexException)
+        {
+            Log("Mutex was abandoned by previously terminated process; continuing.");
         }
         catch (Exception ex)
         {

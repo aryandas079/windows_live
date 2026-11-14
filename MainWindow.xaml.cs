@@ -73,9 +73,13 @@ public partial class MainWindow : Window
         _focusService.IsRunning ||
         _windowsClockService.HasActiveTimer;
 
-    // A song stays active in the dock while playing OR paused until the media app or browser tab is closed (HasMedia becomes false)
+    // A song stays active in the dock while playing OR paused until the media app or browser tab is closed
     private bool IsMusicActive =>
-        _mediaManager?.CurrentTrack?.HasMedia ?? false;
+        _mediaManager?.CurrentTrack != null &&
+        _mediaManager.CurrentTrack.HasMedia &&
+        !string.IsNullOrWhiteSpace(_mediaManager.CurrentTrack.Title) &&
+        !_mediaManager.CurrentTrack.Title.Equals("No Media Playing", StringComparison.OrdinalIgnoreCase) &&
+        !_mediaManager.CurrentTrack.Title.Equals("Connecting…", StringComparison.OrdinalIgnoreCase);
 
     private bool IsMusicPlaying =>
         _mediaManager?.CurrentTrack?.IsPlaying ?? false;
@@ -1354,25 +1358,30 @@ public partial class MainWindow : Window
         {
             if (info != null && (info.IsRunning || info.RemainingTime.TotalSeconds > 0))
             {
-                int mins = info.RemainingTime.Hours > 0
-                    ? (int)info.RemainingTime.TotalMinutes
-                    : info.RemainingTime.Minutes;
-                string formattedTimer = $"{mins}:{info.RemainingTime.Seconds:D2}";
+                int totalMins = (int)info.RemainingTime.TotalMinutes;
+                int secs = info.RemainingTime.Seconds;
+                string formattedTimer = info.RemainingTime.Hours > 0
+                    ? $"{info.RemainingTime.Hours}:{info.RemainingTime.Minutes:D2}:{secs:D2}"
+                    : $"{totalMins}:{secs:D2}";
+
                 CompactLiveTimerCountdownText.Text = formattedTimer;
                 DetachedTimerCountdownText.Text = formattedTimer;
                 FocusCountdownText.Text = $"{formattedTimer} remaining";
+                FocusTimerTitleText.Text = string.IsNullOrWhiteSpace(info.Name) ? "Timer Active" : $"{info.Name} Active";
 
                 if (info.IsRunning)
                 {
                     CompactTimerPauseBar1.Visibility = Visibility.Visible;
                     CompactTimerPauseBar2.Visibility = Visibility.Visible;
                     CompactTimerPlayTriangle.Visibility = Visibility.Collapsed;
+                    FocusToggleButton.Content = "Pause";
                 }
                 else
                 {
                     CompactTimerPauseBar1.Visibility = Visibility.Collapsed;
                     CompactTimerPauseBar2.Visibility = Visibility.Collapsed;
                     CompactTimerPlayTriangle.Visibility = Visibility.Visible;
+                    FocusToggleButton.Content = "Resume";
                 }
             }
 
@@ -1466,6 +1475,17 @@ public partial class MainWindow : Window
         {
             _focusService.Toggle();
         }
+    }
+
+    private void FocusCancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        _windowsClockService.CancelCurrentTimer();
+        _focusService.Stop();
+        if (_isExpanded && _activeCategory == IslandCategory.FocusTimer)
+        {
+            CollapseDock();
+        }
+        UpdateCompactViewVisibility();
     }
 
     private void HardwareBrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

@@ -852,11 +852,14 @@
                         </Border>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="Focus Session Active" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                            <TextBlock x:Name="FocusCountdownText" Text="24:50 remaining" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,3,0,0" />
+                            <TextBlock x:Name="FocusTimerTitleText" Text="Timer Active" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock x:Name="FocusCountdownText" Text="0:58 remaining" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,3,0,0" />
                         </StackPanel>
 
-                        <Button x:Name="FocusToggleButton" Grid.Column="2" Content="Pause" Style="{StaticResource WinUI3IconButton}" Background="{DynamicResource SubtleHoverBrush}" Padding="12,5,12,5" Click="FocusToggleButton_Click" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="FocusToggleButton" Content="Pause" Style="{StaticResource WinUI3IconButton}" Background="{DynamicResource SubtleHoverBrush}" Padding="12,5,12,5" Margin="0,0,6,0" Click="FocusToggleButton_Click" />
+                            <Button x:Name="FocusCancelButton" Content="Cancel" Style="{StaticResource WinUI3IconButton}" Background="{DynamicResource SubtleHoverBrush}" Padding="12,5,12,5" Click="FocusCancelButton_Click" />
+                        </StackPanel>
                     </Grid>
 
                     <!-- ============================================== -->

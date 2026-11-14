@@ -22,9 +22,12 @@ public partial class MainWindow : Window
     private readonly PowerManagerService _powerService;
     private readonly ThemeService _themeService;
     private readonly AppStateTracker _appStateTracker;
+    private readonly FocusTimerService _focusService;
+    private readonly ClipboardWatcherService _clipboardService;
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _autoCollapseTimer;
 
+    private IslandCategory _activeCategory = IslandCategory.MediaPlayback;
     private bool _isExpanded = false;
     private bool _isPinned = false;
     private bool _isNotchMode = true;
@@ -35,7 +38,7 @@ public partial class MainWindow : Window
     private const double CompactMediaWidth = 340.0;
     private const double CompactHeight = 40.0;
     private const double ExpandedWidth = 540.0;
-    private const double ExpandedHeight = 195.0;
+    private const double ExpandedHeight = 185.0;
 
     private double CurrentCompactWidth => (_mediaManager?.CurrentTrack?.HasMedia ?? false) ? CompactMediaWidth : CompactClockWidth;
 
@@ -63,10 +66,14 @@ public partial class MainWindow : Window
         _mediaManager = new MediaManager(Dispatcher);
         _volumeManager = new VolumeManager();
         _powerService = new PowerManagerService();
+        _focusService = new FocusTimerService();
+        _clipboardService = new ClipboardWatcherService();
 
         _mediaManager.TrackChanged += OnTrackChanged;
         _volumeManager.VolumeChanged += OnVolumeChanged;
         _powerService.PowerStatusChanged += OnPowerStatusChanged;
+        _focusService.Tick += OnFocusTimerTick;
+        _clipboardService.ClipboardTextChanged += OnClipboardTextChanged;
 
         _clockTimer = new DispatcherTimer
         {
@@ -93,7 +100,11 @@ public partial class MainWindow : Window
             }
         };
 
-        SourceInitialized += (s, e) => App.Log("MainWindow SourceInitialized");
+        SourceInitialized += (s, e) =>
+        {
+            App.Log("MainWindow SourceInitialized");
+            WindowHelper.MakeToolWindow(this);
+        };
         Loaded += OnLoaded;
         Closing += (s, e) => App.Log($"MainWindow Closing: Cancel={e.Cancel}");
         Closed += (s, e) => App.Log("MainWindow Closed");
@@ -112,23 +123,15 @@ public partial class MainWindow : Window
             switch (state)
             {
                 case ForegroundAppState.FullScreen:
-                    // Fullscreen mode: do not appear at all
-                    _isHoverRevealed = false;
-                    IslandContainer.Visibility = Visibility.Collapsed;
-                    TopEdgeHotspot.Visibility = Visibility.Collapsed;
-                    break;
-
                 case ForegroundAppState.Maximized:
-                    // Maximized mode: hide by default; reveal only when cursor moves to top edge
-                    TopEdgeHotspot.Visibility = Visibility.Visible;
-                    if (!IslandContainer.IsMouseOver && !_isHoverRevealed)
-                    {
-                        HideDockSmooth();
-                    }
+                    // Fullscreen or Maximized mode: disappear completely
+                    _isHoverRevealed = false;
+                    TopEdgeHotspot.Visibility = Visibility.Collapsed;
+                    HideDockSmooth();
                     break;
 
                 case ForegroundAppState.Normal:
-                    // Desktop / non-maximized apps: normal dynamic island visible at top
+                    // Desktop / non-maximized apps: dynamic island visible at top
                     TopEdgeHotspot.Visibility = Visibility.Collapsed;
                     _isHoverRevealed = false;
                     ShowDockSmooth();
@@ -139,19 +142,15 @@ public partial class MainWindow : Window
 
     private void TopEdgeHotspot_MouseEnter(object sender, MouseEventArgs e)
     {
-        if (_appStateTracker.CurrentState == ForegroundAppState.Maximized)
-        {
-            _isHoverRevealed = true;
-            ShowDockSmooth();
-        }
+        // Hotspot disabled when maximized/fullscreen as dock must disappear completely
     }
 
     private void HideDockSmooth()
     {
-        var anim = new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(180));
+        var anim = new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(160));
         anim.Completed += (s, e) =>
         {
-            if (!_isHoverRevealed && _appStateTracker.CurrentState == ForegroundAppState.Maximized)
+            if (_appStateTracker.CurrentState != ForegroundAppState.Normal)
             {
                 IslandContainer.Visibility = Visibility.Collapsed;
             }
@@ -162,7 +161,7 @@ public partial class MainWindow : Window
     private void ShowDockSmooth()
     {
         IslandContainer.Visibility = Visibility.Visible;
-        var anim = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(180));
+        var anim = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(160));
         IslandContainer.BeginAnimation(OpacityProperty, anim);
     }
 
@@ -190,14 +189,14 @@ public partial class MainWindow : Window
         if (!_themeService.IsDarkTheme)
         {
             IslandShadowEffect.Color = Color.FromArgb(255, 60, 60, 70);
-            IslandShadowEffect.Opacity = 0.22;
+            IslandShadowEffect.Opacity = 0.25;
             IslandShadowEffect.BlurRadius = 18;
             IslandShadow.Fill = new SolidColorBrush(Color.FromRgb(220, 220, 225));
         }
         else
         {
             IslandShadowEffect.Color = Colors.Black;
-            IslandShadowEffect.Opacity = 0.5;
+            IslandShadowEffect.Opacity = 0.55;
             IslandShadowEffect.BlurRadius = 22;
             IslandShadow.Fill = new SolidColorBrush(Colors.Black);
         }
@@ -234,6 +233,7 @@ public partial class MainWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         App.Log("MainWindow OnLoaded started");
+        WindowHelper.MakeToolWindow(this);
         WindowHelper.EnsureTopMost(this);
 
         var helper = new WindowInteropHelper(this);
@@ -247,44 +247,17 @@ public partial class MainWindow : Window
         OnPowerStatusChanged();
         _volumeManager.PollVolumeState(forceNotify: true);
         OnTrackChanged(_mediaManager.CurrentTrack);
-        App.Log("MainWindow OnLoaded finished");
-    }
 
-    private async void ExportSnapshotsAsync()
-    {
+        // Initialize Brightness level
         try
         {
-            await System.Threading.Tasks.Task.Delay(600);
-            string outDir = @"C:\Users\aryan\.gemini\antigravity\brain\ac89aa2c-42c4-4c90-b9ee-e64b5d2161f0";
-            SaveElementPng(IslandContainer, Path.Combine(outDir, "dock_realigned_compact.png"));
-
-            ExpandDock();
-            await System.Threading.Tasks.Task.Delay(400);
-
-            SaveElementPng(IslandContainer, Path.Combine(outDir, "dock_realigned_expanded.png"));
-
-            CollapseDock();
+            int b = BrightnessManager.GetBrightness();
+            HardwareBrightnessSlider.Value = b;
+            HardwareBrightnessText.Text = $"{b}%";
         }
-        catch (Exception ex)
-        {
-            App.Log($"Snapshot export error: {ex}");
-        }
-    }
+        catch { }
 
-    private void SaveElementPng(FrameworkElement element, string filePath)
-    {
-        element.UpdateLayout();
-        int w = (int)Math.Ceiling(Math.Max(1, element.ActualWidth));
-        int h = (int)Math.Ceiling(Math.Max(1, element.ActualHeight));
-
-        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
-        rtb.Render(element);
-
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(rtb));
-        using var stream = File.Create(filePath);
-        encoder.Save(stream);
-        App.Log($"Saved snapshot: {filePath} ({w}x{h})");
+        App.Log("MainWindow OnLoaded finished");
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -296,7 +269,6 @@ public partial class MainWindow : Window
 
             Point windowPoint = PointFromScreen(new Point(x, y));
 
-            // Check if dock is currently visible and point is inside it
             if (IslandContainer.Visibility == Visibility.Visible && IslandContainer.Opacity > 0.1)
             {
                 Point islandPoint = IslandContainer.TranslatePoint(new Point(0, 0), this);
@@ -309,7 +281,6 @@ public partial class MainWindow : Window
                 }
             }
 
-            // Check if point is inside top edge hotspot (when maximized)
             if (TopEdgeHotspot.Visibility == Visibility.Visible)
             {
                 Point hotspotPoint = TopEdgeHotspot.TranslatePoint(new Point(0, 0), this);
@@ -322,7 +293,6 @@ public partial class MainWindow : Window
                 }
             }
 
-            // Outside island and hotspot: pass click straight through
             handled = true;
             return (IntPtr)WindowHelper.HTTRANSPARENT;
         }
@@ -348,7 +318,6 @@ public partial class MainWindow : Window
         }
         else if (!_isExpanded && _appStateTracker.CurrentState == ForegroundAppState.Maximized)
         {
-            // If collapsed in maximized mode and cursor leaves island, hide it
             _isHoverRevealed = false;
             HideDockSmooth();
         }
@@ -369,13 +338,14 @@ public partial class MainWindow : Window
 
         AnimateIsland(ExpandedWidth, ExpandedHeight);
 
-        var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(140));
+        var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(100));
         fadeOut.Completed += (s, e) =>
         {
             CompactView.Visibility = Visibility.Collapsed;
-            ExpandedView.Visibility = Visibility.Visible;
-            var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(180));
-            ExpandedView.BeginAnimation(OpacityProperty, fadeIn);
+            ExpandedContainer.Visibility = Visibility.Visible;
+            ShowActiveCategoryView();
+            var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120));
+            ExpandedContainer.BeginAnimation(OpacityProperty, fadeIn);
         };
         CompactView.BeginAnimation(OpacityProperty, fadeOut);
     }
@@ -387,37 +357,56 @@ public partial class MainWindow : Window
 
         AnimateIsland(CurrentCompactWidth, CompactHeight);
 
-        var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(140));
+        var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(100));
         fadeOut.Completed += (s, e) =>
         {
-            ExpandedView.Visibility = Visibility.Collapsed;
+            ExpandedContainer.Visibility = Visibility.Collapsed;
             CompactView.Visibility = Visibility.Visible;
-            var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(180));
+            var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120));
             CompactView.BeginAnimation(OpacityProperty, fadeIn);
         };
-        ExpandedView.BeginAnimation(OpacityProperty, fadeOut);
+        ExpandedContainer.BeginAnimation(OpacityProperty, fadeOut);
     }
 
     private void AnimateIsland(double targetWidth, double targetHeight)
     {
-        var ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
+        var ease = new QuinticEase { EasingMode = EasingMode.EaseOut };
 
         var widthAnim = new DoubleAnimation
         {
             To = targetWidth,
-            Duration = TimeSpan.FromMilliseconds(260),
+            Duration = TimeSpan.FromMilliseconds(200),
             EasingFunction = ease
         };
 
         var heightAnim = new DoubleAnimation
         {
             To = targetHeight,
-            Duration = TimeSpan.FromMilliseconds(260),
+            Duration = TimeSpan.FromMilliseconds(200),
             EasingFunction = ease
         };
 
         IslandContainer.BeginAnimation(WidthProperty, widthAnim);
         IslandContainer.BeginAnimation(HeightProperty, heightAnim);
+    }
+
+    public void SwitchCategory(IslandCategory cat)
+    {
+        _activeCategory = cat;
+        ShowActiveCategoryView();
+    }
+
+    private void ShowActiveCategoryView()
+    {
+        ViewMediaPlayback.Visibility = _activeCategory == IslandCategory.MediaPlayback ? Visibility.Visible : Visibility.Collapsed;
+        ViewDeviceBattery.Visibility = _activeCategory == IslandCategory.DeviceBattery ? Visibility.Visible : Visibility.Collapsed;
+        ViewAppNotification.Visibility = _activeCategory == IslandCategory.AppNotification ? Visibility.Visible : Visibility.Collapsed;
+        ViewFocusTimer.Visibility = _activeCategory == IslandCategory.FocusTimer ? Visibility.Visible : Visibility.Collapsed;
+        ViewLiveActivities.Visibility = _activeCategory == IslandCategory.LiveActivities ? Visibility.Visible : Visibility.Collapsed;
+        ViewHardwareLevels.Visibility = _activeCategory == IslandCategory.HardwareVolumeBrightness ? Visibility.Visible : Visibility.Collapsed;
+        ViewLiveClipboard.Visibility = _activeCategory == IslandCategory.LiveClipboard ? Visibility.Visible : Visibility.Collapsed;
+        ViewWindowSnapping.Visibility = _activeCategory == IslandCategory.WindowSnapping ? Visibility.Visible : Visibility.Collapsed;
+        ViewTimerQuickSet.Visibility = _activeCategory == IslandCategory.TimerQuickSet ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnTrackChanged(MediaTrackInfo track)
@@ -426,13 +415,14 @@ public partial class MainWindow : Window
         {
             if (track.HasMedia)
             {
-                // Media active: Show compact media view
+                // Dynamic trigger: active media sets default expanded view to media playback
+                _activeCategory = IslandCategory.MediaPlayback;
+
                 CompactClockView.Visibility = Visibility.Collapsed;
                 CompactMediaView.Visibility = Visibility.Visible;
 
                 CompactTitleText.Text = string.IsNullOrWhiteSpace(track.Title) ? "Now Playing" : track.Title;
                 CompactArtistText.Text = string.IsNullOrWhiteSpace(track.Artist) ? track.SourceApp : track.Artist;
-                CompactProgressArt.Progress = track.ProgressFraction;
                 CompactProgressArt.ImageSource = track.Thumbnail;
                 CompactEqualizer.IsPlaying = track.IsPlaying;
 
@@ -440,7 +430,6 @@ public partial class MainWindow : Window
                 ExpandedArtistText.Text = string.IsNullOrWhiteSpace(track.AlbumTitle)
                     ? track.Artist
                     : $"{track.Artist} • {track.AlbumTitle}";
-                ExpandedSourceText.Text = string.IsNullOrWhiteSpace(track.SourceApp) ? "Media Player" : track.SourceApp;
 
                 if (track.Thumbnail != null)
                 {
@@ -475,13 +464,11 @@ public partial class MainWindow : Window
             }
             else
             {
-                // No media active: Default to Time & Date
                 CompactMediaView.Visibility = Visibility.Collapsed;
                 CompactClockView.Visibility = Visibility.Visible;
 
                 ExpandedTitleText.Text = "No Media Playing";
                 ExpandedArtistText.Text = "Play music or video on your system";
-                ExpandedSourceText.Text = "Windows Live";
                 ExpandedAlbumImage.Source = null;
                 ExpandedAlbumImage.Visibility = Visibility.Collapsed;
                 ExpandedDefaultOrb.Visibility = Visibility.Visible;
@@ -503,10 +490,14 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
+            int volPct = (int)Math.Round(vol * 100.0);
             if (!_isDraggingSlider)
             {
-                VolumeSlider.Value = vol * 100.0;
+                VolumeSlider.Value = volPct;
             }
+
+            HardwareVolumeBar.Value = volPct;
+            HardwareVolumeText.Text = $"{volPct}%";
 
             if (isMuted || vol <= 0.01f)
             {
@@ -533,13 +524,30 @@ public partial class MainWindow : Window
         {
             if (_powerService.HasBattery)
             {
-                BatteryChip.Visibility = Visibility.Visible;
-                BatteryText.Text = $"{_powerService.BatteryPercent}%";
-                BatteryIcon.Symbol = _powerService.IsCharging ? SymbolRegular.BatteryCharge24 : SymbolRegular.Battery1024;
+                BatteryDeviceName.Text = $"PC Battery ({_powerService.BatteryPercent}%)";
             }
-            else
+        });
+    }
+
+    private void OnFocusTimerTick()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            FocusCountdownText.Text = $"{_focusService.FormattedTime} remaining";
+            FocusToggleButton.Content = _focusService.IsRunning ? "Pause" : "Resume";
+        });
+    }
+
+    private void OnClipboardTextChanged(string text)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            // Dynamic trigger: new clipboard copy automatically brings up clipboard preview
+            ClipboardPreviewText.Text = text;
+            _activeCategory = IslandCategory.LiveClipboard;
+            if (_isExpanded)
             {
-                BatteryChip.Visibility = Visibility.Collapsed;
+                ShowActiveCategoryView();
             }
         });
     }
@@ -550,7 +558,6 @@ public partial class MainWindow : Window
         string timeStr = now.ToString("h:mm tt");
         string dateStr = now.ToString("ddd, MMM d");
 
-        TimeText.Text = timeStr;
         CompactTimeText.Text = timeStr;
         CompactDateText.Text = dateStr;
     }
@@ -650,5 +657,52 @@ public partial class MainWindow : Window
             var pos = TimeSpan.FromSeconds(e.NewValue);
             PositionText.Text = $"{(int)pos.TotalMinutes}:{pos.Seconds:D2}";
         }
+    }
+
+    private void FocusToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        _focusService.Toggle();
+    }
+
+    private void HardwareBrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (IsLoaded)
+        {
+            int val = (int)e.NewValue;
+            HardwareBrightnessText.Text = $"{val}%";
+            BrightnessManager.SetBrightness(val);
+        }
+    }
+
+    private void SnapLeft_Click(object sender, RoutedEventArgs e)
+    {
+        WindowSnappingService.SnapForegroundWindow(SnapPosition.LeftHalf);
+    }
+
+    private void SnapRight_Click(object sender, RoutedEventArgs e)
+    {
+        WindowSnappingService.SnapForegroundWindow(SnapPosition.RightHalf);
+    }
+
+    private void SnapTop_Click(object sender, RoutedEventArgs e)
+    {
+        WindowSnappingService.SnapForegroundWindow(SnapPosition.TopHalf);
+    }
+
+    private void SnapMax_Click(object sender, RoutedEventArgs e)
+    {
+        WindowSnappingService.SnapForegroundWindow(SnapPosition.Maximize);
+    }
+
+    private void StartFocusTimerPreset_Click(object sender, RoutedEventArgs e)
+    {
+        _focusService.Start(25);
+        SwitchCategory(IslandCategory.FocusTimer);
+    }
+
+    private void Start15MinTimer_Click(object sender, RoutedEventArgs e)
+    {
+        _focusService.Start(5);
+        SwitchCategory(IslandCategory.FocusTimer);
     }
 }

@@ -1,11 +1,13 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using System.Windows;
 
 namespace WindowsLive;
 
 public partial class App : Application
 {
+    private static Mutex? _singleInstanceMutex;
     private static readonly string LogFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app_debug.log");
 
     public static void Log(string message)
@@ -20,6 +22,22 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         Log("App.OnStartup called");
+
+        const string mutexName = "Local\\WindowsLive_DynamicIsland_SingletonMutex";
+        try
+        {
+            _singleInstanceMutex = new Mutex(true, mutexName, out bool createdNew);
+            if (!createdNew)
+            {
+                Log("Another instance is already running (mutex locked); exiting.");
+                Shutdown();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Mutex creation warning: {ex.Message}");
+        }
 
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
         {
@@ -47,5 +65,16 @@ public partial class App : Application
             Log($"Exception in OnStartup: {ex}");
             throw;
         }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+            _singleInstanceMutex?.Dispose();
+        }
+        catch { }
+        base.OnExit(e);
     }
 }

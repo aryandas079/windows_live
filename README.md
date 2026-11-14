@@ -49,16 +49,25 @@ A native, lightweight Dynamic Island style dock anchored at the top of your scre
 
 ---
 
-## How to Run
+## Installation and Background Service
 
-### Quick Start
-Double-click `launch.bat` in the project directory, or run from PowerShell / Terminal:
+### Install and Run in Background
+Double-click `install.bat` from the directory:
+- Compiles/installs the application to `%LOCALAPPDATA%\WindowsLive`.
+- Registers the application to run silently in the background on Windows startup (Registry Run key and Windows Startup shortcut).
+- Starts the dynamic island immediately in the background without any console or taskbar distraction.
 
+### Uninstall
+To stop and completely remove the application and its startup entries:
+- Double-click `uninstall.bat` from the project directory.
+- Terminates all running background instances and removes startup registration and installed binaries.
+
+### Manual Launch / Development
+To build and run directly during development:
 ```powershell
-cd windows_live
-dotnet run
+dotnet run --project WindowsLive.csproj
 ```
 
 ### Pre-requisites
 - Windows 10 (Build 19041+) or Windows 11
-- .NET 8.0 or .NET 10.0 SDK
+- .NET 8.0 or .NET 10.0 Windows Desktop SDK

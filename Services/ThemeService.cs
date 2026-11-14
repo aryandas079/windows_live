@@ -10,16 +10,17 @@ public class ThemeService
     public event Action? ThemeChanged;
 
     public bool IsDarkTheme { get; private set; } = true;
+    public bool TransparencyEnabled { get; private set; } = true;
     public Color AccentColor { get; private set; }
     public SolidColorBrush AccentBrush { get; private set; } = new(Colors.DodgerBlue);
 
     // Dynamic surfaces
-    public SolidColorBrush SurfaceDarkBrush { get; private set; } = new(Color.FromRgb(10, 10, 11));
+    public SolidColorBrush SurfaceDarkBrush { get; private set; } = new(Color.FromArgb(128, 10, 10, 11));
     public SolidColorBrush SurfaceBorderBrush { get; private set; } = new(Color.FromArgb(43, 255, 255, 255));
     public SolidColorBrush SubtleHoverBrush { get; private set; } = new(Color.FromArgb(31, 255, 255, 255));
     public SolidColorBrush TextPrimaryBrush { get; private set; } = new(Color.FromArgb(242, 255, 255, 255));
     public SolidColorBrush TextSecondaryBrush { get; private set; } = new(Color.FromArgb(140, 255, 255, 255));
-    public SolidColorBrush CardBackgroundBrush { get; private set; } = new(Color.FromRgb(24, 24, 26));
+    public SolidColorBrush CardBackgroundBrush { get; private set; } = new(Color.FromArgb(120, 24, 24, 26));
     public SolidColorBrush PlayButtonForegroundBrush { get; private set; } = new(Colors.White);
 
     public ThemeService()
@@ -36,8 +37,9 @@ public class ThemeService
 
     public void UpdateTheme()
     {
-        // 1. Check Light vs Dark theme
+        // 1. Check Light vs Dark theme and Transparency settings
         bool isLight = false;
+        bool transparency = true;
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
@@ -48,11 +50,18 @@ public class ThemeService
                 {
                     isLight = intVal == 1;
                 }
+
+                var transVal = key.GetValue("EnableTransparency");
+                if (transVal is int intTrans)
+                {
+                    transparency = intTrans == 1;
+                }
             }
         }
         catch { }
 
         IsDarkTheme = !isLight;
+        TransparencyEnabled = transparency;
 
         // 2. Fetch system accent color
         Color accent = Color.FromRgb(0, 120, 215); // Fallback Windows Blue
@@ -87,26 +96,26 @@ public class ThemeService
         AccentBrush = new SolidColorBrush(AccentColor);
         AccentBrush.Freeze();
 
-        // 3. Update theme-aware brushes
+        // 3. Totally Opaque Surface Brushes (Solid 255 alpha)
         if (IsDarkTheme)
         {
-            // Dark Mode palette
-            SurfaceDarkBrush = new SolidColorBrush(Color.FromRgb(10, 10, 11)); // Deep OLED dark
-            SurfaceBorderBrush = new SolidColorBrush(Color.FromArgb(43, 255, 255, 255)); // Subtle light border
+            // Dark Mode palette (OLED solid dark)
+            SurfaceDarkBrush = new SolidColorBrush(Color.FromRgb(18, 18, 20));
+            SurfaceBorderBrush = new SolidColorBrush(Color.FromArgb(43, 255, 255, 255));
             SubtleHoverBrush = new SolidColorBrush(Color.FromArgb(31, 255, 255, 255));
             TextPrimaryBrush = new SolidColorBrush(Color.FromArgb(242, 255, 255, 255));
-            TextSecondaryBrush = new SolidColorBrush(Color.FromArgb(150, 255, 255, 255));
-            CardBackgroundBrush = new SolidColorBrush(Color.FromRgb(24, 24, 26));
+            TextSecondaryBrush = new SolidColorBrush(Color.FromArgb(160, 255, 255, 255));
+            CardBackgroundBrush = new SolidColorBrush(Color.FromRgb(30, 30, 34));
         }
         else
         {
-            // Light Mode palette (WinUI 3 Mica/Acrylic light style)
-            SurfaceDarkBrush = new SolidColorBrush(Color.FromRgb(245, 245, 247)); // Soft frosted light surface
-            SurfaceBorderBrush = new SolidColorBrush(Color.FromArgb(38, 0, 0, 0)); // 15% dark stroke
-            SubtleHoverBrush = new SolidColorBrush(Color.FromArgb(18, 0, 0, 0));
-            TextPrimaryBrush = new SolidColorBrush(Color.FromRgb(24, 24, 27)); // High contrast dark text
-            TextSecondaryBrush = new SolidColorBrush(Color.FromRgb(105, 105, 115));
-            CardBackgroundBrush = new SolidColorBrush(Color.FromRgb(232, 232, 236));
+            // Light Mode palette (Matches Windows Light Theme, totally solid/opaque)
+            SurfaceDarkBrush = new SolidColorBrush(Color.FromRgb(245, 245, 247));
+            SurfaceBorderBrush = new SolidColorBrush(Color.FromArgb(50, 0, 0, 0));
+            SubtleHoverBrush = new SolidColorBrush(Color.FromArgb(25, 0, 0, 0));
+            TextPrimaryBrush = new SolidColorBrush(Color.FromRgb(20, 20, 24));
+            TextSecondaryBrush = new SolidColorBrush(Color.FromRgb(95, 95, 105));
+            CardBackgroundBrush = new SolidColorBrush(Color.FromRgb(230, 230, 236));
         }
 
         // Determine best text contrast for accent Play button

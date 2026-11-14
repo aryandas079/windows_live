@@ -2,28 +2,32 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-             Width="30" Height="30">
+             Width="26" Height="26">
     <Grid>
-        <!-- Background Track Ring -->
+        <!-- Background Track Ring (Optional: Collapsed) -->
         <Ellipse Width="26" Height="26"
                  Stroke="{DynamicResource SubtleHoverBrush}"
                  StrokeThickness="2"
                  HorizontalAlignment="Center"
-                 VerticalAlignment="Center" />
+                 VerticalAlignment="Center"
+                 Visibility="Collapsed" />
 
-        <!-- Progress Arc -->
+        <!-- Progress Arc (Collapsed: progress bar removed in compact mode) -->
         <Path x:Name="ProgressArcPath"
               Stroke="{Binding AccentBrush, RelativeSource={RelativeSource AncestorType=UserControl}}"
               StrokeThickness="2.2"
               StrokeStartLineCap="Round"
               StrokeEndLineCap="Round"
               HorizontalAlignment="Center"
-              VerticalAlignment="Center" />
+              VerticalAlignment="Center"
+              Visibility="Collapsed" />
 
-        <!-- Disc Container -->
-        <Border Width="20" Height="20"
-                CornerRadius="10"
+        <!-- Disc Container: Clean rounded artwork thumbnail -->
+        <Border Width="24" Height="24"
+                CornerRadius="6"
                 ClipToBounds="True"
+                BorderBrush="{DynamicResource SurfaceBorderBrush}"
+                BorderThickness="0.5"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center">
             <Grid>
@@ -38,7 +42,7 @@
                 <!-- Fallback WinUI 3 Fluent Music Note -->
                 <ui:SymbolIcon x:Name="MusicSymbol"
                                Symbol="MusicNote224"
-                               FontSize="10"
+                               FontSize="11"
                                Foreground="{DynamicResource PlayButtonForegroundBrush}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"

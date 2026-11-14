@@ -481,10 +481,15 @@ public partial class MainWindow : Window
 
     private void ExpandDock()
     {
-        if (_isExpanded || !HasActiveContent) return;
+        if (_isExpanded) return;
+        if (!HasActiveContent && !_isNotificationAlertActive && !_notificationService.HasNotifications) return;
         _isExpanded = true;
 
-        if (_notificationService.HasNotifications && (_isNotificationAlertActive || _activeCategory == IslandCategory.AppNotification || !(_mediaManager?.CurrentTrack?.HasMedia ?? false)))
+        if (_isNotificationAlertActive || _activeCategory == IslandCategory.AppNotification)
+        {
+            _activeCategory = IslandCategory.AppNotification;
+        }
+        else if (_notificationService.HasNotifications && !(_mediaManager?.CurrentTrack?.HasMedia ?? false))
         {
             _activeCategory = IslandCategory.AppNotification;
         }
@@ -582,7 +587,10 @@ public partial class MainWindow : Window
         {
             if (track.HasMedia)
             {
-                _activeCategory = IslandCategory.MediaPlayback;
+                if (!_isNotificationAlertActive && _activeCategory != IslandCategory.AppNotification)
+                {
+                    _activeCategory = IslandCategory.MediaPlayback;
+                }
 
                 CompactEqualizer.IsPlaying = track.IsPlaying;
 
@@ -969,19 +977,26 @@ public partial class MainWindow : Window
     {
         e.Handled = true;
         _activeCategory = IslandCategory.AppNotification;
+        if (_currentNotification != null)
+        {
+            UpdateNotificationUI(_currentNotification);
+        }
         ExpandDock();
     }
 
     private void OnNotificationReceived(IslandNotification notif)
     {
-        // Don't hijack media playback when media apps send notifications for track changes
-        if (notif.AppName.Contains("Music", StringComparison.OrdinalIgnoreCase) ||
+        // Don't hijack with notifications from media apps when media track updates (handled natively by media controls)
+        if (notif.AppType == KnownNotificationApp.Spotify ||
+            notif.AppType == KnownNotificationApp.AppleMusic ||
+            notif.AppName.Contains("Apple Music", StringComparison.OrdinalIgnoreCase) ||
             notif.AppName.Contains("Spotify", StringComparison.OrdinalIgnoreCase) ||
-            notif.AppName.Contains("Media", StringComparison.OrdinalIgnoreCase) ||
-            (_mediaManager?.CurrentTrack?.HasMedia ?? false))
+            notif.AppName.Contains("Windows Media Player", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
+
+        App.Log($"Processing notification in MainWindow: App={notif.AppName}, Title={notif.Title}, Message={notif.Message}");
 
         Dispatcher.Invoke(() =>
         {
@@ -990,10 +1005,26 @@ public partial class MainWindow : Window
             UpdateNotificationUI(notif);
             _activeCategory = IslandCategory.AppNotification;
 
-            // Expand to show notification banner (like iOS dynamic island)
-            ExpandDock();
+            // Clear any active unlock alert
+            if (_isUnlockAlertActive)
+            {
+                _isUnlockAlertActive = false;
+                _unlockAlertTimer.Stop();
+                CompactUnlockView.Visibility = Visibility.Collapsed;
+            }
+
+            // Expand to show notification banner
+            if (_isExpanded)
+            {
+                ShowActiveCategoryView();
+            }
+            else
+            {
+                ExpandDock();
+            }
 
             _notificationAlertTimer.Stop();
+            _notificationAlertTimer.Interval = TimeSpan.FromSeconds(5.0);
             _notificationAlertTimer.Start();
         });
     }

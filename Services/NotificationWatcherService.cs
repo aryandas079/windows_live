@@ -15,7 +15,7 @@ public class NotificationWatcherService
 {
     private UserNotificationListener? _listener;
     private readonly DispatcherTimer _pollTimer;
-    private readonly HashSet<uint> _seenIds = new();
+    private readonly Dictionary<uint, string> _activeNotificationContent = new();
     private readonly List<IslandNotification> _activeNotifications = new();
     private bool _isInitialized = false;
     private bool _isPolling = false;
@@ -32,7 +32,7 @@ public class NotificationWatcherService
     {
         _pollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(900)
+            Interval = TimeSpan.FromMilliseconds(750)
         };
         _pollTimer.Tick += async (s, e) => await PollNotificationsAsync();
     }
@@ -45,16 +45,36 @@ public class NotificationWatcherService
             var access = await _listener.RequestAccessAsync();
             if (access == UserNotificationListenerAccessStatus.Allowed)
             {
-                // Baseline: record existing notifications so we don't spam popups for old ones
+                // Baseline: load existing notifications into active list so compact pill reflects current state
                 var existing = await _listener.GetNotificationsAsync(NotificationKinds.Toast);
                 foreach (var n in existing)
                 {
-                    _seenIds.Add(n.Id);
+                    var (title, msg) = ExtractTexts(n);
+                    var logo = await LoadAppLogoAsync(n);
+                    string appName = n.AppInfo?.DisplayInfo?.DisplayName ?? "Notification";
+                    if (string.IsNullOrWhiteSpace(appName)) appName = "Notification";
+
+                    var item = new IslandNotification
+                    {
+                        Id = n.Id,
+                        AppName = appName,
+                        AppId = n.AppInfo?.Id ?? "",
+                        Title = string.IsNullOrWhiteSpace(title) ? appName : title,
+                        Message = msg,
+                        AppLogo = logo,
+                        ReceivedTime = DateTime.Now
+                    };
+                    _activeNotifications.Add(item);
+                    _activeNotificationContent[n.Id] = $"{title}|{msg}";
                 }
 
                 _isInitialized = true;
                 _pollTimer.Start();
-                App.Log($"NotificationWatcherService started successfully. Existing toasts: {existing.Count}");
+                App.Log($"NotificationWatcherService started successfully. Loaded {existing.Count} notifications.");
+                if (_activeNotifications.Count > 0)
+                {
+                    NotificationsChanged?.Invoke();
+                }
             }
             else
             {
@@ -81,15 +101,16 @@ public class NotificationWatcherService
             foreach (var n in notifs)
             {
                 currentIds.Add(n.Id);
+                var (title, msg) = ExtractTexts(n);
+                string contentSignature = $"{title}|{msg}";
 
-                if (!_seenIds.Contains(n.Id))
+                var existingItem = _activeNotifications.FirstOrDefault(x => x.Id == n.Id);
+
+                if (existingItem == null)
                 {
-                    _seenIds.Add(n.Id);
+                    // Brand new notification
                     changed = true;
-
-                    var (title, msg) = ExtractTexts(n);
                     var logo = await LoadAppLogoAsync(n);
-
                     string appName = n.AppInfo?.DisplayInfo?.DisplayName ?? "Notification";
                     if (string.IsNullOrWhiteSpace(appName)) appName = "Notification";
 
@@ -105,17 +126,32 @@ public class NotificationWatcherService
                     };
 
                     _activeNotifications.Add(item);
-                    App.Log($"New notification detected: App={item.AppName}, Title={item.Title}");
+                    _activeNotificationContent[n.Id] = contentSignature;
+                    App.Log($"New notification detected: App={item.AppName}, Title={item.Title}, Message={item.Message}");
                     NotificationReceived?.Invoke(item);
+                }
+                else if (_activeNotificationContent.TryGetValue(n.Id, out var prevContent) && prevContent != contentSignature)
+                {
+                    // Notification content updated (e.g. WhatsApp new message in existing conversation thread)
+                    changed = true;
+                    _activeNotificationContent[n.Id] = contentSignature;
+                    existingItem.Title = string.IsNullOrWhiteSpace(title) ? existingItem.AppName : title;
+                    existingItem.Message = msg;
+                    existingItem.ReceivedTime = DateTime.Now;
+
+                    App.Log($"Notification updated: App={existingItem.AppName}, Title={existingItem.Title}, Message={existingItem.Message}");
+                    NotificationReceived?.Invoke(existingItem);
                 }
             }
 
             // Clean up dismissed notifications
             for (int i = _activeNotifications.Count - 1; i >= 0; i--)
             {
-                if (!currentIds.Contains(_activeNotifications[i].Id))
+                uint id = _activeNotifications[i].Id;
+                if (!currentIds.Contains(id))
                 {
                     _activeNotifications.RemoveAt(i);
+                    _activeNotificationContent.Remove(id);
                     changed = true;
                 }
             }
@@ -197,24 +233,5 @@ public class NotificationWatcherService
             _listener?.RemoveNotification(id);
         }
         catch { }
-
-        var item = _activeNotifications.FirstOrDefault(x => x.Id == id);
-        if (item != null)
-        {
-            _activeNotifications.Remove(item);
-            NotificationsChanged?.Invoke();
-        }
-    }
-
-    public void ClearAll()
-    {
-        try
-        {
-            _listener?.ClearNotifications();
-        }
-        catch { }
-
-        _activeNotifications.Clear();
-        NotificationsChanged?.Invoke();
     }
 }

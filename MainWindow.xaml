@@ -218,6 +218,9 @@
                 <Grid x:Name="CompactNotificationView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
+                      Background="Transparent"
+                      Cursor="Hand"
+                      MouseDown="CompactNotificationView_MouseDown"
                       Margin="8,0,8,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />

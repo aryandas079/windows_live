@@ -758,8 +758,12 @@ public partial class MainWindow : Window
 
         // Reset shackle transforms to closed/locked state
         LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+        LockShackleTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+        LockShackleScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+        LockShackleTranslate.X = 0;
         LockShackleTranslate.Y = 0;
+        LockShackleScale.ScaleX = 1.0;
         LockShackleRotate.Angle = 0;
 
         // Animate island container width to 190.0 (compact height 36.0)
@@ -769,30 +773,42 @@ public partial class MainWindow : Window
         var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120));
         CompactUnlockView.BeginAnimation(OpacityProperty, fadeIn);
 
-        // Play subtle slick unlock click sound
+        // Play crisp mechanical unlock click sound
         PlayUnlockSound();
 
-        // Animate shackle popping up and swinging open slickly
+        // 1. Shackle lifts up with snappy spring ease
         var liftAnim = new DoubleAnimation
         {
             From = 0.0,
             To = -3.5,
             Duration = TimeSpan.FromMilliseconds(220),
-            BeginTime = TimeSpan.FromMilliseconds(70),
-            EasingFunction = new BackEase { Amplitude = 0.45, EasingMode = EasingMode.EaseOut }
+            BeginTime = TimeSpan.FromMilliseconds(50),
+            EasingFunction = new BackEase { Amplitude = 0.40, EasingMode = EasingMode.EaseOut }
         };
 
-        var rotateAnim = new DoubleAnimation
+        // 2. Shackle shifts outward to the right into the authentic open/twisted position
+        var shiftAnim = new DoubleAnimation
         {
             From = 0.0,
-            To = -30.0,
-            Duration = TimeSpan.FromMilliseconds(250),
-            BeginTime = TimeSpan.FromMilliseconds(80),
-            EasingFunction = new BackEase { Amplitude = 0.5, EasingMode = EasingMode.EaseOut }
+            To = 2.8,
+            Duration = TimeSpan.FromMilliseconds(240),
+            BeginTime = TimeSpan.FromMilliseconds(60),
+            EasingFunction = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut }
+        };
+
+        // 3. Subtle 3D perspective twist foreshortening
+        var scaleAnim = new DoubleAnimation
+        {
+            From = 1.0,
+            To = 0.88,
+            Duration = TimeSpan.FromMilliseconds(240),
+            BeginTime = TimeSpan.FromMilliseconds(60),
+            EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseOut }
         };
 
         LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, liftAnim);
-        LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, rotateAnim);
+        LockShackleTranslate.BeginAnimation(TranslateTransform.XProperty, shiftAnim);
+        LockShackleScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
 
         // Stay on screen for 3.0 seconds, then return to normal
         _unlockAlertTimer.Start();
@@ -802,24 +818,83 @@ public partial class MainWindow : Window
     {
         try
         {
-            string navSound = @"C:\Windows\Media\Windows Navigation Start.wav";
-            string unlockSound = @"C:\Windows\Media\Windows Unlock.wav";
-
-            string? soundFile = System.IO.File.Exists(navSound) ? navSound : (System.IO.File.Exists(unlockSound) ? unlockSound : null);
-            if (soundFile != null)
+            string soundPath = GetOrGenerateUnlockSound();
+            if (!string.IsNullOrEmpty(soundPath) && System.IO.File.Exists(soundPath))
             {
                 Task.Run(() =>
                 {
                     try
                     {
-                        using var player = new System.Media.SoundPlayer(soundFile);
-                        player.Play();
+                        using var player = new System.Media.SoundPlayer(soundPath);
+                        player.PlaySync();
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        App.Log($"PlayUnlockSound playback error: {ex.Message}");
+                    }
                 });
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            App.Log($"PlayUnlockSound error: {ex.Message}");
+        }
+    }
+
+    private static string GetOrGenerateUnlockSound()
+    {
+        try
+        {
+            string wavPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "unlock_click.wav");
+            if (!System.IO.File.Exists(wavPath))
+            {
+                int sampleRate = 44100;
+                double duration = 0.07;
+                int sampleCount = (int)(sampleRate * duration);
+                byte[] wavData = new byte[44 + sampleCount * 2];
+
+                System.Text.Encoding.ASCII.GetBytes("RIFF").CopyTo(wavData, 0);
+                BitConverter.GetBytes(wavData.Length - 8).CopyTo(wavData, 4);
+                System.Text.Encoding.ASCII.GetBytes("WAVEfmt ").CopyTo(wavData, 8);
+                BitConverter.GetBytes(16).CopyTo(wavData, 16);
+                BitConverter.GetBytes((short)1).CopyTo(wavData, 20);
+                BitConverter.GetBytes((short)1).CopyTo(wavData, 22);
+                BitConverter.GetBytes(sampleRate).CopyTo(wavData, 24);
+                BitConverter.GetBytes(sampleRate * 2).CopyTo(wavData, 28);
+                BitConverter.GetBytes((short)2).CopyTo(wavData, 32);
+                BitConverter.GetBytes((short)16).CopyTo(wavData, 34);
+                System.Text.Encoding.ASCII.GetBytes("data").CopyTo(wavData, 36);
+                BitConverter.GetBytes(sampleCount * 2).CopyTo(wavData, 40);
+
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    double t = (double)i / sampleRate;
+                    double val = 0.0;
+                    if (t < 0.012)
+                    {
+                        double env1 = Math.Exp(-t * 700.0);
+                        val += env1 * Math.Sin(2.0 * Math.PI * 2600.0 * t) * 0.40;
+                    }
+                    if (t >= 0.014 && t < 0.065)
+                    {
+                        double t2 = t - 0.014;
+                        double env2 = Math.Exp(-t2 * 200.0);
+                        val += env2 * (Math.Sin(2.0 * Math.PI * 1800.0 * t2) * 0.70 + Math.Sin(2.0 * Math.PI * 3400.0 * t2) * 0.35);
+                    }
+                    short s16 = (short)Math.Clamp(val * 28000.0, -32767.0, 32767.0);
+                    BitConverter.GetBytes(s16).CopyTo(wavData, 44 + i * 2);
+                }
+
+                System.IO.File.WriteAllBytes(wavPath, wavData);
+            }
+            return wavPath;
+        }
+        catch
+        {
+            string nav = @"C:\Windows\Media\Windows Navigation Start.wav";
+            if (System.IO.File.Exists(nav)) return nav;
+            return @"C:\Windows\Media\Windows Unlock.wav";
+        }
     }
 
     private void OnPowerStatusChanged()

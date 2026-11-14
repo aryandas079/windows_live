@@ -35,7 +35,8 @@ public partial class MainWindow : Window
     private bool _isNotchMode = true;
     private bool _isDraggingSlider = false;
 
-    private const double CompactClockWidth = 200.0;
+    private const double CompactClockWidth = 195.0;
+    private const double CompactClockChargingWidth = 255.0;
     private const double CompactMediaWidth = 270.0;
     private const double CompactChargingWidth = 320.0;
     private const double CompactHeight = 44.0;
@@ -44,12 +45,18 @@ public partial class MainWindow : Window
 
     private bool _isChargingAlertActive = false;
 
+    private bool HasActiveContent =>
+        (_mediaManager?.CurrentTrack?.HasMedia ?? false) ||
+        _isChargingAlertActive ||
+        (_focusService?.IsRunning ?? false);
+
     private double CurrentCompactWidth
     {
         get
         {
             if (_isChargingAlertActive) return CompactChargingWidth;
-            return (_mediaManager?.CurrentTrack?.HasMedia ?? false) ? CompactMediaWidth : CompactClockWidth;
+            if (_mediaManager?.CurrentTrack?.HasMedia ?? false) return CompactMediaWidth;
+            return (_powerService.IsCharging && _powerService.HasBattery) ? CompactClockChargingWidth : CompactClockWidth;
         }
     }
 
@@ -319,6 +326,8 @@ public partial class MainWindow : Window
         ApplyThemeResources();
         UpdateClock();
         OnPowerStatusChanged();
+        IslandContainer.Width = CurrentCompactWidth;
+        IslandContainer.Height = CompactHeight;
         _volumeManager.PollVolumeState(forceNotify: true);
         OnTrackChanged(_mediaManager.CurrentTrack);
 
@@ -392,7 +401,8 @@ public partial class MainWindow : Window
     private void OnIslandMouseEnter(object sender, MouseEventArgs e)
     {
         _autoCollapseTimer.Stop();
-        if (!_isExpanded)
+        IslandContainer.Cursor = HasActiveContent ? Cursors.Hand : Cursors.Arrow;
+        if (!_isExpanded && HasActiveContent)
         {
             ExpandDock();
         }
@@ -413,7 +423,7 @@ public partial class MainWindow : Window
 
     private void OnIslandMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.LeftButton == MouseButtonState.Pressed && !_isExpanded)
+        if (e.LeftButton == MouseButtonState.Pressed && !_isExpanded && HasActiveContent)
         {
             ExpandDock();
         }
@@ -421,7 +431,7 @@ public partial class MainWindow : Window
 
     private void ExpandDock()
     {
-        if (_isExpanded) return;
+        if (_isExpanded || !HasActiveContent) return;
         _isExpanded = true;
 
         AnimateIsland(ExpandedWidth, ExpandedHeight);
@@ -552,6 +562,11 @@ public partial class MainWindow : Window
             }
             else
             {
+                if (_isExpanded)
+                {
+                    CollapseDock();
+                }
+
                 if (!_isChargingAlertActive)
                 {
                     CompactMediaView.Visibility = Visibility.Collapsed;
@@ -567,9 +582,9 @@ public partial class MainWindow : Window
                 PlayPauseIcon.Symbol = SymbolRegular.Play24;
                 CompactEqualizer.IsPlaying = false;
 
-                if (!_isExpanded && Math.Abs(IslandContainer.Width - CompactClockWidth) > 1.0)
+                if (!_isExpanded && Math.Abs(IslandContainer.Width - CurrentCompactWidth) > 1.0)
                 {
-                    AnimateIsland(CompactClockWidth, CompactHeight);
+                    AnimateIsland(CurrentCompactWidth, CompactHeight);
                 }
             }
 
@@ -662,6 +677,10 @@ public partial class MainWindow : Window
                 CompactChargingText.Text = $"{_powerService.BatteryPercent}%";
                 double fillWidth = Math.Max(2.5, (_powerService.BatteryPercent / 100.0) * 26.0);
                 CompactChargingBatteryFill.Width = fillWidth;
+            }
+            else if (!_isExpanded && !(_mediaManager?.CurrentTrack?.HasMedia ?? false))
+            {
+                AnimateIsland(CurrentCompactWidth, CompactHeight);
             }
         });
     }

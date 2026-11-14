@@ -28,10 +28,10 @@
 
         <!-- Island Container -->
         <Grid x:Name="IslandContainer"
-              Width="220" Height="36"
+              Width="200" Height="44"
               VerticalAlignment="Top"
               HorizontalAlignment="Center"
-              Cursor="Hand">
+              Cursor="Arrow">
 
             <!-- Ambient Glow / Drop Shadow Layer -->
             <controls:DynamicIslandNotch x:Name="IslandShadow"
@@ -60,7 +60,7 @@
             <Grid x:Name="CompactView"
                   Height="44"
                   VerticalAlignment="Top"
-                  Margin="16,0,16,0"
+                  Margin="12,0,12,0"
                   Opacity="1.0">
 
                 <!-- 1. Default Mode: Clock & Date (When no media is playing) -->
@@ -78,16 +78,16 @@
                     <TextBlock x:Name="CompactTimeText"
                                Grid.Column="0"
                                Text="2:15 PM"
-                               FontSize="13"
+                               FontSize="12.5"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center" />
 
                     <Ellipse Grid.Column="1"
-                             Width="3.5" Height="3.5"
+                             Width="3" Height="3"
                              Fill="{DynamicResource TextSecondaryBrush}"
                              Opacity="0.6"
-                             Margin="9,0,9,0"
+                             Margin="7,0,7,0"
                              VerticalAlignment="Center" />
 
                     <TextBlock x:Name="CompactDateText"
@@ -106,14 +106,14 @@
                             BorderBrush="#4030D158"
                             BorderThickness="1"
                             CornerRadius="8"
-                            Padding="6,2,6,2"
-                            Margin="8,0,0,0"
+                            Padding="5,1.5,5,1.5"
+                            Margin="6,0,0,0"
                             VerticalAlignment="Center"
                             Cursor="Hand"
                             MouseDown="CompactChargingPill_MouseDown">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <ui:SymbolIcon Symbol="Flash24" FontSize="11" Foreground="#30D158" Margin="0,0,3,0" VerticalAlignment="Center" />
-                            <TextBlock x:Name="CompactBatteryPercentText" Text="85%" FontSize="11" FontWeight="Bold" Foreground="#30D158" VerticalAlignment="Center" />
+                            <ui:SymbolIcon Symbol="Flash24" FontSize="10" Foreground="#30D158" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="CompactBatteryPercentText" Text="85%" FontSize="11" FontWeight="SemiBold" Foreground="#30D158" VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
                 </Grid>

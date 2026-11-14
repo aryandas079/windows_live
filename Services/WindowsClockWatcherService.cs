@@ -6,6 +6,7 @@ namespace WindowsLive.Services;
 
 public class WindowsClockTimerInfo
 {
+    public string Key { get; set; } = string.Empty;
     public string Name { get; set; } = "Timer";
     public TimeSpan Duration { get; set; }
     public TimeSpan RemainingTime { get; set; }
@@ -123,6 +124,7 @@ public class WindowsClockWatcherService
                                 var currentRemaining = initialRemaining - elapsed;
                                 latestRunning = new WindowsClockTimerInfo
                                 {
+                                    Key = pair.Key,
                                     Name = name,
                                     Duration = duration,
                                     RemainingTime = currentRemaining,
@@ -143,6 +145,7 @@ public class WindowsClockWatcherService
                             {
                                 latestRunning = new WindowsClockTimerInfo
                                 {
+                                    Key = pair.Key,
                                     Name = name,
                                     Duration = duration,
                                     RemainingTime = remaining,
@@ -173,8 +176,83 @@ public class WindowsClockWatcherService
         }
     }
 
+    public void PauseActiveTimer()
+    {
+        if (_activeTimer == null) return;
+        try
+        {
+            var appData = Windows.Management.Core.ApplicationDataManager.CreateForPackageFamily(PackageFamilyName);
+            if (appData?.LocalSettings?.Containers.ContainsKey("Timers") == true)
+            {
+                var timersContainer = appData.LocalSettings.Containers["Timers"];
+                if (timersContainer.Values.ContainsKey(_activeTimer.Key) &&
+                    timersContainer.Values[_activeTimer.Key] is Windows.Storage.ApplicationDataCompositeValue comp)
+                {
+                    comp["RemainingTime"] = _activeTimer.RemainingTime.Ticks;
+                    comp["StartTime"] = 0L;
+                    comp["__Updated"] = DateTime.UtcNow.ToFileTimeUtc();
+                    timersContainer.Values[_activeTimer.Key] = comp;
+                }
+            }
+            _activeTimer.IsRunning = false;
+            TimerStateChanged?.Invoke(_activeTimer);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"WindowsClockWatcherService PauseActiveTimer error: {ex.Message}");
+        }
+    }
+
+    public void ResumeActiveTimer()
+    {
+        if (_activeTimer == null) return;
+        try
+        {
+            var appData = Windows.Management.Core.ApplicationDataManager.CreateForPackageFamily(PackageFamilyName);
+            if (appData?.LocalSettings?.Containers.ContainsKey("Timers") == true)
+            {
+                var timersContainer = appData.LocalSettings.Containers["Timers"];
+                if (timersContainer.Values.ContainsKey(_activeTimer.Key) &&
+                    timersContainer.Values[_activeTimer.Key] is Windows.Storage.ApplicationDataCompositeValue comp)
+                {
+                    comp["StartTime"] = DateTime.UtcNow.ToFileTimeUtc();
+                    comp["__Updated"] = DateTime.UtcNow.ToFileTimeUtc();
+                    timersContainer.Values[_activeTimer.Key] = comp;
+                }
+            }
+            _activeTimer.IsRunning = true;
+            _activeTimer.EndTime = DateTime.Now + _activeTimer.RemainingTime;
+            TimerStateChanged?.Invoke(_activeTimer);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"WindowsClockWatcherService ResumeActiveTimer error: {ex.Message}");
+        }
+    }
+
     public void CancelCurrentTimer()
     {
+        if (_activeTimer != null)
+        {
+            try
+            {
+                var appData = Windows.Management.Core.ApplicationDataManager.CreateForPackageFamily(PackageFamilyName);
+                if (appData?.LocalSettings?.Containers.ContainsKey("Timers") == true)
+                {
+                    var timersContainer = appData.LocalSettings.Containers["Timers"];
+                    if (timersContainer.Values.ContainsKey(_activeTimer.Key) &&
+                        timersContainer.Values[_activeTimer.Key] is Windows.Storage.ApplicationDataCompositeValue comp)
+                    {
+                        comp["StartTime"] = 0L;
+                        comp["RemainingTime"] = 0L;
+                        comp["__Updated"] = DateTime.UtcNow.ToFileTimeUtc();
+                        timersContainer.Values[_activeTimer.Key] = comp;
+                    }
+                }
+            }
+            catch { }
+        }
+
         _activeTimer = null;
         TimerStateChanged?.Invoke(null);
     }

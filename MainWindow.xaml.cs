@@ -1205,11 +1205,28 @@ public partial class MainWindow : Window
     private void CompactTimerPauseBtn_Click(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        if (_focusService.IsRunning)
+        if (_windowsClockService.HasActiveTimer)
+        {
+            if (_windowsClockService.ActiveTimer?.IsRunning == true)
+            {
+                _windowsClockService.PauseActiveTimer();
+                CompactTimerPauseBar1.Visibility = Visibility.Collapsed;
+                CompactTimerPauseBar2.Visibility = Visibility.Collapsed;
+                CompactTimerPlayTriangle.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                _windowsClockService.ResumeActiveTimer();
+                CompactTimerPauseBar1.Visibility = Visibility.Visible;
+                CompactTimerPauseBar2.Visibility = Visibility.Visible;
+                CompactTimerPlayTriangle.Visibility = Visibility.Collapsed;
+            }
+        }
+        else if (_focusService.IsRunning)
         {
             _focusService.Pause();
         }
-        else
+        else if (_focusService.Remaining.TotalSeconds > 0)
         {
             _focusService.Resume();
         }
@@ -1218,8 +1235,8 @@ public partial class MainWindow : Window
     private void CompactTimerCancelBtn_Click(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        _focusService.Stop();
         _windowsClockService.CancelCurrentTimer();
+        _focusService.Stop();
         if (_isExpanded && _activeCategory == IslandCategory.FocusTimer)
         {
             CollapseDock();
@@ -1231,7 +1248,7 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            if (info != null && info.IsRunning)
+            if (info != null && (info.IsRunning || info.RemainingTime.TotalSeconds > 0))
             {
                 int mins = info.RemainingTime.Hours > 0
                     ? (int)info.RemainingTime.TotalMinutes
@@ -1239,9 +1256,18 @@ public partial class MainWindow : Window
                 CompactLiveTimerCountdownText.Text = $"{mins}:{info.RemainingTime.Seconds:D2}";
                 FocusCountdownText.Text = $"{mins}:{info.RemainingTime.Seconds:D2} remaining";
 
-                CompactTimerPauseBar1.Visibility = Visibility.Visible;
-                CompactTimerPauseBar2.Visibility = Visibility.Visible;
-                CompactTimerPlayTriangle.Visibility = Visibility.Collapsed;
+                if (info.IsRunning)
+                {
+                    CompactTimerPauseBar1.Visibility = Visibility.Visible;
+                    CompactTimerPauseBar2.Visibility = Visibility.Visible;
+                    CompactTimerPlayTriangle.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    CompactTimerPauseBar1.Visibility = Visibility.Collapsed;
+                    CompactTimerPauseBar2.Visibility = Visibility.Collapsed;
+                    CompactTimerPlayTriangle.Visibility = Visibility.Visible;
+                }
             }
 
             UpdateCompactViewVisibility();

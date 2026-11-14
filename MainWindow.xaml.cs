@@ -37,12 +37,11 @@ public partial class MainWindow : Window
     private bool _isNotchMode = true;
     private bool _isDraggingSlider = false;
 
-    private const double CompactClockWidth = 195.0;
-    private const double CompactClockChargingWidth = 255.0;
-    private const double CompactMediaWidth = 270.0;
+    private const double CompactDefaultWidth = 160.0;
+    private const double CompactMediaWidth = 240.0;
     private const double CompactChargingWidth = 320.0;
     private const double CompactNotificationWidth = 220.0;
-    private const double CompactHeight = 44.0;
+    private const double CompactHeight = 36.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
 
@@ -53,18 +52,15 @@ public partial class MainWindow : Window
     private bool HasActiveContent =>
         (_mediaManager?.CurrentTrack?.HasMedia ?? false) ||
         _isChargingAlertActive ||
-        _isNotificationAlertActive ||
-        _notificationService.HasNotifications ||
-        (_focusService?.IsRunning ?? false);
+        _isNotificationAlertActive;
 
     private double CurrentCompactWidth
     {
         get
         {
             if (_isChargingAlertActive) return CompactChargingWidth;
-            if (_notificationService.HasNotifications) return CompactNotificationWidth;
             if (_mediaManager?.CurrentTrack?.HasMedia ?? false) return CompactMediaWidth;
-            return (_powerService.IsCharging && _powerService.HasBattery) ? CompactClockChargingWidth : CompactClockWidth;
+            return CompactDefaultWidth;
         }
     }
 
@@ -884,17 +880,6 @@ public partial class MainWindow : Window
             CompactNotificationView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Visible;
         }
-        else if (_notificationService.HasNotifications)
-        {
-            CompactClockView.Visibility = Visibility.Collapsed;
-            CompactMediaView.Visibility = Visibility.Collapsed;
-            CompactChargingView.Visibility = Visibility.Collapsed;
-            CompactNotificationView.Visibility = Visibility.Visible;
-            if (_currentNotification != null)
-            {
-                UpdateNotificationUI(_currentNotification);
-            }
-        }
         else if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
         {
             CompactClockView.Visibility = Visibility.Collapsed;
@@ -904,10 +889,11 @@ public partial class MainWindow : Window
         }
         else
         {
-            CompactMediaView.Visibility = Visibility.Collapsed;
+            // Empty blank notch: by default nothing is shown
+            CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
-            CompactClockView.Visibility = Visibility.Visible;
+            CompactMediaView.Visibility = Visibility.Collapsed;
         }
 
         if (!_isExpanded)

@@ -778,15 +778,11 @@ public partial class MainWindow : Window
         CompactUnlockView.Opacity = 0.0;
         CompactUnlockView.Visibility = Visibility.Visible;
 
-        // Reset shackle transforms to closed/locked state
+        // Reset shackle transforms to closed/locked state (Image 1)
         LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, null);
         LockShackleTranslate.BeginAnimation(TranslateTransform.XProperty, null);
-        LockShackleScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, null);
         LockShackleTranslate.X = 0;
         LockShackleTranslate.Y = 0;
-        LockShackleScale.ScaleX = 1.0;
-        LockShackleRotate.Angle = 0;
 
         // Animate island container width to 190.0 (compact height 36.0)
         AnimateIsland(CompactUnlockWidth, CompactHeight);
@@ -795,42 +791,32 @@ public partial class MainWindow : Window
         var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120));
         CompactUnlockView.BeginAnimation(OpacityProperty, fadeIn);
 
-        // Play crisp mechanical unlock click sound
+        // Play crisp mechanical unlock click sound strictly through device speakers
         PlayUnlockSound();
 
-        // 1. Shackle lifts up with snappy spring ease
+        // Smooth transition from Image 1 (Locked) to Image 2 (Unlocked):
+        // 1. Shackle lifts up out of the body
         var liftAnim = new DoubleAnimation
         {
             From = 0.0,
             To = -3.5,
-            Duration = TimeSpan.FromMilliseconds(220),
+            Duration = TimeSpan.FromMilliseconds(260),
             BeginTime = TimeSpan.FromMilliseconds(50),
-            EasingFunction = new BackEase { Amplitude = 0.40, EasingMode = EasingMode.EaseOut }
-        };
-
-        // 2. Shackle shifts outward to the right into the authentic open/twisted position
-        var shiftAnim = new DoubleAnimation
-        {
-            From = 0.0,
-            To = 2.8,
-            Duration = TimeSpan.FromMilliseconds(240),
-            BeginTime = TimeSpan.FromMilliseconds(60),
             EasingFunction = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut }
         };
 
-        // 3. Subtle 3D perspective twist foreshortening
-        var scaleAnim = new DoubleAnimation
+        // 2. Shackle shifts outward to the right into the exact Image 2 position
+        var shiftAnim = new DoubleAnimation
         {
-            From = 1.0,
-            To = 0.88,
-            Duration = TimeSpan.FromMilliseconds(240),
-            BeginTime = TimeSpan.FromMilliseconds(60),
-            EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseOut }
+            From = 0.0,
+            To = 4.5,
+            Duration = TimeSpan.FromMilliseconds(280),
+            BeginTime = TimeSpan.FromMilliseconds(50),
+            EasingFunction = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut }
         };
 
         LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, liftAnim);
         LockShackleTranslate.BeginAnimation(TranslateTransform.XProperty, shiftAnim);
-        LockShackleScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
 
         // Stay on screen for 3.0 seconds, then return to normal
         _unlockAlertTimer.Start();
@@ -843,18 +829,8 @@ public partial class MainWindow : Window
             string soundPath = GetOrGenerateUnlockSound();
             if (!string.IsNullOrEmpty(soundPath) && System.IO.File.Exists(soundPath))
             {
-                Task.Run(() =>
-                {
-                    try
-                    {
-                        using var player = new System.Media.SoundPlayer(soundPath);
-                        player.PlaySync();
-                    }
-                    catch (Exception ex)
-                    {
-                        App.Log($"PlayUnlockSound playback error: {ex.Message}");
-                    }
-                });
+                // Play exclusively through built-in device speakers (bypassing headphones/AirPods/Bluetooth)
+                SpeakerAudioService.PlayUnlockSoundOnSpeakers(soundPath);
             }
         }
         catch (Exception ex)

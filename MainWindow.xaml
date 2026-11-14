@@ -272,21 +272,18 @@
                     <!-- Left: Slick Animated Padlock (Matches User Uploaded Reference) -->
                     <Viewbox Grid.Column="0" Width="18" Height="20" HorizontalAlignment="Left" VerticalAlignment="Center">
                         <Canvas Width="22" Height="24">
-                            <!-- Shackle (Arch): Left leg goes deep to Y=12.5 so it stays rooted in the body when lifted,
-                                 Right leg goes to Y=9.5 so when lifted by 3.5px it opens cleanly above the body top (Y=9.0) -->
+                            <!-- Shackle (Arch): Smoothly transitions from Image 1 (Locked) to Image 2 (Unlocked) -->
                             <Canvas x:Name="LockShackleContainer" Width="16" Height="14" Canvas.Left="3" Canvas.Top="1">
                                 <Canvas.RenderTransform>
                                     <TransformGroup>
                                         <TranslateTransform x:Name="LockShackleTranslate" X="0" Y="0" />
-                                        <ScaleTransform x:Name="LockShackleScale" ScaleX="1.0" ScaleY="1.0" CenterX="2.5" CenterY="10" />
-                                        <RotateTransform x:Name="LockShackleRotate" Angle="0" CenterX="2.5" CenterY="10" />
                                     </TransformGroup>
                                 </Canvas.RenderTransform>
                                 <Path Stroke="White"
                                       StrokeThickness="2.2"
                                       StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round"
-                                      Data="M 2.5,12.5 V 5.2 C 2.5,2.6 4.7,1.2 7.5,1.2 C 10.3,1.2 12.5,2.6 12.5,5.2 V 9.5" />
+                                      Data="M 4.5,13.0 V 5.2 C 4.5,2.6 6.3,1.2 8.0,1.2 C 9.7,1.2 11.5,2.6 11.5,5.2 V 11.0" />
                             </Canvas>
 
                             <!-- Padlock Body -->

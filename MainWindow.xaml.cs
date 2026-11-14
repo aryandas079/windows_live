@@ -139,16 +139,21 @@ public partial class MainWindow : Window
 
             _chargingAlertTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(4.5)
+                Interval = TimeSpan.FromSeconds(5.0)
             };
             _chargingAlertTimer.Tick += (s, e) =>
             {
                 _chargingAlertTimer.Stop();
-                if (!_isPinned && !IslandContainer.IsMouseOver && _isChargingAlertActive)
+                if (_isChargingAlertActive)
                 {
                     _isChargingAlertActive = false;
 
-                    var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(140));
+                    // Restore shadow effect from charging glow
+                    IslandShadowEffect.Color = _themeService.IsDarkTheme ? Colors.Black : Color.FromArgb(255, 60, 60, 70);
+                    IslandShadowEffect.Opacity = _themeService.IsDarkTheme ? 0.55 : 0.25;
+                    IslandShadowEffect.BlurRadius = _themeService.IsDarkTheme ? 22 : 18;
+
+                    var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
                     fadeOut.Completed += (s2, e2) =>
                     {
                         CompactChargingView.Visibility = Visibility.Collapsed;
@@ -624,15 +629,16 @@ public partial class MainWindow : Window
         _isChargingAlertActive = true;
         _chargingAlertTimer.Stop();
 
-        int percent = _powerService.BatteryPercent;
+        int percent = Math.Clamp(_powerService.BatteryPercent, 1, 100);
         CompactChargingText.Text = $"{percent}%";
 
-        // Battery fill calculation (inner capsule width max is 26px)
-        double targetFillWidth = Math.Max(2.5, (percent / 100.0) * 26.0);
+        // Battery fill calculation (inner capsule usable width is 31px)
+        double targetFillWidth = Math.Max(3.0, (percent / 100.0) * 31.0);
 
-        // Hide other compact views and activate charging view matching Image 2
+        // Hide other compact views and activate charging view matching Image
         CompactClockView.Visibility = Visibility.Collapsed;
         CompactMediaView.Visibility = Visibility.Collapsed;
+        CompactNotificationView.Visibility = Visibility.Collapsed;
         CompactChargingView.Opacity = 0.0;
         CompactChargingView.Visibility = Visibility.Visible;
 
@@ -645,21 +651,26 @@ public partial class MainWindow : Window
             CompactView.Opacity = 1.0;
         }
 
-        // Animate island container width to 320.0 (compact height 44.0)
+        // Animate island container width to 320.0 (compact height 36.0)
         AnimateIsland(CompactChargingWidth, CompactHeight);
+
+        // Gentle emerald ambient glow around notch while charging alert displays
+        IslandShadowEffect.Color = Color.FromRgb(48, 209, 88);
+        IslandShadowEffect.Opacity = 0.40;
+        IslandShadowEffect.BlurRadius = 24;
 
         // Smooth fade-in of the charging view
         var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
         CompactChargingView.BeginAnimation(OpacityProperty, fadeIn);
 
         // Smooth battery fill animation from 0 to targetFillWidth
-        var fillAnim = new DoubleAnimation(0.0, targetFillWidth, TimeSpan.FromMilliseconds(500))
+        var fillAnim = new DoubleAnimation(0.0, targetFillWidth, TimeSpan.FromMilliseconds(650))
         {
             EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseOut }
         };
         CompactChargingBatteryFill.BeginAnimation(WidthProperty, fillAnim);
 
-        // Display for 4.5 seconds then smoothly restore
+        // Display for exactly 5.0 seconds then smoothly disappear
         _chargingAlertTimer.Start();
     }
 
@@ -684,7 +695,7 @@ public partial class MainWindow : Window
             if (_isChargingAlertActive)
             {
                 CompactChargingText.Text = $"{_powerService.BatteryPercent}%";
-                double fillWidth = Math.Max(2.5, (_powerService.BatteryPercent / 100.0) * 26.0);
+                double fillWidth = Math.Max(3.0, (_powerService.BatteryPercent / 100.0) * 31.0);
                 CompactChargingBatteryFill.Width = fillWidth;
             }
             else if (!_isExpanded && !(_mediaManager?.CurrentTrack?.HasMedia ?? false))

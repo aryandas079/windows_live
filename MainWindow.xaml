@@ -154,11 +154,11 @@
                                                IsPlaying="True" />
                 </Grid>
 
-                <!-- 3. Charging Mode: Matches Image 2 ("Charging" on left, "28% [battery]" on right) -->
+                <!-- 3. Charging Mode: Matches Image ("Charging" on left, "84% [battery]" on right) -->
                 <Grid x:Name="CompactChargingView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="8,0,8,0">
+                      Margin="10,0,10,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -171,43 +171,44 @@
                                FontSize="15"
                                FontWeight="Normal"
                                Foreground="#FFFFFF"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               Margin="4,0,0,0" />
 
                     <!-- Center: Spacious gap -->
                     <Grid Grid.Column="1" />
 
-                    <!-- Right: Percentage & Green Battery Capsule -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Right: Percentage & Apple-Style Clean Battery Capsule -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,2,0">
                         <TextBlock x:Name="CompactChargingText"
-                                   Text="28%"
-                                   FontSize="15"
+                                   Text="84%"
+                                   FontSize="16"
                                    FontWeight="SemiBold"
-                                   Foreground="#34C759"
-                                   Margin="0,0,9,0"
+                                   Foreground="#30D158"
+                                   Margin="0,0,10,0"
                                    VerticalAlignment="Center" />
 
-                        <!-- Apple Battery Icon matching Image 2 -->
+                        <!-- Apple Battery Icon matching Image -->
                         <Grid VerticalAlignment="Center">
-                            <!-- Unfilled / Background Capsule (Dark Olive Green) -->
-                            <Border Width="28" Height="14"
-                                    CornerRadius="4"
-                                    Background="#1C3F1E"
-                                    BorderBrush="#255528"
+                            <!-- Unfilled / Background Capsule (Deep Emerald Background) -->
+                            <Border Width="33" Height="16"
+                                    CornerRadius="4.5"
+                                    Background="#163519"
+                                    BorderBrush="#245028"
                                     BorderThickness="1"
                                     ClipToBounds="True">
-                                <!-- Filled Level (Neon Apple Green #34C759) -->
+                                <!-- Filled Level (Vibrant Apple Green #30D158) -->
                                 <Border x:Name="CompactChargingBatteryFill"
-                                        Width="8" Height="14"
-                                        CornerRadius="3"
-                                        Background="#34C759"
+                                        Width="26" Height="14"
+                                        CornerRadius="3.5"
+                                        Background="#30D158"
                                         HorizontalAlignment="Left" />
                             </Border>
-                            <!-- Battery Tip / Nub -->
+                            <!-- Battery Terminal Cap / Nub -->
                             <Border Width="2.5" Height="6"
-                                    CornerRadius="1"
-                                    Background="#255528"
+                                    CornerRadius="0,1.5,1.5,0"
+                                    Background="#245028"
                                     HorizontalAlignment="Right"
-                                    Margin="0,0,-3.5,0"
+                                    Margin="0,0,-3,0"
                                     VerticalAlignment="Center" />
                         </Grid>
                     </StackPanel>

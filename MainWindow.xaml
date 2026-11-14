@@ -121,23 +121,31 @@
                 <!-- 2. Media Mode: Matches Image 3 (disc icon left, animated equalizer right) -->
                 <Grid x:Name="CompactMediaView"
                       Visibility="Collapsed"
-                      VerticalAlignment="Center">
+                      VerticalAlignment="Center"
+                      Margin="10,0,10,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Circular Media Disc / Thumbnail -->
+                    <!-- Left: Rounded Album Art / Thumbnail safely inset inside notch -->
                     <Border Grid.Column="0"
-                            Width="26" Height="26"
-                            CornerRadius="13"
-                            ClipToBounds="True"
-                            VerticalAlignment="Center"
-                            Margin="2,0,0,0">
+                            Width="24" Height="24"
+                            CornerRadius="6"
+                            Background="{DynamicResource CardBackgroundBrush}"
+                            VerticalAlignment="Center">
                         <Grid>
                             <Ellipse x:Name="CompactDefaultOrb" Fill="{DynamicResource AccentColorBrush}" />
-                            <Image x:Name="CompactAlbumImage" Stretch="UniformToFill" Visibility="Collapsed" />
+                            <Image x:Name="CompactAlbumImage" Stretch="UniformToFill" Visibility="Collapsed">
+                                <Image.OpacityMask>
+                                    <VisualBrush>
+                                        <VisualBrush.Visual>
+                                            <Border Width="24" Height="24" CornerRadius="6" Background="Black" />
+                                        </VisualBrush.Visual>
+                                    </VisualBrush>
+                                </Image.OpacityMask>
+                            </Image>
                             <ui:SymbolIcon x:Name="CompactOrbSymbol" Symbol="MusicNote224" FontSize="11" Foreground="{DynamicResource PlayButtonForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
                     </Border>
@@ -149,7 +157,7 @@
                     <controls:EqualizerControl x:Name="CompactEqualizer"
                                                Grid.Column="2"
                                                VerticalAlignment="Center"
-                                               Margin="0,0,4,0"
+                                               Margin="0,0,2,0"
                                                AccentBrush="{DynamicResource AccentColorBrush}"
                                                IsPlaying="True" />
                 </Grid>

@@ -21,7 +21,9 @@ public class ThemeService
     public SolidColorBrush TextPrimaryBrush { get; private set; } = new(Color.FromArgb(242, 255, 255, 255));
     public SolidColorBrush TextSecondaryBrush { get; private set; } = new(Color.FromArgb(140, 255, 255, 255));
     public SolidColorBrush CardBackgroundBrush { get; private set; } = new(Color.FromArgb(120, 24, 24, 26));
-    public SolidColorBrush PlayButtonForegroundBrush { get; private set; } = new(Colors.White);
+    public SolidColorBrush PlayButtonBackgroundBrush { get; private set; } = new(Colors.White);
+    public SolidColorBrush PlayButtonForegroundBrush { get; private set; } = new(Colors.Black);
+    public SolidColorBrush CircleButtonBackgroundBrush { get; private set; } = new(Color.FromArgb(40, 255, 255, 255));
 
     public ThemeService()
     {
@@ -99,13 +101,16 @@ public class ThemeService
         // 3. Totally Opaque Surface Brushes (Solid 255 alpha)
         if (IsDarkTheme)
         {
-            // Dark Mode palette (OLED solid dark)
+            // Dark Mode palette (OLED solid dark matching rockstar image)
             SurfaceDarkBrush = new SolidColorBrush(Color.FromRgb(18, 18, 20));
             SurfaceBorderBrush = new SolidColorBrush(Color.FromArgb(43, 255, 255, 255));
             SubtleHoverBrush = new SolidColorBrush(Color.FromArgb(31, 255, 255, 255));
-            TextPrimaryBrush = new SolidColorBrush(Color.FromArgb(242, 255, 255, 255));
+            TextPrimaryBrush = new SolidColorBrush(Color.FromRgb(255, 255, 255));
             TextSecondaryBrush = new SolidColorBrush(Color.FromArgb(160, 255, 255, 255));
             CardBackgroundBrush = new SolidColorBrush(Color.FromRgb(30, 30, 34));
+            PlayButtonBackgroundBrush = new SolidColorBrush(Colors.White);
+            PlayButtonForegroundBrush = new SolidColorBrush(Color.FromRgb(18, 18, 20));
+            CircleButtonBackgroundBrush = new SolidColorBrush(Color.FromArgb(45, 255, 255, 255));
         }
         else
         {
@@ -116,12 +121,10 @@ public class ThemeService
             TextPrimaryBrush = new SolidColorBrush(Color.FromRgb(20, 20, 24));
             TextSecondaryBrush = new SolidColorBrush(Color.FromRgb(95, 95, 105));
             CardBackgroundBrush = new SolidColorBrush(Color.FromRgb(230, 230, 236));
+            PlayButtonBackgroundBrush = new SolidColorBrush(Color.FromRgb(20, 20, 24));
+            PlayButtonForegroundBrush = new SolidColorBrush(Colors.White);
+            CircleButtonBackgroundBrush = new SolidColorBrush(Color.FromArgb(25, 0, 0, 0));
         }
-
-        // Determine best text contrast for accent Play button
-        // Perceived luminance formula: (0.299*R + 0.587*G + 0.114*B)
-        double luminance = (0.299 * AccentColor.R + 0.587 * AccentColor.G + 0.114 * AccentColor.B) / 255.0;
-        PlayButtonForegroundBrush = luminance > 0.55 ? new SolidColorBrush(Colors.Black) : new SolidColorBrush(Colors.White);
 
         SurfaceDarkBrush.Freeze();
         SurfaceBorderBrush.Freeze();
@@ -129,7 +132,9 @@ public class ThemeService
         TextPrimaryBrush.Freeze();
         TextSecondaryBrush.Freeze();
         CardBackgroundBrush.Freeze();
+        PlayButtonBackgroundBrush.Freeze();
         PlayButtonForegroundBrush.Freeze();
+        CircleButtonBackgroundBrush.Freeze();
 
         ThemeChanged?.Invoke();
     }

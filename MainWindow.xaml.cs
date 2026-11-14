@@ -32,13 +32,12 @@ public partial class MainWindow : Window
     private bool _isPinned = false;
     private bool _isNotchMode = true;
     private bool _isDraggingSlider = false;
-    private bool _isHoverRevealed = false;
 
-    private const double CompactClockWidth = 220.0;
-    private const double CompactMediaWidth = 300.0;
-    private const double CompactHeight = 36.0;
-    private const double ExpandedWidth = 440.0;
-    private const double ExpandedHeight = 145.0;
+    private const double CompactClockWidth = 190.0;
+    private const double CompactMediaWidth = 240.0;
+    private const double CompactHeight = 38.0;
+    private const double ExpandedWidth = 370.0;
+    private const double ExpandedHeight = 68.0;
 
     private double CurrentCompactWidth => (_mediaManager?.CurrentTrack?.HasMedia ?? false) ? CompactMediaWidth : CompactClockWidth;
 
@@ -94,7 +93,6 @@ public partial class MainWindow : Window
                 CollapseDock();
                 if (_appStateTracker.CurrentState == ForegroundAppState.Maximized)
                 {
-                    _isHoverRevealed = false;
                     HideDockSmooth();
                 }
             }
@@ -125,7 +123,6 @@ public partial class MainWindow : Window
                 case ForegroundAppState.FullScreen:
                 case ForegroundAppState.Maximized:
                     // Fullscreen or Maximized mode: disappear completely
-                    _isHoverRevealed = false;
                     TopEdgeHotspot.Visibility = Visibility.Collapsed;
                     HideDockSmooth();
                     break;
@@ -133,7 +130,6 @@ public partial class MainWindow : Window
                 case ForegroundAppState.Normal:
                     // Desktop / non-maximized apps: dynamic island visible at top
                     TopEdgeHotspot.Visibility = Visibility.Collapsed;
-                    _isHoverRevealed = false;
                     ShowDockSmooth();
                     break;
             }
@@ -184,7 +180,9 @@ public partial class MainWindow : Window
         Application.Current.Resources["TextPrimaryBrush"] = _themeService.TextPrimaryBrush;
         Application.Current.Resources["TextSecondaryBrush"] = _themeService.TextSecondaryBrush;
         Application.Current.Resources["CardBackgroundBrush"] = _themeService.CardBackgroundBrush;
+        Application.Current.Resources["PlayButtonBackgroundBrush"] = _themeService.PlayButtonBackgroundBrush;
         Application.Current.Resources["PlayButtonForegroundBrush"] = _themeService.PlayButtonForegroundBrush;
+        Application.Current.Resources["CircleButtonBackgroundBrush"] = _themeService.CircleButtonBackgroundBrush;
 
         if (!_themeService.IsDarkTheme)
         {
@@ -206,19 +204,21 @@ public partial class MainWindow : Window
 
     private void UpdateControlThemeColors()
     {
-        CompactProgressArt.AccentBrush = _themeService.AccentBrush;
         CompactEqualizer.AccentBrush = _themeService.AccentBrush;
 
-        if (_isPinned)
+        if (_themeService.IsDarkTheme)
         {
-            PinIcon.Foreground = _themeService.AccentBrush;
+            PlayPauseButton.Background = new SolidColorBrush(Colors.White);
+            PlayPauseIcon.Foreground = new SolidColorBrush(Colors.Black);
         }
         else
         {
-            PinIcon.Foreground = _themeService.TextSecondaryBrush;
+            PlayPauseButton.Background = _themeService.AccentBrush;
+            PlayPauseIcon.Foreground = _themeService.PlayButtonForegroundBrush;
         }
 
-        PlayPauseIcon.Foreground = _themeService.PlayButtonForegroundBrush;
+        PreviousButton.Foreground = _themeService.TextSecondaryBrush;
+        NextButton.Foreground = _themeService.TextSecondaryBrush;
         ExpandedOrbSymbol.Foreground = _themeService.PlayButtonForegroundBrush;
         ExpandedDefaultOrb.Fill = _themeService.AccentBrush;
     }
@@ -318,7 +318,6 @@ public partial class MainWindow : Window
         }
         else if (!_isExpanded && _appStateTracker.CurrentState == ForegroundAppState.Maximized)
         {
-            _isHoverRevealed = false;
             HideDockSmooth();
         }
     }
@@ -421,15 +420,10 @@ public partial class MainWindow : Window
                 CompactClockView.Visibility = Visibility.Collapsed;
                 CompactMediaView.Visibility = Visibility.Visible;
 
-                CompactTitleText.Text = string.IsNullOrWhiteSpace(track.Title) ? "Now Playing" : track.Title;
-                CompactArtistText.Text = string.IsNullOrWhiteSpace(track.Artist) ? track.SourceApp : track.Artist;
-                CompactProgressArt.ImageSource = track.Thumbnail;
                 CompactEqualizer.IsPlaying = track.IsPlaying;
 
                 ExpandedTitleText.Text = string.IsNullOrWhiteSpace(track.Title) ? "Now Playing" : track.Title;
-                ExpandedArtistText.Text = string.IsNullOrWhiteSpace(track.AlbumTitle)
-                    ? track.Artist
-                    : $"{track.Artist} • {track.AlbumTitle}";
+                ExpandedArtistText.Text = string.IsNullOrWhiteSpace(track.Artist) ? "Audio" : track.Artist;
 
                 if (track.Thumbnail != null)
                 {
@@ -437,6 +431,9 @@ public partial class MainWindow : Window
                     ExpandedAlbumImage.Visibility = Visibility.Visible;
                     ExpandedDefaultOrb.Visibility = Visibility.Collapsed;
                     ExpandedOrbSymbol.Visibility = Visibility.Collapsed;
+
+                    CompactAlbumImage.Source = track.Thumbnail;
+                    CompactAlbumImage.Visibility = Visibility.Visible;
                 }
                 else
                 {
@@ -444,15 +441,9 @@ public partial class MainWindow : Window
                     ExpandedAlbumImage.Visibility = Visibility.Collapsed;
                     ExpandedDefaultOrb.Visibility = Visibility.Visible;
                     ExpandedOrbSymbol.Visibility = Visibility.Visible;
-                }
 
-                PositionText.Text = track.PositionString;
-                DurationText.Text = track.DurationString;
-
-                if (!_isDraggingSlider)
-                {
-                    TrackSlider.Maximum = Math.Max(1.0, track.Duration.TotalSeconds);
-                    TrackSlider.Value = track.Position.TotalSeconds;
+                    CompactAlbumImage.Source = null;
+                    CompactAlbumImage.Visibility = Visibility.Collapsed;
                 }
 
                 PlayPauseIcon.Symbol = track.IsPlaying ? SymbolRegular.Pause24 : SymbolRegular.Play24;
@@ -491,30 +482,8 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() =>
         {
             int volPct = (int)Math.Round(vol * 100.0);
-            if (!_isDraggingSlider)
-            {
-                VolumeSlider.Value = volPct;
-            }
-
             HardwareVolumeBar.Value = volPct;
             HardwareVolumeText.Text = $"{volPct}%";
-
-            if (isMuted || vol <= 0.01f)
-            {
-                VolumeIcon.Symbol = SymbolRegular.SpeakerMute24;
-            }
-            else if (vol < 0.35f)
-            {
-                VolumeIcon.Symbol = SymbolRegular.Speaker024;
-            }
-            else if (vol < 0.7f)
-            {
-                VolumeIcon.Symbol = SymbolRegular.Speaker124;
-            }
-            else
-            {
-                VolumeIcon.Symbol = SymbolRegular.Speaker224;
-            }
         });
     }
 
@@ -577,32 +546,12 @@ public partial class MainWindow : Window
         await _mediaManager.NextAsync();
     }
 
-    private void ShuffleButton_Click(object sender, RoutedEventArgs e)
-    {
-        var isAccent = ShuffleButton.Foreground == _themeService.AccentBrush;
-        ShuffleButton.Foreground = isAccent ? _themeService.TextSecondaryBrush : _themeService.AccentBrush;
-    }
-
-    private void RepeatButton_Click(object sender, RoutedEventArgs e)
-    {
-        var isAccent = RepeatButton.Foreground == _themeService.AccentBrush;
-        RepeatButton.Foreground = isAccent ? _themeService.TextSecondaryBrush : _themeService.AccentBrush;
-    }
-
-    private void PinButton_Click(object sender, RoutedEventArgs e)
-    {
-        _isPinned = !_isPinned;
-        PinIcon.Foreground = _isPinned ? _themeService.AccentBrush : _themeService.TextSecondaryBrush;
-    }
-
     private void CollapseButton_Click(object sender, RoutedEventArgs e)
     {
         _isPinned = false;
-        PinIcon.Foreground = _themeService.TextSecondaryBrush;
         CollapseDock();
         if (_appStateTracker.CurrentState == ForegroundAppState.Maximized)
         {
-            _isHoverRevealed = false;
             HideDockSmooth();
         }
     }
@@ -622,40 +571,6 @@ public partial class MainWindow : Window
         {
             Top = 8;
             IslandContainer.Margin = new Thickness(0, 0, 0, 0);
-        }
-    }
-
-    private void VolumeButton_Click(object sender, RoutedEventArgs e)
-    {
-        _volumeManager.ToggleMute();
-    }
-
-    private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (IsLoaded)
-        {
-            _volumeManager.SetVolume((float)(e.NewValue / 100.0));
-        }
-    }
-
-    private void TrackSlider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        _isDraggingSlider = true;
-        _autoCollapseTimer.Stop();
-    }
-
-    private async void TrackSlider_PreviewMouseUp(object sender, MouseButtonEventArgs e)
-    {
-        _isDraggingSlider = false;
-        await _mediaManager.SeekAsync(TimeSpan.FromSeconds(TrackSlider.Value));
-    }
-
-    private void TrackSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (_isDraggingSlider)
-        {
-            var pos = TimeSpan.FromSeconds(e.NewValue);
-            PositionText.Text = $"{(int)pos.TotalMinutes}:{pos.Seconds:D2}";
         }
     }
 

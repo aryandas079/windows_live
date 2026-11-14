@@ -19,30 +19,100 @@ public static class WindowHelper
     private const uint SWP_SHOWWINDOW = 0x0040;
     private const uint SWP_FRAMECHANGED = 0x0020;
 
+    private const int DWMWA_EXCLUDED_FROM_PEEK = 12;
+
     public const int WM_NCHITTEST = 0x0084;
     public const int HTTRANSPARENT = -1;
     public const int HTCLIENT = 1;
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLong", SetLastError = true)]
+    private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
+    private static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    private static extern bool SetWindowText(IntPtr hWnd, string lpString);
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    [ComImport]
+    [Guid("56FDF342-FD6D-11d0-958A-006097C9A090")]
+    [ClassInterface(ClassInterfaceType.None)]
+    private class TaskbarInstance
+    {
+    }
+
+    [ComImport]
+    [Guid("56FDF344-FD6D-11d0-958A-006097C9A090")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface ITaskbarList
+    {
+        void HrInit();
+        void AddTab(IntPtr hWnd);
+        void DeleteTab(IntPtr hWnd);
+        void ActivateTab(IntPtr hWnd);
+        void SetActiveAlt(IntPtr hWnd);
+    }
+
+    private static IntPtr GetWindowLongAuto(IntPtr hWnd, int nIndex)
+    {
+        if (IntPtr.Size == 8)
+            return GetWindowLongPtr64(hWnd, nIndex);
+        return new IntPtr(GetWindowLong32(hWnd, nIndex));
+    }
+
+    private static IntPtr SetWindowLongAuto(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+    {
+        if (IntPtr.Size == 8)
+            return SetWindowLongPtr64(hWnd, nIndex, dwNewLong);
+        return new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
+    }
+
     public static void MakeToolWindow(Window window)
     {
         var helper = new WindowInteropHelper(window);
-        if (helper.Handle != IntPtr.Zero)
+        IntPtr hWnd = helper.Handle;
+        if (hWnd != IntPtr.Zero)
         {
-            int exStyle = GetWindowLong(helper.Handle, GWL_EXSTYLE);
-            // Remove WS_EX_APPWINDOW and add WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE
-            int newStyle = (exStyle & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
-            SetWindowLong(helper.Handle, GWL_EXSTYLE, newStyle);
-            SetWindowPos(helper.Handle, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+            // 1. Clear window title completely so Task Manager & Alt-Tab have no titled app window
+            SetWindowText(hWnd, string.Empty);
+
+            // 2. Remove WS_EX_APPWINDOW and add WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE
+            IntPtr exStyle = GetWindowLongAuto(hWnd, GWL_EXSTYLE);
+            long newStyle = (exStyle.ToInt64() & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+            SetWindowLongAuto(hWnd, GWL_EXSTYLE, new IntPtr(newStyle));
+
+            // 3. Exclude from DWM Peek and Alt-Tab switcher
+            try
+            {
+                int trueVal = 1;
+                DwmSetWindowAttribute(hWnd, DWMWA_EXCLUDED_FROM_PEEK, ref trueVal, sizeof(int));
+            }
+            catch { }
+
+            // 4. Instruct Windows Shell to remove from taskbar and task switcher tabs
+            try
+            {
+                var taskbar = (ITaskbarList)new TaskbarInstance();
+                taskbar.HrInit();
+                taskbar.DeleteTab(hWnd);
+            }
+            catch { }
+
+            // 5. Apply frame change
+            SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
         }
     }
 

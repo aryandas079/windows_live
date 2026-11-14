@@ -42,10 +42,36 @@ public class FocusTimerService
         Tick?.Invoke();
     }
 
+    public void StartSeconds(int seconds)
+    {
+        _remaining = TimeSpan.FromSeconds(seconds);
+        _isRunning = true;
+        _timer.Start();
+        Tick?.Invoke();
+    }
+
+    public void Pause()
+    {
+        _isRunning = false;
+        _timer.Stop();
+        Tick?.Invoke();
+    }
+
+    public void Resume()
+    {
+        if (_remaining.TotalSeconds > 0)
+        {
+            _isRunning = true;
+            _timer.Start();
+            Tick?.Invoke();
+        }
+    }
+
     public void Stop()
     {
         _isRunning = false;
         _timer.Stop();
+        _remaining = TimeSpan.Zero;
         Tick?.Invoke();
     }
 

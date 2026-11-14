@@ -46,6 +46,7 @@ public partial class MainWindow : Window
     private const double CompactUnlockWidth = 190.0;
     private const double CompactSilentRingWidth = 200.0;
     private const double CompactDndWidth = 240.0;
+    private const double CompactTimerWidth = 240.0;
     private const double CompactHeight = 36.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
@@ -68,6 +69,8 @@ public partial class MainWindow : Window
         _isUnlockAlertActive ||
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
+        _focusService.IsRunning ||
+        (_focusService.Remaining.TotalSeconds > 0) ||
         (_mediaManager?.CurrentTrack?.HasMedia ?? false) ||
         _isChargingAlertActive ||
         _isNotificationAlertActive;
@@ -81,6 +84,7 @@ public partial class MainWindow : Window
             if (_isDndAlertActive) return CompactDndWidth;
             if (_isChargingAlertActive) return CompactChargingWidth;
             if (_isNotificationAlertActive && _currentNotification != null) return CompactNotificationWidth;
+            if (_focusService.IsRunning || _focusService.Remaining.TotalSeconds > 0) return CompactTimerWidth;
             if (_mediaManager?.CurrentTrack?.HasMedia ?? false) return CompactMediaWidth;
             return CompactDefaultWidth;
         }
@@ -1150,7 +1154,50 @@ public partial class MainWindow : Window
         {
             FocusCountdownText.Text = $"{_focusService.FormattedTime} remaining";
             FocusToggleButton.Content = _focusService.IsRunning ? "Pause" : "Resume";
+
+            // Format "M:SS" or "MM:SS" matching reference (e.g. "0:58", "4:32")
+            CompactLiveTimerCountdownText.Text = $"{_focusService.Remaining.Minutes}:{_focusService.Remaining.Seconds:D2}";
+
+            // Update pause/play icon state in the compact pill
+            if (_focusService.IsRunning)
+            {
+                CompactTimerPauseBar1.Visibility = Visibility.Visible;
+                CompactTimerPauseBar2.Visibility = Visibility.Visible;
+                CompactTimerPlayTriangle.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                CompactTimerPauseBar1.Visibility = Visibility.Collapsed;
+                CompactTimerPauseBar2.Visibility = Visibility.Collapsed;
+                CompactTimerPlayTriangle.Visibility = Visibility.Visible;
+            }
+
+            UpdateCompactViewVisibility();
         });
+    }
+
+    private void CompactTimerPauseBtn_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_focusService.IsRunning)
+        {
+            _focusService.Pause();
+        }
+        else
+        {
+            _focusService.Resume();
+        }
+    }
+
+    private void CompactTimerCancelBtn_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        _focusService.Stop();
+        if (_isExpanded && _activeCategory == IslandCategory.FocusTimer)
+        {
+            CollapseDock();
+        }
+        UpdateCompactViewVisibility();
     }
 
     private void OnClipboardTextChanged(string text)
@@ -1374,6 +1421,7 @@ public partial class MainWindow : Window
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Visible;
         }
         else if (_isSilentRingAlertActive)
@@ -1384,6 +1432,7 @@ public partial class MainWindow : Window
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Visible;
         }
         else if (_isDndAlertActive)
@@ -1394,6 +1443,7 @@ public partial class MainWindow : Window
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Visible;
         }
         else if (_isChargingAlertActive)
@@ -1404,6 +1454,7 @@ public partial class MainWindow : Window
             CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Visible;
         }
         else if (_isNotificationAlertActive && _currentNotification != null)
@@ -1414,7 +1465,19 @@ public partial class MainWindow : Window
             CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Visible;
+        }
+        else if (_focusService.IsRunning || _focusService.Remaining.TotalSeconds > 0)
+        {
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Visible;
         }
         else if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
         {
@@ -1424,6 +1487,7 @@ public partial class MainWindow : Window
             CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Visible;
         }
         else
@@ -1435,6 +1499,7 @@ public partial class MainWindow : Window
             CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
         }
 

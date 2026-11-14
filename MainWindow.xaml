@@ -397,6 +397,124 @@
                                VerticalAlignment="Center"
                                Margin="0,0,4,0" />
                 </Grid>
+
+                <!-- 8. Live Active Timer Pill (Matches User Uploaded Reference Exactly) -->
+                <!-- Amber circle pause button, subtle dark cancel (X) button, and amber Timer mm:ss text -->
+                <Grid x:Name="CompactLiveTimerView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="6,0,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Control Buttons Group -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Amber Circular Pause / Resume Button -->
+                        <Button x:Name="CompactTimerPauseBtn"
+                                Width="28" Height="28"
+                                Margin="0,0,6,0"
+                                Padding="0"
+                                Background="#382500"
+                                BorderBrush="#6B4800"
+                                BorderThickness="1"
+                                Cursor="Hand"
+                                Click="CompactTimerPauseBtn_Click">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="PBorder"
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        CornerRadius="14">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="PBorder" Property="Background" Value="#4D3300" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="PBorder" Property="Background" Value="#291A00" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Button.Style>
+                            <Canvas Width="10" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <!-- Amber Pause Bars (or Play Triangle) -->
+                                <Rectangle x:Name="CompactTimerPauseBar1" Width="3" Height="11" Canvas.Left="0" Canvas.Top="0.5" RadiusX="1" RadiusY="1" Fill="#F59E0B" />
+                                <Rectangle x:Name="CompactTimerPauseBar2" Width="3" Height="11" Canvas.Left="7" Canvas.Top="0.5" RadiusX="1" RadiusY="1" Fill="#F59E0B" />
+                                <Path x:Name="CompactTimerPlayTriangle" Data="M 1,0.5 L 9,6 L 1,11.5 Z" Fill="#F59E0B" Visibility="Collapsed" />
+                            </Canvas>
+                        </Button>
+
+                        <!-- Dark Circular Close / Cancel Button (X) -->
+                        <Button x:Name="CompactTimerCancelBtn"
+                                Width="28" Height="28"
+                                Padding="0"
+                                Background="#1A1A1E"
+                                BorderBrush="#2C2C30"
+                                BorderThickness="1"
+                                Cursor="Hand"
+                                Click="CompactTimerCancelBtn_Click">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="CBorder"
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        CornerRadius="14">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="CBorder" Property="Background" Value="#2A2A30" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="CBorder" Property="Background" Value="#101014" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Button.Style>
+                            <Canvas Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <!-- Clean Crisp White 'X' -->
+                                <Line X1="1" Y1="1" X2="9" Y2="9" Stroke="White" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Line X1="9" Y1="1" X2="1" Y2="9" Stroke="White" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Center: Notch Space -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: "Timer mm:ss" in Vibrant iOS Amber (#F59E0B) -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                        <TextBlock Text="Timer "
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="#F59E0B"
+                                   VerticalAlignment="Center" />
+                        <TextBlock x:Name="CompactLiveTimerCountdownText"
+                                   Text="0:58"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="#F59E0B"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
             </Grid>
 
             <!-- ============================================== -->

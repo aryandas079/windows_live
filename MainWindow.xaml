@@ -153,6 +153,65 @@
                                                AccentBrush="{DynamicResource AccentColorBrush}"
                                                IsPlaying="True" />
                 </Grid>
+
+                <!-- 3. Charging Mode: Matches Image 2 ("Charging" on left, "28% [battery]" on right) -->
+                <Grid x:Name="CompactChargingView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="8,0,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: "Charging" in clean white font -->
+                    <TextBlock Grid.Column="0"
+                               Text="Charging"
+                               FontSize="15"
+                               FontWeight="Normal"
+                               Foreground="#FFFFFF"
+                               VerticalAlignment="Center" />
+
+                    <!-- Center: Spacious gap -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Percentage & Green Battery Capsule -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="CompactChargingText"
+                                   Text="28%"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="#34C759"
+                                   Margin="0,0,9,0"
+                                   VerticalAlignment="Center" />
+
+                        <!-- Apple Battery Icon matching Image 2 -->
+                        <Grid VerticalAlignment="Center">
+                            <!-- Unfilled / Background Capsule (Dark Olive Green) -->
+                            <Border Width="28" Height="14"
+                                    CornerRadius="4"
+                                    Background="#1C3F1E"
+                                    BorderBrush="#255528"
+                                    BorderThickness="1"
+                                    ClipToBounds="True">
+                                <!-- Filled Level (Neon Apple Green #34C759) -->
+                                <Border x:Name="CompactChargingBatteryFill"
+                                        Width="8" Height="14"
+                                        CornerRadius="3"
+                                        Background="#34C759"
+                                        HorizontalAlignment="Left" />
+                            </Border>
+                            <!-- Battery Tip / Nub -->
+                            <Border Width="2.5" Height="6"
+                                    CornerRadius="1"
+                                    Background="#255528"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,0,-3.5,0"
+                                    VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
             </Grid>
 
             <!-- ============================================== -->
@@ -244,70 +303,6 @@
                             </Button>
                         </StackPanel>
                     </Grid>
-
-                    <!-- ============================================== -->
-                    <!-- CHARGING ANIMATION VIEW (Apple-style Alert)    -->
-                    <!-- ============================================== -->
-                    <Grid x:Name="ViewChargingAlert" Visibility="Collapsed" VerticalAlignment="Center" Margin="6,4,6,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Left: Animated Green Battery Capsule with Positive Nub -->
-                        <Border Grid.Column="0"
-                                Width="54" Height="50"
-                                CornerRadius="14"
-                                Background="#1830D158"
-                                BorderBrush="#4030D158"
-                                BorderThickness="1.2"
-                                Margin="0,0,18,0"
-                                VerticalAlignment="Center">
-                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <!-- Battery Capsule Outer Border -->
-                                <Border Width="34" Height="20" CornerRadius="5" BorderBrush="#30D158" BorderThickness="1.8" Padding="1.5">
-                                    <!-- Battery Fill Level -->
-                                    <Grid HorizontalAlignment="Left">
-                                        <Border x:Name="ChargingBatteryFill" Width="26" Height="13" CornerRadius="3" Background="#30D158" />
-                                    </Grid>
-                                </Border>
-                                <!-- Positive Nub on Right -->
-                                <Border Width="2.5" Height="7" CornerRadius="1" Background="#30D158" HorizontalAlignment="Right" Margin="0,0,-4,0" VerticalAlignment="Center" />
-                                <!-- Pulsing Lightning Bolt Centered -->
-                                <ui:SymbolIcon x:Name="ChargingBoltIcon" Symbol="Flash24" FontSize="14" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <ui:SymbolIcon.Effect>
-                                        <DropShadowEffect Color="#30D158" BlurRadius="8" Opacity="0.9" ShadowDepth="0" />
-                                    </ui:SymbolIcon.Effect>
-                                </ui:SymbolIcon>
-                            </Grid>
-                        </Border>
-
-                        <!-- Center: Charging Title & Detailed Subtext -->
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,20,0">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Charging" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                <ui:SymbolIcon Symbol="Flash24" FontSize="13" Foreground="#30D158" Margin="6,0,0,0" VerticalAlignment="Center" />
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                <TextBlock x:Name="ChargingSubtextPercent" Text="85%" FontSize="13" FontWeight="Bold" Foreground="#30D158" />
-                                <TextBlock Text=" • Power Connected" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </StackPanel>
-
-                        <!-- Right: Glowing Green Pill Badge -->
-                        <Border Grid.Column="2"
-                                Background="#2430D158"
-                                BorderBrush="#5030D158"
-                                BorderThickness="1.5"
-                                CornerRadius="16"
-                                Padding="14,7,14,7"
-                                VerticalAlignment="Center">
-                            <TextBlock x:Name="ChargingBadgePercentText" Text="85%" FontSize="16" FontWeight="Bold" Foreground="#30D158" VerticalAlignment="Center" />
-                        </Border>
-                    </Grid>
-
-
 
                     <!-- ============================================== -->
                     <!-- 2. CONNECTED DEVICES BATTERY (Image 2)         -->

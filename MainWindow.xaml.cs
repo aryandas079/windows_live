@@ -37,11 +37,21 @@ public partial class MainWindow : Window
 
     private const double CompactClockWidth = 200.0;
     private const double CompactMediaWidth = 270.0;
+    private const double CompactChargingWidth = 320.0;
     private const double CompactHeight = 44.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
 
-    private double CurrentCompactWidth => (_mediaManager?.CurrentTrack?.HasMedia ?? false) ? CompactMediaWidth : CompactClockWidth;
+    private bool _isChargingAlertActive = false;
+
+    private double CurrentCompactWidth
+    {
+        get
+        {
+            if (_isChargingAlertActive) return CompactChargingWidth;
+            return (_mediaManager?.CurrentTrack?.HasMedia ?? false) ? CompactMediaWidth : CompactClockWidth;
+        }
+    }
 
     public MainWindow()
     {
@@ -102,14 +112,33 @@ public partial class MainWindow : Window
             _chargingAlertTimer.Tick += (s, e) =>
             {
                 _chargingAlertTimer.Stop();
-                if (!_isPinned && !IslandContainer.IsMouseOver && _activeCategory == IslandCategory.ChargingAnimation)
+                if (!_isPinned && !IslandContainer.IsMouseOver && _isChargingAlertActive)
                 {
-                    if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
+                    _isChargingAlertActive = false;
+
+                    var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(140));
+                    fadeOut.Completed += (s2, e2) =>
                     {
-                        _activeCategory = IslandCategory.MediaPlayback;
-                        ShowActiveCategoryView();
-                    }
-                    CollapseDock();
+                        CompactChargingView.Visibility = Visibility.Collapsed;
+
+                        if (_mediaManager?.CurrentTrack?.HasMedia ?? false)
+                        {
+                            CompactMediaView.Visibility = Visibility.Visible;
+                        }
+                        else
+                        {
+                            CompactClockView.Visibility = Visibility.Visible;
+                        }
+
+                        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(150));
+                        if (CompactMediaView.Visibility == Visibility.Visible)
+                            CompactMediaView.BeginAnimation(OpacityProperty, fadeIn);
+                        else
+                            CompactClockView.BeginAnimation(OpacityProperty, fadeIn);
+
+                        AnimateIsland(CurrentCompactWidth, CompactHeight);
+                    };
+                    CompactChargingView.BeginAnimation(OpacityProperty, fadeOut);
                 }
             };
 
@@ -463,7 +492,6 @@ public partial class MainWindow : Window
     private void ShowActiveCategoryView()
     {
         ViewMediaPlayback.Visibility = _activeCategory == IslandCategory.MediaPlayback ? Visibility.Visible : Visibility.Collapsed;
-        ViewChargingAlert.Visibility = _activeCategory == IslandCategory.ChargingAnimation ? Visibility.Visible : Visibility.Collapsed;
         ViewDeviceBattery.Visibility = _activeCategory == IslandCategory.DeviceBattery ? Visibility.Visible : Visibility.Collapsed;
         ViewAppNotification.Visibility = _activeCategory == IslandCategory.AppNotification ? Visibility.Visible : Visibility.Collapsed;
         ViewFocusTimer.Visibility = _activeCategory == IslandCategory.FocusTimer ? Visibility.Visible : Visibility.Collapsed;
@@ -483,8 +511,11 @@ public partial class MainWindow : Window
                 // Dynamic trigger: active media sets default expanded view to media playback
                 _activeCategory = IslandCategory.MediaPlayback;
 
-                CompactClockView.Visibility = Visibility.Collapsed;
-                CompactMediaView.Visibility = Visibility.Visible;
+                if (!_isChargingAlertActive)
+                {
+                    CompactClockView.Visibility = Visibility.Collapsed;
+                    CompactMediaView.Visibility = Visibility.Visible;
+                }
 
                 CompactEqualizer.IsPlaying = track.IsPlaying;
 
@@ -521,8 +552,11 @@ public partial class MainWindow : Window
             }
             else
             {
-                CompactMediaView.Visibility = Visibility.Collapsed;
-                CompactClockView.Visibility = Visibility.Visible;
+                if (!_isChargingAlertActive)
+                {
+                    CompactMediaView.Visibility = Visibility.Collapsed;
+                    CompactClockView.Visibility = Visibility.Visible;
+                }
 
                 ExpandedTitleText.Text = "No Media Playing";
                 ExpandedArtistText.Text = "Play music or video on your system";
@@ -563,49 +597,45 @@ public partial class MainWindow : Window
 
     public void ShowChargingAnimation()
     {
-        _activeCategory = IslandCategory.ChargingAnimation;
-        ShowActiveCategoryView();
-
-        ChargingSubtextPercent.Text = $"{_powerService.BatteryPercent}%";
-        ChargingBadgePercentText.Text = $"{_powerService.BatteryPercent}%";
-        double fillWidth = Math.Max(4.0, (_powerService.BatteryPercent / 100.0) * 26.0);
-        ChargingBatteryFill.Width = fillWidth;
-
-        // Vivid neon emerald glow on the notch
-        IslandShadowEffect.Color = Color.FromRgb(48, 209, 88);
-        IslandShadowEffect.Opacity = 0.75;
-        IslandShadowEffect.BlurRadius = 24;
-
-        if (!_isExpanded)
-        {
-            _isExpanded = true;
-            AnimateIsland(420.0, 82.0);
-
-            var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(100));
-            fadeOut.Completed += (s, e) =>
-            {
-                CompactView.Visibility = Visibility.Collapsed;
-                ExpandedContainer.Visibility = Visibility.Visible;
-                ShowActiveCategoryView();
-                var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(120));
-                ExpandedContainer.BeginAnimation(OpacityProperty, fadeIn);
-            };
-            CompactView.BeginAnimation(OpacityProperty, fadeOut);
-        }
-        else
-        {
-            AnimateIsland(420.0, 82.0);
-        }
-
-        // Pulse animation on the lightning bolt
-        var pulseAnim = new DoubleAnimation(0.3, 1.0, new Duration(TimeSpan.FromMilliseconds(400)))
-        {
-            AutoReverse = true,
-            RepeatBehavior = new RepeatBehavior(5)
-        };
-        ChargingBoltIcon.BeginAnimation(UIElement.OpacityProperty, pulseAnim);
-
+        _isChargingAlertActive = true;
         _chargingAlertTimer.Stop();
+
+        int percent = _powerService.BatteryPercent;
+        CompactChargingText.Text = $"{percent}%";
+
+        // Battery fill calculation (inner capsule width max is 26px)
+        double targetFillWidth = Math.Max(2.5, (percent / 100.0) * 26.0);
+
+        // Hide other compact views and activate charging view matching Image 2
+        CompactClockView.Visibility = Visibility.Collapsed;
+        CompactMediaView.Visibility = Visibility.Collapsed;
+        CompactChargingView.Opacity = 0.0;
+        CompactChargingView.Visibility = Visibility.Visible;
+
+        // If currently expanded, collapse into compact charging notch
+        if (_isExpanded)
+        {
+            _isExpanded = false;
+            ExpandedContainer.Visibility = Visibility.Collapsed;
+            CompactView.Visibility = Visibility.Visible;
+            CompactView.Opacity = 1.0;
+        }
+
+        // Animate island container width to 320.0 (compact height 44.0)
+        AnimateIsland(CompactChargingWidth, CompactHeight);
+
+        // Smooth fade-in of the charging view
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
+        CompactChargingView.BeginAnimation(OpacityProperty, fadeIn);
+
+        // Smooth battery fill animation from 0 to targetFillWidth
+        var fillAnim = new DoubleAnimation(0.0, targetFillWidth, TimeSpan.FromMilliseconds(500))
+        {
+            EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseOut }
+        };
+        CompactChargingBatteryFill.BeginAnimation(WidthProperty, fillAnim);
+
+        // Display for 4.5 seconds then smoothly restore
         _chargingAlertTimer.Start();
     }
 
@@ -627,12 +657,11 @@ public partial class MainWindow : Window
                 BatteryDeviceName.Text = $"PC Battery ({_powerService.BatteryPercent}%)";
             }
 
-            if (_activeCategory == IslandCategory.ChargingAnimation)
+            if (_isChargingAlertActive)
             {
-                ChargingSubtextPercent.Text = $"{_powerService.BatteryPercent}%";
-                ChargingBadgePercentText.Text = $"{_powerService.BatteryPercent}%";
-                double fillWidth = Math.Max(4.0, (_powerService.BatteryPercent / 100.0) * 26.0);
-                ChargingBatteryFill.Width = fillWidth;
+                CompactChargingText.Text = $"{_powerService.BatteryPercent}%";
+                double fillWidth = Math.Max(2.5, (_powerService.BatteryPercent / 100.0) * 26.0);
+                CompactChargingBatteryFill.Width = fillWidth;
             }
         });
     }

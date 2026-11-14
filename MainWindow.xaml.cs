@@ -47,6 +47,9 @@ public partial class MainWindow : Window
     private const double CompactSilentRingWidth = 200.0;
     private const double CompactDndWidth = 240.0;
     private const double CompactTimerWidth = 240.0;
+    private const double CompactSplitLeadingWidth = 126.0;
+    private const double DetachedBubbleWidth = 52.0;
+    private const double DetachedBubbleGap = 12.0;
     private const double CompactHeight = 36.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
@@ -70,12 +73,25 @@ public partial class MainWindow : Window
         _focusService.IsRunning ||
         _windowsClockService.HasActiveTimer;
 
+    private bool IsMusicPlaying =>
+        _mediaManager?.CurrentTrack?.IsPlaying ?? false;
+
+    private bool IsSplitActive =>
+        !_isExpanded &&
+        !_isUnlockAlertActive &&
+        !_isSilentRingAlertActive &&
+        !_isDndAlertActive &&
+        !_isChargingAlertActive &&
+        !_isNotificationAlertActive &&
+        IsAnyTimerActive &&
+        IsMusicPlaying;
+
     private bool HasActiveContent =>
         _isUnlockAlertActive ||
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
         IsAnyTimerActive ||
-        (_mediaManager?.CurrentTrack?.IsPlaying ?? false) ||
+        IsMusicPlaying ||
         _isChargingAlertActive ||
         _isNotificationAlertActive;
 
@@ -88,8 +104,9 @@ public partial class MainWindow : Window
             if (_isDndAlertActive) return CompactDndWidth;
             if (_isChargingAlertActive) return CompactChargingWidth;
             if (_isNotificationAlertActive && _currentNotification != null) return CompactNotificationWidth;
+            if (IsAnyTimerActive && IsMusicPlaying) return CompactSplitLeadingWidth;
             if (IsAnyTimerActive) return CompactTimerWidth;
-            if (_mediaManager?.CurrentTrack?.IsPlaying ?? false) return CompactMediaWidth;
+            if (IsMusicPlaying) return CompactMediaWidth;
             return CompactDefaultWidth;
         }
     }
@@ -521,6 +538,18 @@ public partial class MainWindow : Window
                 }
             }
 
+            if (DetachedBubbleContainer.Visibility == Visibility.Visible && DetachedBubbleContainer.Opacity > 0.1)
+            {
+                Point bubblePoint = DetachedBubbleContainer.TranslatePoint(new Point(0, 0), this);
+                Rect bubbleRect = new Rect(bubblePoint.X, bubblePoint.Y, DetachedBubbleContainer.ActualWidth, DetachedBubbleContainer.ActualHeight);
+
+                if (bubbleRect.Contains(windowPoint))
+                {
+                    handled = true;
+                    return (IntPtr)WindowHelper.HTCLIENT;
+                }
+            }
+
             if (TopEdgeHotspot.Visibility == Visibility.Visible)
             {
                 Point hotspotPoint = TopEdgeHotspot.TranslatePoint(new Point(0, 0), this);
@@ -587,21 +616,30 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ExpandDock()
+    private void ExpandDock(IslandCategory? preferredCategory = null)
     {
         if (_isExpanded) return;
         if (!HasActiveContent && !_isNotificationAlertActive) return;
         _isExpanded = true;
 
-        if (_isNotificationAlertActive && _currentNotification != null)
+        if (preferredCategory.HasValue)
+        {
+            _activeCategory = preferredCategory.Value;
+        }
+        else if (_isNotificationAlertActive && _currentNotification != null)
         {
             _activeCategory = IslandCategory.AppNotification;
+        }
+        else if (IsSplitActive)
+        {
+            // By default hovering the split island expands to the music player
+            _activeCategory = IslandCategory.MediaPlayback;
         }
         else if (IsAnyTimerActive)
         {
             _activeCategory = IslandCategory.FocusTimer;
         }
-        else if (_mediaManager?.CurrentTrack?.IsPlaying ?? false)
+        else if (IsMusicPlaying)
         {
             _activeCategory = IslandCategory.MediaPlayback;
         }
@@ -677,6 +715,48 @@ public partial class MainWindow : Window
 
         IslandContainer.BeginAnimation(WidthProperty, widthAnim);
         IslandContainer.BeginAnimation(HeightProperty, heightAnim);
+
+        UpdateSplitBubbleAnimation(targetWidth);
+    }
+
+    private void UpdateSplitBubbleAnimation(double mainIslandTargetWidth)
+    {
+        if (IsSplitActive)
+        {
+            // Position detached bubble adjacent to the right edge of the main island
+            // Offset from center = (mainIslandWidth / 2) + gap + (bubbleWidth / 2)
+            double bubbleCenterX = (mainIslandTargetWidth / 2.0) + DetachedBubbleGap + (DetachedBubbleWidth / 2.0);
+            DetachedBubbleContainer.Margin = new Thickness(bubbleCenterX * 2.0, 0, 0, 0);
+
+            if (DetachedBubbleContainer.Visibility != Visibility.Visible || DetachedBubbleContainer.Opacity < 0.1)
+            {
+                DetachedBubbleContainer.Visibility = Visibility.Visible;
+                var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(220))
+                {
+                    EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseOut }
+                };
+                DetachedBubbleContainer.BeginAnimation(OpacityProperty, fadeIn);
+            }
+        }
+        else
+        {
+            if (DetachedBubbleContainer.Visibility == Visibility.Visible && DetachedBubbleContainer.Opacity > 0.0)
+            {
+                var fadeOut = new DoubleAnimation(DetachedBubbleContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
+                {
+                    EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseIn }
+                };
+                fadeOut.Completed += (s, e) =>
+                {
+                    DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+                };
+                DetachedBubbleContainer.BeginAnimation(OpacityProperty, fadeOut);
+            }
+            else
+            {
+                DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+            }
+        }
     }
 
     public void SwitchCategory(IslandCategory cat)
@@ -733,6 +813,11 @@ public partial class MainWindow : Window
                     CompactAlbumImage.Visibility = Visibility.Visible;
                     CompactDefaultOrb.Visibility = Visibility.Collapsed;
                     CompactOrbSymbol.Visibility = Visibility.Collapsed;
+
+                    SplitAlbumImage.Source = track.Thumbnail;
+                    SplitAlbumImage.Visibility = Visibility.Visible;
+                    SplitDefaultOrb.Visibility = Visibility.Collapsed;
+                    SplitOrbSymbol.Visibility = Visibility.Collapsed;
                 }
                 else
                 {
@@ -745,8 +830,14 @@ public partial class MainWindow : Window
                     CompactAlbumImage.Visibility = Visibility.Collapsed;
                     CompactDefaultOrb.Visibility = Visibility.Visible;
                     CompactOrbSymbol.Visibility = Visibility.Visible;
+
+                    SplitAlbumImage.Source = null;
+                    SplitAlbumImage.Visibility = Visibility.Collapsed;
+                    SplitDefaultOrb.Visibility = Visibility.Visible;
+                    SplitOrbSymbol.Visibility = Visibility.Visible;
                 }
 
+                SplitEqualizer.IsPlaying = track.IsPlaying;
                 PlayPauseIcon.Symbol = track.IsPlaying ? SymbolRegular.Pause24 : SymbolRegular.Play24;
 
                 UpdateCompactViewVisibility();
@@ -764,6 +855,13 @@ public partial class MainWindow : Window
                 ExpandedAlbumImage.Visibility = Visibility.Collapsed;
                 ExpandedDefaultOrb.Visibility = Visibility.Visible;
                 ExpandedOrbSymbol.Visibility = Visibility.Visible;
+
+                SplitAlbumImage.Source = null;
+                SplitAlbumImage.Visibility = Visibility.Collapsed;
+                SplitDefaultOrb.Visibility = Visibility.Visible;
+                SplitOrbSymbol.Visibility = Visibility.Visible;
+                SplitEqualizer.IsPlaying = false;
+
                 PlayPauseIcon.Symbol = SymbolRegular.Play24;
                 CompactEqualizer.IsPlaying = false;
 
@@ -1182,7 +1280,9 @@ public partial class MainWindow : Window
             FocusToggleButton.Content = _focusService.IsRunning ? "Pause" : "Resume";
 
             // Format "M:SS" or "MM:SS" matching reference (e.g. "0:58", "4:32")
-            CompactLiveTimerCountdownText.Text = $"{_focusService.Remaining.Minutes}:{_focusService.Remaining.Seconds:D2}";
+            string formattedTimer = $"{_focusService.Remaining.Minutes}:{_focusService.Remaining.Seconds:D2}";
+            CompactLiveTimerCountdownText.Text = formattedTimer;
+            DetachedTimerCountdownText.Text = formattedTimer;
 
             // Update pause/play icon state in the compact pill
             if (_focusService.IsRunning)
@@ -1253,8 +1353,10 @@ public partial class MainWindow : Window
                 int mins = info.RemainingTime.Hours > 0
                     ? (int)info.RemainingTime.TotalMinutes
                     : info.RemainingTime.Minutes;
-                CompactLiveTimerCountdownText.Text = $"{mins}:{info.RemainingTime.Seconds:D2}";
-                FocusCountdownText.Text = $"{mins}:{info.RemainingTime.Seconds:D2} remaining";
+                string formattedTimer = $"{mins}:{info.RemainingTime.Seconds:D2}";
+                CompactLiveTimerCountdownText.Text = formattedTimer;
+                DetachedTimerCountdownText.Text = formattedTimer;
+                FocusCountdownText.Text = $"{formattedTimer} remaining";
 
                 if (info.IsRunning)
                 {
@@ -1542,6 +1644,21 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Visible;
         }
+        else if (IsSplitActive)
+        {
+            // Apple Dynamic Island Split Multi-Activity Presentation:
+            // Main notch displays compact music (album artwork on left, pulsing waveform on right)
+            // Detached satellite bubble displays amber live countdown on the right
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Visible;
+        }
         else if (IsAnyTimerActive)
         {
             CompactClockView.Visibility = Visibility.Collapsed;
@@ -1551,9 +1668,10 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Visible;
         }
-        else if (_mediaManager?.CurrentTrack?.IsPlaying ?? false)
+        else if (IsMusicPlaying)
         {
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
@@ -1562,6 +1680,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Visible;
         }
         else
@@ -1574,6 +1693,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
         }
 
@@ -1758,5 +1878,32 @@ public partial class MainWindow : Window
     {
         _focusService.Start(5);
         SwitchCategory(IslandCategory.FocusTimer);
+    }
+
+    private void DetachedBubbleContainer_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _autoCollapseTimer.Stop();
+        if (!_isExpanded)
+        {
+            // Hovering directly over the detached timer bubble expands directly into the timer controls
+            ExpandDock(IslandCategory.FocusTimer);
+        }
+    }
+
+    private void DetachedBubbleContainer_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (_isExpanded && !_isPinned && !_isDraggingSlider)
+        {
+            _autoCollapseTimer.Stop();
+            _autoCollapseTimer.Start();
+        }
+    }
+
+    private void DetachedBubbleContainer_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed && !_isExpanded)
+        {
+            ExpandDock(IslandCategory.FocusTimer);
+        }
     }
 }

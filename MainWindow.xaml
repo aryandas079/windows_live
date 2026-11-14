@@ -515,6 +515,51 @@
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </Grid>
+
+                <!-- 9. Split Leading Bubble: Compact Music View (Shown when Timer + Music are both active) -->
+                <!-- Shows rounded album artwork on the left and live pulsing equalizer on the right -->
+                <Grid x:Name="SplitLeadingMediaView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="8,0,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Rounded Album Artwork / Thumbnail -->
+                    <Border Grid.Column="0"
+                            Width="22" Height="22"
+                            CornerRadius="6"
+                            Background="{DynamicResource CardBackgroundBrush}"
+                            VerticalAlignment="Center">
+                        <Grid>
+                            <Ellipse x:Name="SplitDefaultOrb" Fill="{DynamicResource AccentColorBrush}" />
+                            <Image x:Name="SplitAlbumImage" Stretch="UniformToFill" Visibility="Collapsed">
+                                <Image.OpacityMask>
+                                    <VisualBrush>
+                                        <VisualBrush.Visual>
+                                            <Border Width="22" Height="22" CornerRadius="6" Background="Black" />
+                                        </VisualBrush.Visual>
+                                    </VisualBrush>
+                                </Image.OpacityMask>
+                            </Image>
+                            <ui:SymbolIcon x:Name="SplitOrbSymbol" Symbol="MusicNote224" FontSize="10" Foreground="{DynamicResource PlayButtonForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Center Gap -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Animated Accent Equalizer Waveform -->
+                    <controls:EqualizerControl x:Name="SplitEqualizer"
+                                               Grid.Column="2"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,2,0"
+                                               AccentBrush="{DynamicResource AccentColorBrush}"
+                                               IsPlaying="True" />
+                </Grid>
             </Grid>
 
             <!-- ============================================== -->
@@ -968,6 +1013,56 @@
                     </Grid>
 
                 </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- ========================================================================================= -->
+        <!-- DETACHED SATELLITE BUBBLE (Apple Dynamic Island Split Multi-Activity Presentation)       -->
+        <!-- Shown detached to the right of the main island when Timer + Music run concurrently      -->
+        <!-- 52px wide x 36px tall floating pill containing the live amber countdown & mini clock      -->
+        <!-- ========================================================================================= -->
+        <Grid x:Name="DetachedBubbleContainer"
+              Width="52" Height="36"
+              VerticalAlignment="Top"
+              HorizontalAlignment="Center"
+              Visibility="Collapsed"
+              Opacity="0.0"
+              Cursor="Hand"
+              MouseEnter="DetachedBubbleContainer_MouseEnter"
+              MouseLeave="DetachedBubbleContainer_MouseLeave"
+              MouseDown="DetachedBubbleContainer_MouseDown">
+            <!-- Detached Floating Bubble Shadow Layer -->
+            <controls:DynamicIslandNotch x:Name="DetachedBubbleShadow"
+                                         IsNotchMode="False"
+                                         CornerRadius="18"
+                                         Fill="#000000"
+                                         StrokeThickness="0">
+                <controls:DynamicIslandNotch.Effect>
+                    <DropShadowEffect x:Name="DetachedShadowEffect" Color="#000000" BlurRadius="18" Opacity="0.45" ShadowDepth="3" Direction="270" />
+                </controls:DynamicIslandNotch.Effect>
+            </controls:DynamicIslandNotch>
+
+            <!-- Detached Floating Bubble Base Surface -->
+            <controls:DynamicIslandNotch x:Name="DetachedBubbleNotch"
+                                         IsNotchMode="False"
+                                         CornerRadius="18"
+                                         Fill="{DynamicResource SurfaceDarkBrush}"
+                                         Stroke="{DynamicResource SurfaceBorderBrush}"
+                                         StrokeThickness="1" />
+
+            <!-- Content Inside Detached Bubble: Amber Mini Timer Icon & Live Countdown Digits -->
+            <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <!-- Subtle Mini Clock / Timer Symbol -->
+                    <ui:SymbolIcon Symbol="Timer24" FontSize="11" Foreground="#F59E0B" VerticalAlignment="Center" Margin="0,0,3,0" />
+                    <!-- Crisp Amber Countdown (e.g. "0:58" or "4:32") -->
+                    <TextBlock x:Name="DetachedTimerCountdownText"
+                               Text="0:58"
+                               FontSize="11.5"
+                               FontWeight="Bold"
+                               Foreground="#F59E0B"
+                               VerticalAlignment="Center" />
+                </StackPanel>
             </Grid>
         </Grid>
     </Grid>

@@ -160,7 +160,15 @@ public partial class MainWindow : Window
                     _currentNotification = null;
                 }
 
-                if (_isExpanded && _activeCategory == IslandCategory.AppNotification)
+                // If currently showing notification category, switch active category to whatever background task is live
+                if (_activeCategory == IslandCategory.AppNotification)
+                {
+                    if (IsAnyTimerActive) _activeCategory = IslandCategory.FocusTimer;
+                    else if (_mediaManager?.CurrentTrack?.IsPlaying ?? false) _activeCategory = IslandCategory.MediaPlayback;
+                    else _activeCategory = IslandCategory.MediaPlayback;
+                }
+
+                if (_isExpanded)
                 {
                     CollapseDock();
                 }
@@ -549,8 +557,9 @@ public partial class MainWindow : Window
         IslandContainer.Cursor = HasActiveContent ? Cursors.Hand : Cursors.Arrow;
         if (!_isExpanded)
         {
-            // Only expand on hover if there is active live content (music playing, active timer, active alert)
-            if (_isNotificationAlertActive || IsAnyTimerActive || (_mediaManager?.CurrentTrack?.IsPlaying ?? false))
+            // Only expand on hover if there is live content to interact with (active timer or music playing)
+            // Notifications only show once on arrival and NEVER re-open on hover after disappearing
+            if (IsAnyTimerActive || (_mediaManager?.CurrentTrack?.IsPlaying ?? false))
             {
                 ExpandDock();
             }
@@ -584,7 +593,7 @@ public partial class MainWindow : Window
         if (!HasActiveContent && !_isNotificationAlertActive) return;
         _isExpanded = true;
 
-        if (_isNotificationAlertActive || _activeCategory == IslandCategory.AppNotification)
+        if (_isNotificationAlertActive && _currentNotification != null)
         {
             _activeCategory = IslandCategory.AppNotification;
         }

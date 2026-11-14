@@ -106,25 +106,47 @@ public class WindowsClockWatcherService
                     long startTicks = comp.ContainsKey("StartTime") && comp["StartTime"] is long st ? st : 0;
                     long updatedTicks = comp.ContainsKey("__Updated") && comp["__Updated"] is long up ? up : 0;
 
+                    // When a timer is actively running in Windows Clock:
+                    // StartTime > 0 (FILETIME when started) OR RemainingTime > 0
                     if (durationTicks > 0)
                     {
                         var duration = TimeSpan.FromTicks(durationTicks);
-                        TimeSpan remaining = remainingTicks > 0 ? TimeSpan.FromTicks(remainingTicks) : duration;
-                        DateTime updatedTime = updatedTicks > 0 ? DateTime.FromFileTimeUtc(updatedTicks) : DateTime.UtcNow;
 
-                        // Check if timer was started or updated recently
-                        var elapsedSinceUpdate = DateTime.UtcNow - updatedTime;
-                        if (elapsedSinceUpdate < remaining && elapsedSinceUpdate >= TimeSpan.Zero)
+                        if (startTicks > 0)
                         {
-                            var currentRemaining = remaining - elapsedSinceUpdate;
-                            if (currentRemaining.TotalSeconds > 0)
+                            DateTime startTime = DateTime.FromFileTimeUtc(startTicks);
+                            TimeSpan initialRemaining = remainingTicks > 0 ? TimeSpan.FromTicks(remainingTicks) : duration;
+                            TimeSpan elapsed = DateTime.UtcNow - startTime;
+
+                            if (elapsed >= TimeSpan.Zero && elapsed < initialRemaining)
                             {
+                                var currentRemaining = initialRemaining - elapsed;
                                 latestRunning = new WindowsClockTimerInfo
                                 {
                                     Name = name,
                                     Duration = duration,
                                     RemainingTime = currentRemaining,
                                     EndTime = DateTime.Now + currentRemaining,
+                                    IsRunning = true
+                                };
+                                break;
+                            }
+                        }
+                        else if (remainingTicks > 0 && updatedTicks > 0)
+                        {
+                            // Paused or just updated with remaining time
+                            DateTime updatedTime = DateTime.FromFileTimeUtc(updatedTicks);
+                            TimeSpan remaining = TimeSpan.FromTicks(remainingTicks);
+                            var elapsed = DateTime.UtcNow - updatedTime;
+
+                            if (elapsed >= TimeSpan.Zero && elapsed < TimeSpan.FromSeconds(5))
+                            {
+                                latestRunning = new WindowsClockTimerInfo
+                                {
+                                    Name = name,
+                                    Duration = duration,
+                                    RemainingTime = remaining,
+                                    EndTime = DateTime.Now + remaining,
                                     IsRunning = true
                                 };
                                 break;

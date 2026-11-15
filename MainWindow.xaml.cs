@@ -47,6 +47,7 @@ public partial class MainWindow : Window
     private const double CompactSilentRingWidth = 200.0;
     private const double CompactDndWidth = 240.0;
     private const double CompactNightModeWidth = 240.0;
+    private const double CompactAlarmWidth = 250.0;
     private const double CompactTimerWidth = 240.0;
     private const double CompactRecordingWidth = 230.0;
     private const double CompactScreenRecordingWidth = 240.0;
@@ -64,6 +65,7 @@ public partial class MainWindow : Window
     private bool _isSilentRingAlertActive = false;
     private bool _isDndAlertActive = false;
     private bool _isNightModeAlertActive = false;
+    private bool _isAlarmActive = false;
     private IslandNotification? _currentNotification = null;
 
     private readonly DispatcherTimer _silentRingAlertTimer;
@@ -71,6 +73,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _nightModeAlertTimer;
     private readonly FocusAssistWatcherService _focusAssistService;
     private readonly NightLightWatcherService _nightLightService;
+    private readonly AlarmService _alarmService;
     private readonly WindowsClockWatcherService _windowsClockService;
     private readonly VoiceRecordingService _voiceRecordingService;
     private readonly ScreenRecordingService _screenRecordingService;
@@ -97,6 +100,7 @@ public partial class MainWindow : Window
 
     private bool IsSplitActive =>
         !_isExpanded &&
+        !_isAlarmActive &&
         !_isUnlockAlertActive &&
         !_isSilentRingAlertActive &&
         !_isDndAlertActive &&
@@ -109,6 +113,7 @@ public partial class MainWindow : Window
         IsMusicActive;
 
     private bool HasActiveContent =>
+        _isAlarmActive ||
         _isUnlockAlertActive ||
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
@@ -126,6 +131,7 @@ public partial class MainWindow : Window
     {
         get
         {
+            if (_isAlarmActive) return CompactAlarmWidth;
             if (_isUnlockAlertActive) return CompactUnlockWidth;
             if (_isSilentRingAlertActive) return CompactSilentRingWidth;
             if (_isDndAlertActive) return CompactDndWidth;
@@ -164,6 +170,7 @@ public partial class MainWindow : Window
             _notificationService = new NotificationWatcherService();
             _focusAssistService = new FocusAssistWatcherService();
             _nightLightService = new NightLightWatcherService();
+            _alarmService = new AlarmService();
             _windowsClockService = new WindowsClockWatcherService();
             _voiceRecordingService = new VoiceRecordingService();
             _screenRecordingService = new ScreenRecordingService();
@@ -181,6 +188,8 @@ public partial class MainWindow : Window
             _focusAssistService.Start();
             _nightLightService.NightModeChanged += OnNightModeChanged;
             _nightLightService.Start();
+            _alarmService.AlarmStateChanged += OnAlarmStateChanged;
+            _alarmService.SnoozeStarted += OnAlarmSnoozeStarted;
             _windowsClockService.TimerStateChanged += OnWindowsClockTimerChanged;
             _windowsClockService.Start();
             _voiceRecordingService.RecordingStateChanged += OnVoiceRecordingStateChanged;
@@ -1192,6 +1201,22 @@ public partial class MainWindow : Window
         CompactTimerNightMoon.Visibility = isNight ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private void CompactClockView_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Right)
+        {
+            e.Handled = true;
+            if (_isAlarmActive)
+            {
+                _alarmService.Dismiss();
+            }
+            else
+            {
+                _alarmService.TriggerAlarm("Alarm");
+            }
+        }
+    }
+
     private void CompactNightModePill_MouseDown(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
@@ -1203,6 +1228,126 @@ public partial class MainWindow : Window
         {
             _nightLightService.OpenNightLightSettings();
         }
+    }
+
+    private void OnAlarmStateChanged(bool isRinging, string alarmTitle)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _isAlarmActive = isRinging;
+            CompactAlarmTitleText.Text = string.IsNullOrWhiteSpace(alarmTitle) ? "Alarm" : alarmTitle;
+
+            if (isRinging)
+            {
+                // Clear any temporary compact alerts
+                if (_isUnlockAlertActive)
+                {
+                    _isUnlockAlertActive = false;
+                    _unlockAlertTimer.Stop();
+                    CompactUnlockView.Visibility = Visibility.Collapsed;
+                }
+                if (_isSilentRingAlertActive)
+                {
+                    _isSilentRingAlertActive = false;
+                    _silentRingAlertTimer.Stop();
+                    CompactSilentRingView.Visibility = Visibility.Collapsed;
+                }
+                if (_isDndAlertActive)
+                {
+                    _isDndAlertActive = false;
+                    _dndAlertTimer.Stop();
+                    CompactDndView.Visibility = Visibility.Collapsed;
+                }
+                if (_isNightModeAlertActive)
+                {
+                    _isNightModeAlertActive = false;
+                    _nightModeAlertTimer.Stop();
+                    CompactNightModeView.Visibility = Visibility.Collapsed;
+                }
+                if (_isChargingAlertActive)
+                {
+                    _isChargingAlertActive = false;
+                    _chargingAlertTimer.Stop();
+                    CompactChargingView.Visibility = Visibility.Collapsed;
+                }
+
+                if (_isExpanded)
+                {
+                    _isExpanded = false;
+                    ExpandedContainer.Visibility = Visibility.Collapsed;
+                    CompactView.Visibility = Visibility.Visible;
+                    CompactView.Opacity = 1.0;
+                }
+
+                StartAlarmWiggleAnimation();
+            }
+            else
+            {
+                StopAlarmWiggleAnimation();
+            }
+
+            UpdateCompactViewVisibility();
+        });
+    }
+
+    private void OnAlarmSnoozeStarted(TimeSpan duration)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            CompactAlarmTitleText.Text = $"Snoozed ({(int)duration.TotalMinutes}m)";
+            CompactAlarmView.Visibility = Visibility.Visible;
+            AnimateIsland(CompactAlarmWidth, CompactHeight);
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+                if (!_isAlarmActive)
+                {
+                    CompactAlarmView.Visibility = Visibility.Collapsed;
+                    UpdateCompactViewVisibility();
+                }
+            };
+            timer.Start();
+        });
+    }
+
+    private void CompactAlarmSnoozeBtn_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        uint? nid = _alarmService.ActiveNotificationId;
+        _alarmService.Snooze(9);
+        if (nid.HasValue)
+        {
+            _notificationService.Dismiss(nid.Value);
+        }
+    }
+
+    private void CompactAlarmDismissBtn_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        uint? nid = _alarmService.ActiveNotificationId;
+        _alarmService.Dismiss();
+        if (nid.HasValue)
+        {
+            _notificationService.Dismiss(nid.Value);
+        }
+    }
+
+    private void StartAlarmWiggleAnimation()
+    {
+        var anim = new DoubleAnimation(-8.0, 8.0, TimeSpan.FromMilliseconds(75))
+        {
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+        AlarmIconRotate.BeginAnimation(RotateTransform.AngleProperty, anim);
+    }
+
+    private void StopAlarmWiggleAnimation()
+    {
+        AlarmIconRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+        AlarmIconRotate.Angle = 0;
     }
 
     private void OnChargingConnected()
@@ -1894,8 +2039,35 @@ public partial class MainWindow : Window
         _notificationAlertTimer.Start();
     }
 
+    private bool IsAlarmNotification(IslandNotification notif)
+    {
+        if (notif == null) return false;
+        string app = notif.AppName ?? "";
+        string appId = notif.AppId ?? "";
+        string title = notif.Title ?? "";
+        string msg = notif.Message ?? "";
+
+        bool isClock = appId.Contains("WindowsAlarms", StringComparison.OrdinalIgnoreCase) ||
+                       app.Contains("Clock", StringComparison.OrdinalIgnoreCase) ||
+                       app.Contains("Alarms", StringComparison.OrdinalIgnoreCase);
+
+        bool isAlarmWord = title.Contains("Alarm", StringComparison.OrdinalIgnoreCase) ||
+                           msg.Contains("Alarm", StringComparison.OrdinalIgnoreCase);
+
+        return (isClock && isAlarmWord) || (isClock && !title.Contains("Timer", StringComparison.OrdinalIgnoreCase));
+    }
+
     private void OnNotificationReceived(IslandNotification notif)
     {
+        if (IsAlarmNotification(notif))
+        {
+            Dispatcher.Invoke(() =>
+            {
+                _alarmService.TriggerAlarm(notif.Title, notif.Id);
+            });
+            return;
+        }
+
         // Don't hijack with notifications from media apps when media track updates (handled natively by media controls)
         if (notif.AppType == KnownNotificationApp.Spotify ||
             notif.AppType == KnownNotificationApp.AppleMusic ||
@@ -1973,8 +2145,25 @@ public partial class MainWindow : Window
 
     private void UpdateCompactViewVisibility()
     {
-        if (_isUnlockAlertActive)
+        if (_isAlarmActive)
         {
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
+            CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
+            CompactAlarmView.Visibility = Visibility.Visible;
+        }
+        else if (_isUnlockAlertActive)
+        {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
@@ -1989,6 +2178,7 @@ public partial class MainWindow : Window
         }
         else if (_isSilentRingAlertActive)
         {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
@@ -2003,6 +2193,7 @@ public partial class MainWindow : Window
         }
         else if (_isDndAlertActive)
         {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
@@ -2017,6 +2208,7 @@ public partial class MainWindow : Window
         }
         else if (_isNightModeAlertActive)
         {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
@@ -2031,6 +2223,7 @@ public partial class MainWindow : Window
         }
         else if (_isChargingAlertActive)
         {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
@@ -2045,6 +2238,7 @@ public partial class MainWindow : Window
         }
         else if (_isNotificationAlertActive && _currentNotification != null)
         {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
@@ -2059,6 +2253,7 @@ public partial class MainWindow : Window
         }
         else if (IsScreenRecordingActive)
         {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
@@ -2074,6 +2269,7 @@ public partial class MainWindow : Window
         }
         else if (IsVoiceRecordingActive)
         {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
@@ -2092,6 +2288,7 @@ public partial class MainWindow : Window
             // Apple Dynamic Island Split Multi-Activity Presentation:
             // Main notch displays compact music (album artwork on left, pulsing waveform on right)
             // Detached satellite bubble displays amber live countdown on the right
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
@@ -2107,6 +2304,7 @@ public partial class MainWindow : Window
         }
         else if (IsAnyTimerActive)
         {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
@@ -2122,6 +2320,7 @@ public partial class MainWindow : Window
         }
         else if (IsMusicActive)
         {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
@@ -2138,6 +2337,7 @@ public partial class MainWindow : Window
         else
         {
             // Empty notch / idle dock:
+            CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Collapsed;

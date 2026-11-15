@@ -67,7 +67,9 @@
                 <Grid x:Name="CompactClockView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      HorizontalAlignment="Center">
+                      HorizontalAlignment="Center"
+                      Cursor="Hand"
+                      MouseDown="CompactClockView_MouseDown">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
@@ -748,6 +750,143 @@
                                Foreground="#FF9F0A"
                                VerticalAlignment="Center"
                                Margin="0,0,4,0" />
+                </Grid>
+
+                <!-- 13. Active Alarm Ringing Mode (Matches Reference Images media_1794688160504_22f75d15.jpg & media_1794688172755_799d9597.png) -->
+                <Grid x:Name="CompactAlarmView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="8,0,12,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Orange Alarm Clock Icon + "Alarm" Text -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Custom Vector Orange Alarm Clock with black hands -->
+                        <Viewbox Width="26" Height="26" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                            <Viewbox.RenderTransform>
+                                <RotateTransform x:Name="AlarmIconRotate" Angle="0" />
+                            </Viewbox.RenderTransform>
+                            <Canvas Width="26" Height="26">
+                                <!-- Left Bell / Ear -->
+                                <Path Fill="#FFA000" Data="M 4,7.8 C 2.2,5.6 3.0,2.8 5.5,2.0 C 7.6,1.4 9.6,2.6 10.0,4.2 C 7.8,4.6 5.8,5.8 4,7.8 Z" />
+                                <!-- Right Bell / Ear -->
+                                <Path Fill="#FFA000" Data="M 22,7.8 C 23.8,5.6 23.0,2.8 20.5,2.0 C 18.4,1.4 16.4,2.6 16.0,4.2 C 18.2,4.6 20.2,5.8 22,7.8 Z" />
+                                <!-- Left Foot -->
+                                <Line X1="6.8" Y1="19.2" X2="4.0" Y2="23.2" Stroke="#FFA000" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <!-- Right Foot -->
+                                <Line X1="19.2" Y1="19.2" X2="22.0" Y2="23.2" Stroke="#FFA000" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <!-- Clock Body (Orange Circle) -->
+                                <Ellipse Canvas.Left="3.5" Canvas.Top="3.5" Width="19" Height="19" Fill="#FFA000" />
+                                <!-- Black Clock Hands (Center at 13, 13; Hour hand up to 8.5, minute hand left to 8.5) -->
+                                <Path Stroke="Black" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                      Data="M 8.5,13 H 13 V 8.2" />
+                            </Canvas>
+                        </Viewbox>
+
+                        <!-- "Alarm" Title Text in Vibrant Apple Orange (#FFA000) -->
+                        <TextBlock x:Name="CompactAlarmTitleText"
+                                   Text="Alarm"
+                                   FontSize="15.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="#FFA000"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0" />
+                    </StackPanel>
+
+                    <!-- Center Gap (Island Notch) -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Snooze ('Zzz') and Dismiss ('X') Action Buttons -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Amber Snooze Button with 'Zzz' -->
+                        <Button x:Name="CompactAlarmSnoozeBtn"
+                                Width="28" Height="28"
+                                Margin="0,0,6,0"
+                                Padding="0"
+                                Background="#382002"
+                                BorderBrush="#553200"
+                                BorderThickness="1"
+                                Cursor="Hand"
+                                ToolTip="Snooze (9 min)"
+                                Click="CompactAlarmSnoozeBtn_Click">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="SBorder"
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        CornerRadius="14">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="SBorder" Property="Background" Value="#4D2C03" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="SBorder" Property="Background" Value="#291500" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Button.Style>
+                            <!-- 'Zzz' Arrangement matching user reference photo -->
+                            <Canvas Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Z" FontSize="10.5" FontWeight="Bold" Foreground="#FFA000" Canvas.Left="0" Canvas.Top="-1" />
+                                <TextBlock Text="z" FontSize="8" FontWeight="Bold" Foreground="#FFA000" Canvas.Left="1.5" Canvas.Top="8" />
+                                <TextBlock Text="Z" FontSize="9.5" FontWeight="Bold" Foreground="#FFA000" Canvas.Left="8.5" Canvas.Top="3.5" />
+                            </Canvas>
+                        </Button>
+
+                        <!-- Dark Dismiss Button ('X') -->
+                        <Button x:Name="CompactAlarmDismissBtn"
+                                Width="28" Height="28"
+                                Padding="0"
+                                Background="#2C2C2E"
+                                BorderBrush="#3A3A3C"
+                                BorderThickness="1"
+                                Cursor="Hand"
+                                ToolTip="Dismiss Alarm"
+                                Click="CompactAlarmDismissBtn_Click">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="DBorder"
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        CornerRadius="14">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="DBorder" Property="Background" Value="#3A3A3E" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="DBorder" Property="Background" Value="#1C1C1E" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Button.Style>
+                            <Canvas Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Line X1="1" Y1="1" X2="9" Y2="9" Stroke="White" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                <Line X1="9" Y1="1" X2="1" Y2="9" Stroke="White" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Grid>
 

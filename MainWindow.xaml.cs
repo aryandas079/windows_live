@@ -51,6 +51,9 @@ public partial class MainWindow : Window
     private const double CompactBluetoothWidth = 230.0;
     private const double ExpandedBluetoothWidth = 450.0;
     private const double ExpandedBluetoothHeight = 68.0;
+    private const double CompactPowerEfficiencyWidth = 265.0;
+    private const double CompactPowerBalancedWidth = 220.0;
+    private const double CompactPowerPerformanceWidth = 255.0;
     private const double CompactTimerWidth = 240.0;
     private const double CompactRecordingWidth = 230.0;
     private const double CompactScreenRecordingWidth = 240.0;
@@ -71,6 +74,8 @@ public partial class MainWindow : Window
     private bool _isAlarmActive = false;
     private bool _isBluetoothAlertActive = false;
     private BluetoothDeviceInfo? _activeBluetoothDevice = null;
+    private bool _isPowerModeAlertActive = false;
+    private WindowsPowerMode _activePowerMode = WindowsPowerMode.Balanced;
     private IslandNotification? _currentNotification = null;
 
     private readonly DispatcherTimer _silentRingAlertTimer;
@@ -78,10 +83,12 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _nightModeAlertTimer;
     private readonly DispatcherTimer _bluetoothAlertTimer;
     private readonly DispatcherTimer _bluetoothHoverCollapseTimer;
+    private readonly DispatcherTimer _powerModeAlertTimer;
     private readonly FocusAssistWatcherService _focusAssistService;
     private readonly NightLightWatcherService _nightLightService;
     private readonly AlarmService _alarmService;
     private readonly BluetoothWatcherService _bluetoothService;
+    private readonly PowerModeWatcherService _powerModeService;
     private readonly WindowsClockWatcherService _windowsClockService;
     private readonly VoiceRecordingService _voiceRecordingService;
     private readonly ScreenRecordingService _screenRecordingService;
@@ -110,6 +117,7 @@ public partial class MainWindow : Window
         !_isExpanded &&
         !_isAlarmActive &&
         !_isBluetoothAlertActive &&
+        !_isPowerModeAlertActive &&
         !_isUnlockAlertActive &&
         !_isSilentRingAlertActive &&
         !_isDndAlertActive &&
@@ -124,6 +132,7 @@ public partial class MainWindow : Window
     private bool HasActiveContent =>
         _isAlarmActive ||
         _isBluetoothAlertActive ||
+        _isPowerModeAlertActive ||
         _isUnlockAlertActive ||
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
@@ -143,6 +152,15 @@ public partial class MainWindow : Window
         {
             if (_isAlarmActive) return CompactAlarmWidth;
             if (_isBluetoothAlertActive) return CompactBluetoothWidth;
+            if (_isPowerModeAlertActive)
+            {
+                return _activePowerMode switch
+                {
+                    WindowsPowerMode.BestPowerEfficiency => CompactPowerEfficiencyWidth,
+                    WindowsPowerMode.BestPerformance => CompactPowerPerformanceWidth,
+                    _ => CompactPowerBalancedWidth
+                };
+            }
             if (_isUnlockAlertActive) return CompactUnlockWidth;
             if (_isSilentRingAlertActive) return CompactSilentRingWidth;
             if (_isDndAlertActive) return CompactDndWidth;
@@ -205,6 +223,9 @@ public partial class MainWindow : Window
             _bluetoothService.DeviceConnected += OnBluetoothDeviceConnected;
             _bluetoothService.DeviceDisconnected += OnBluetoothDeviceDisconnected;
             _bluetoothService.Start();
+            _powerModeService = new PowerModeWatcherService();
+            _powerModeService.PowerModeChanged += OnPowerModeChanged;
+            _powerModeService.Start();
             _windowsClockService.TimerStateChanged += OnWindowsClockTimerChanged;
             _windowsClockService.Start();
             _voiceRecordingService.RecordingStateChanged += OnVoiceRecordingStateChanged;
@@ -411,6 +432,26 @@ public partial class MainWindow : Window
                     _isBluetoothAlertActive = false;
                     _activeBluetoothDevice = null;
                     CollapseDock();
+                }
+            };
+
+            _powerModeAlertTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(3.5)
+            };
+            _powerModeAlertTimer.Tick += (s, e) =>
+            {
+                _powerModeAlertTimer.Stop();
+                if (_isPowerModeAlertActive)
+                {
+                    _isPowerModeAlertActive = false;
+                    var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
+                    fadeOut.Completed += (s2, e2) =>
+                    {
+                        CompactPowerModeView.Visibility = Visibility.Collapsed;
+                        UpdateCompactViewVisibility();
+                    };
+                    CompactPowerModeView.BeginAnimation(OpacityProperty, fadeOut);
                 }
             };
 
@@ -1311,6 +1352,10 @@ public partial class MainWindow : Window
             {
                 _voiceRecordingService.SimulateToggle();
             }
+            else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
+            {
+                CycleTestPowerMode();
+            }
             else if (_isAlarmActive)
             {
                 _alarmService.Dismiss();
@@ -1487,6 +1532,117 @@ public partial class MainWindow : Window
             _chargingAlertTimer.Stop();
             CompactChargingView.Visibility = Visibility.Collapsed;
         }
+        if (_isPowerModeAlertActive)
+        {
+            _isPowerModeAlertActive = false;
+            _powerModeAlertTimer.Stop();
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private int _testPowerModeIndex = 0;
+    private void CycleTestPowerMode()
+    {
+        var modes = new[] { WindowsPowerMode.BestPowerEfficiency, WindowsPowerMode.Balanced, WindowsPowerMode.BestPerformance };
+        _testPowerModeIndex = (_testPowerModeIndex + 1) % modes.Length;
+        _powerModeService.SimulateMode(modes[_testPowerModeIndex]);
+    }
+
+    private void OnPowerModeChanged(WindowsPowerMode mode)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            ShowPowerModeAlert(mode);
+        });
+    }
+
+    public void ShowPowerModeAlert(WindowsPowerMode mode)
+    {
+        _activePowerMode = mode;
+        _isPowerModeAlertActive = true;
+        _powerModeAlertTimer.Stop();
+
+        ClearTemporaryAlerts();
+
+        Color accentColor;
+        SolidColorBrush badgeBrush;
+        string title;
+        double targetWidth;
+
+        switch (mode)
+        {
+            case WindowsPowerMode.BestPowerEfficiency:
+                title = "Best Power Efficiency";
+                accentColor = Color.FromRgb(48, 209, 88); // #30D158 Apple Green
+                badgeBrush = new SolidColorBrush(Color.FromRgb(52, 199, 89));
+                targetWidth = CompactPowerEfficiencyWidth;
+                PowerIconEfficiency.Visibility = Visibility.Visible;
+                PowerIconBalanced.Visibility = Visibility.Collapsed;
+                PowerIconPerformance.Visibility = Visibility.Collapsed;
+                break;
+
+            case WindowsPowerMode.BestPerformance:
+                title = "Best Performance";
+                accentColor = Color.FromRgb(255, 69, 58); // #FF453A Red-Orange
+                badgeBrush = new SolidColorBrush(Color.FromRgb(255, 59, 48));
+                targetWidth = CompactPowerPerformanceWidth;
+                PowerIconEfficiency.Visibility = Visibility.Collapsed;
+                PowerIconBalanced.Visibility = Visibility.Collapsed;
+                PowerIconPerformance.Visibility = Visibility.Visible;
+                break;
+
+            case WindowsPowerMode.Balanced:
+            default:
+                title = "Balanced";
+                accentColor = Color.FromRgb(10, 132, 255); // #0A84FF Apple Blue
+                badgeBrush = new SolidColorBrush(Color.FromRgb(0, 122, 255));
+                targetWidth = CompactPowerBalancedWidth;
+                PowerIconEfficiency.Visibility = Visibility.Collapsed;
+                PowerIconBalanced.Visibility = Visibility.Visible;
+                PowerIconPerformance.Visibility = Visibility.Collapsed;
+                break;
+        }
+
+        CompactPowerModeBadge.Background = badgeBrush;
+        CompactPowerModeText.Text = title;
+        CompactPowerModeText.Foreground = new SolidColorBrush(accentColor);
+
+        // Hide other compact views & show Power Mode view
+        UpdateCompactViewVisibility();
+
+        CompactPowerModeView.Opacity = 0.0;
+        CompactPowerModeView.Visibility = Visibility.Visible;
+
+        if (_isExpanded)
+        {
+            _isExpanded = false;
+            ExpandedContainer.Visibility = Visibility.Collapsed;
+            CompactView.Visibility = Visibility.Visible;
+            CompactView.Opacity = 1.0;
+        }
+
+        // Animate island container width
+        AnimateIsland(targetWidth, CompactHeight);
+
+        // Ambient edge glow matching mode color
+        IslandShadowEffect.Color = accentColor;
+        IslandShadowEffect.Opacity = 0.40;
+        IslandShadowEffect.BlurRadius = 24;
+
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
+        CompactPowerModeView.BeginAnimation(OpacityProperty, fadeIn);
+
+        _powerModeAlertTimer.Start();
+    }
+
+    private void CompactPowerModeView_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:powersleep") { UseShellExecute = true });
+        }
+        catch { }
     }
 
     private void OnBluetoothDeviceConnected(BluetoothDeviceInfo dev)
@@ -2502,6 +2658,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2519,6 +2676,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2535,6 +2693,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2551,6 +2710,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2567,6 +2727,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2583,6 +2744,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2599,11 +2761,30 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Visible;
+        }
+        else if (_isPowerModeAlertActive)
+        {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
+            CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Visible;
         }
         else if (_isNotificationAlertActive && _currentNotification != null)
         {
@@ -2616,6 +2797,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2632,6 +2814,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
@@ -2649,6 +2832,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
@@ -2669,6 +2853,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
@@ -2686,6 +2871,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
@@ -2703,6 +2889,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
@@ -2720,6 +2907,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
             CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;

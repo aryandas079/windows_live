@@ -56,7 +56,6 @@ public partial class MainWindow : Window
     private const double CompactHeight = 36.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
-    private const double ExpandedNotificationReplyHeight = 138.0;
 
     private bool _isChargingAlertActive = false;
     private bool _isNotificationAlertActive = false;
@@ -194,13 +193,7 @@ public partial class MainWindow : Window
             {
                 _notificationAlertTimer.Stop();
 
-                // If user is actively typing in the reply box, give them time to finish
-                if (NotificationReplyInput.IsFocused || !string.IsNullOrWhiteSpace(NotificationReplyInput.Text))
-                {
-                    return;
-                }
-
-                // Disappear after 5s once shown
+                // Disappear after exactly 5s once shown
                 _isNotificationAlertActive = false;
                 if (_currentNotification != null)
                 {
@@ -211,7 +204,9 @@ public partial class MainWindow : Window
                 // If currently showing notification category, switch active category to whatever background task is live
                 if (_activeCategory == IslandCategory.AppNotification)
                 {
-                    if (IsAnyTimerActive) _activeCategory = IslandCategory.FocusTimer;
+                    if (IsScreenRecordingActive) _activeCategory = IslandCategory.ScreenRecording;
+                    else if (IsVoiceRecordingActive) _activeCategory = IslandCategory.VoiceRecording;
+                    else if (IsAnyTimerActive) _activeCategory = IslandCategory.FocusTimer;
                     else if (IsMusicActive) _activeCategory = IslandCategory.MediaPlayback;
                     else _activeCategory = IslandCategory.MediaPlayback;
                 }
@@ -605,17 +600,6 @@ public partial class MainWindow : Window
             return (IntPtr)WindowHelper.HTTRANSPARENT;
         }
 
-        if (msg == 0x0021) // WM_MOUSEACTIVATE
-        {
-            // If the user clicks on the notification reply input or send button, activate the window so they can type immediately
-            if (_isExpanded && _activeCategory == IslandCategory.AppNotification && NotificationReplyRow.Visibility == Visibility.Visible)
-            {
-                WindowHelper.SetActivationEnabled(this, true);
-                handled = true;
-                return (IntPtr)1; // MA_ACTIVATE
-            }
-        }
-
         return IntPtr.Zero;
     }
 
@@ -697,8 +681,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        double targetHeight = (_activeCategory == IslandCategory.AppNotification && (_currentNotification?.IsMessagingApp ?? false))
-            ? ExpandedNotificationReplyHeight
+        double targetHeight = _activeCategory == IslandCategory.AppNotification
+            ? 72.0
             : ExpandedHeight;
 
         AnimateIsland(ExpandedWidth, targetHeight);
@@ -828,8 +812,8 @@ public partial class MainWindow : Window
 
         if (_isExpanded)
         {
-            double targetHeight = (_activeCategory == IslandCategory.AppNotification && (_currentNotification?.IsMessagingApp ?? false))
-                ? ExpandedNotificationReplyHeight
+            double targetHeight = _activeCategory == IslandCategory.AppNotification
+                ? 72.0
                 : ExpandedHeight;
             AnimateIsland(ExpandedWidth, targetHeight);
         }
@@ -1995,166 +1979,6 @@ public partial class MainWindow : Window
 
         CompactNotifIcon.SetNotification(notif);
         ExpandedNotifIcon.SetNotification(notif);
-
-        if (notif.IsMessagingApp)
-        {
-            NotificationReplyRow.Visibility = Visibility.Visible;
-            NotificationReplyInput.Text = "";
-            NotificationReplyPlaceholder.Text = $"Reply to {notif.DisplayTitle}...";
-            NotificationReplyPlaceholder.Visibility = Visibility.Visible;
-
-            if (notif.AppType == KnownNotificationApp.WhatsApp)
-            {
-                NotificationSendButton.Background = new SolidColorBrush(Color.FromRgb(37, 211, 102));
-            }
-            else if (notif.AppType == KnownNotificationApp.Telegram)
-            {
-                NotificationSendButton.Background = new SolidColorBrush(Color.FromRgb(36, 161, 222));
-            }
-            else if (notif.AppType == KnownNotificationApp.Discord)
-            {
-                NotificationSendButton.Background = new SolidColorBrush(Color.FromRgb(88, 101, 242));
-            }
-            else if (notif.AppType == KnownNotificationApp.Facebook)
-            {
-                NotificationSendButton.Background = new SolidColorBrush(Color.FromRgb(24, 119, 242));
-            }
-            else
-            {
-                NotificationSendButton.Background = new SolidColorBrush(Color.FromRgb(0, 120, 212));
-            }
-        }
-        else
-        {
-            NotificationReplyRow.Visibility = Visibility.Collapsed;
-        }
-    }
-
-    private void NotificationReplyBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        WindowHelper.SetActivationEnabled(this, true);
-        Activate();
-        NotificationReplyInput.Focus();
-        Keyboard.Focus(NotificationReplyInput);
-    }
-
-    private void NotificationReplyInput_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        WindowHelper.SetActivationEnabled(this, true);
-        Activate();
-        NotificationReplyInput.Focus();
-        Keyboard.Focus(NotificationReplyInput);
-    }
-
-    private void NotificationReplyInput_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            e.Handled = true;
-            SendNotificationReply();
-        }
-        else if (e.Key == Key.Escape)
-        {
-            e.Handled = true;
-            _isNotificationAlertActive = false;
-            CollapseDock();
-        }
-    }
-
-    private void NotificationReplyInput_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        NotificationReplyPlaceholder.Visibility = string.IsNullOrEmpty(NotificationReplyInput.Text)
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-
-        if (!string.IsNullOrEmpty(NotificationReplyInput.Text))
-        {
-            _notificationAlertTimer.Stop();
-        }
-    }
-
-    private void NotificationReplyInput_GotFocus(object sender, RoutedEventArgs e)
-    {
-        _notificationAlertTimer.Stop();
-    }
-
-    private void NotificationReplyInput_LostFocus(object sender, RoutedEventArgs e)
-    {
-        // When user leaves the input, restore WS_EX_NOACTIVATE unless still expanded with text
-        if (string.IsNullOrEmpty(NotificationReplyInput.Text))
-        {
-            WindowHelper.SetActivationEnabled(this, false);
-        }
-
-        if (string.IsNullOrEmpty(NotificationReplyInput.Text) && _isNotificationAlertActive)
-        {
-            _notificationAlertTimer.Stop();
-            _notificationAlertTimer.Interval = TimeSpan.FromSeconds(3.0);
-            _notificationAlertTimer.Start();
-        }
-    }
-
-    private void NotificationSendButton_Click(object sender, RoutedEventArgs e)
-    {
-        SendNotificationReply();
-    }
-
-    private void SendNotificationReply()
-    {
-        string text = NotificationReplyInput.Text.Trim();
-        if (string.IsNullOrWhiteSpace(text)) return;
-
-        App.Log($"Sending reply: '{text}' for notification App={_currentNotification?.AppName}");
-
-        if (_currentNotification != null)
-        {
-            try
-            {
-                // Always put text on clipboard for instant paste convenience
-                try { Clipboard.SetText(text); } catch { }
-
-                if (_currentNotification.AppType == KnownNotificationApp.WhatsApp)
-                {
-                    try
-                    {
-                        Process.Start(new ProcessStartInfo($"whatsapp://send?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
-                    }
-                    catch
-                    {
-                        // Fallback to web whatsapp if protocol is not registered
-                        Process.Start(new ProcessStartInfo($"https://web.whatsapp.com/send?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
-                    }
-                }
-                else if (_currentNotification.AppType == KnownNotificationApp.Telegram)
-                {
-                    try
-                    {
-                        Process.Start(new ProcessStartInfo($"tg://msg_url?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
-                    }
-                    catch
-                    {
-                        Process.Start(new ProcessStartInfo($"https://t.me/share/url?text={Uri.EscapeDataString(text)}") { UseShellExecute = true });
-                    }
-                }
-                else
-                {
-                    Clipboard.SetText(text);
-                }
-
-                _notificationService.Dismiss(_currentNotification.Id);
-            }
-            catch (Exception ex)
-            {
-                App.Log($"SendNotificationReply exception: {ex.Message}");
-            }
-        }
-
-        PlayUnlockSound();
-
-        NotificationReplyInput.Text = "";
-        _isNotificationAlertActive = false;
-        _notificationAlertTimer.Stop();
-        CollapseDock();
     }
 
     private void Start15MinTimer_Click(object sender, RoutedEventArgs e)

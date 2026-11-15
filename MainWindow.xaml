@@ -809,13 +809,8 @@
                     <!-- 3. APP NOTIFICATION CARD (Spacious & Modern)   -->
                     <!-- ============================================== -->
                     <Grid x:Name="ViewAppNotification" Visibility="Collapsed" VerticalAlignment="Center" Margin="2,2,2,2">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <!-- Row 0: App Header (Icon, Title, Message, "now") -->
-                        <Grid Grid.Row="0" VerticalAlignment="Center">
+                        <!-- Notification Header: App Squircle Icon on Left, Title/Subtext Center, "now" on Right -->
+                        <Grid VerticalAlignment="Center">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -857,95 +852,6 @@
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        VerticalAlignment="Center"
                                        Margin="16,0,4,0" />
-                        </Grid>
-
-                        <!-- Row 1: Quick Reply Box with Send Arrow (WhatsApp, Telegram, Messaging Apps) -->
-                        <Grid x:Name="NotificationReplyRow"
-                              Grid.Row="1"
-                              Visibility="Collapsed"
-                              Margin="0,10,0,2">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Modern Capsule Reply Input Box -->
-                            <Border x:Name="NotificationReplyBorder"
-                                    Grid.Column="0"
-                                    Height="36"
-                                    CornerRadius="18"
-                                    Background="#222226"
-                                    BorderBrush="#3D3D42"
-                                    BorderThickness="1"
-                                    Padding="14,0,12,0"
-                                    PreviewMouseDown="NotificationReplyBox_PreviewMouseDown">
-                                <Grid VerticalAlignment="Center">
-                                    <TextBlock x:Name="NotificationReplyPlaceholder"
-                                               Text="Reply..."
-                                               FontSize="13"
-                                               Foreground="#8E8E93"
-                                               VerticalAlignment="Center"
-                                               IsHitTestVisible="False" />
-                                    <TextBox x:Name="NotificationReplyInput"
-                                             Background="Transparent"
-                                             BorderThickness="0"
-                                             Foreground="#FFFFFF"
-                                             CaretBrush="#30D158"
-                                             FontSize="13.5"
-                                             VerticalAlignment="Center"
-                                             VerticalContentAlignment="Center"
-                                             Padding="0"
-                                             PreviewMouseDown="NotificationReplyInput_PreviewMouseDown"
-                                             KeyDown="NotificationReplyInput_KeyDown"
-                                             TextChanged="NotificationReplyInput_TextChanged"
-                                             GotFocus="NotificationReplyInput_GotFocus"
-                                             LostFocus="NotificationReplyInput_LostFocus" />
-                                </Grid>
-                            </Border>
-
-                            <!-- Sleek Circular Send Button (36x36) -->
-                            <Button x:Name="NotificationSendButton"
-                                    Grid.Column="1"
-                                    Width="36" Height="36"
-                                    Margin="8,0,0,0"
-                                    Padding="0"
-                                    Background="#25D366"
-                                    BorderThickness="0"
-                                    Cursor="Hand"
-                                    Click="NotificationSendButton_Click">
-                                <Button.Style>
-                                    <Style TargetType="Button">
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border x:Name="BtnBorder"
-                                                            Background="{TemplateBinding Background}"
-                                                            CornerRadius="18">
-                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="BtnBorder" Property="Background" Value="#2BE671"/>
-                                                            <Setter Property="Opacity" Value="0.95"/>
-                                                        </Trigger>
-                                                        <Trigger Property="IsPressed" Value="True">
-                                                            <Setter TargetName="BtnBorder" Property="Background" Value="#1EBE5D"/>
-                                                            <Setter Property="Opacity" Value="0.8"/>
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </Button.Style>
-                                <Viewbox Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Canvas Width="24" Height="24">
-                                        <!-- Crisp Send Arrow -->
-                                        <Path Fill="White"
-                                              Data="M 2.01,21 L 23,12 L 2.01,3 L 2,10 L 17,12 L 2,14 Z" />
-                                    </Canvas>
-                                </Viewbox>
-                            </Button>
                         </Grid>
                     </Grid>
 

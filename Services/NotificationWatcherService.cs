@@ -111,16 +111,19 @@ public class NotificationWatcherService
                     // Brand new notification
                     changed = true;
                     var logo = await LoadAppLogoAsync(n);
-                    string appName = n.AppInfo?.DisplayInfo?.DisplayName ?? "Notification";
+                    string appName = UwpResourceResolver.Clean(n.AppInfo?.DisplayInfo?.DisplayName, "Notification");
                     if (string.IsNullOrWhiteSpace(appName)) appName = "Notification";
+
+                    string cleanTitle = UwpResourceResolver.Clean(title, appName);
+                    string cleanMsg = UwpResourceResolver.Clean(msg, "");
 
                     var item = new IslandNotification
                     {
                         Id = n.Id,
                         AppName = appName,
                         AppId = n.AppInfo?.Id ?? "",
-                        Title = string.IsNullOrWhiteSpace(title) ? appName : title,
-                        Message = msg,
+                        Title = string.IsNullOrWhiteSpace(cleanTitle) ? appName : cleanTitle,
+                        Message = cleanMsg,
                         AppLogo = logo,
                         ReceivedTime = DateTime.Now
                     };
@@ -135,8 +138,9 @@ public class NotificationWatcherService
                     // Notification content updated (e.g. WhatsApp new message in existing conversation thread)
                     changed = true;
                     _activeNotificationContent[n.Id] = contentSignature;
-                    existingItem.Title = string.IsNullOrWhiteSpace(title) ? existingItem.AppName : title;
-                    existingItem.Message = msg;
+                    string cleanTitle = UwpResourceResolver.Clean(title, existingItem.AppName);
+                    existingItem.Title = string.IsNullOrWhiteSpace(cleanTitle) ? existingItem.AppName : cleanTitle;
+                    existingItem.Message = UwpResourceResolver.Clean(msg, "");
                     existingItem.ReceivedTime = DateTime.Now;
 
                     App.Log($"Notification updated: App={existingItem.AppName}, Title={existingItem.Title}, Message={existingItem.Message}");
@@ -173,13 +177,14 @@ public class NotificationWatcherService
 
     private (string title, string message) ExtractTexts(UserNotification n)
     {
+        string fallbackApp = UwpResourceResolver.Clean(n.AppInfo?.DisplayInfo?.DisplayName, "Notification");
         try
         {
             var toast = n.Notification?.Visual?.GetBinding(KnownNotificationBindings.ToastGeneric);
             if (toast != null)
             {
                 var elements = toast.GetTextElements()
-                    .Select(t => t.Text?.Trim())
+                    .Select(t => UwpResourceResolver.Clean(t.Text?.Trim(), fallbackApp))
                     .Where(t => !string.IsNullOrEmpty(t))
                     .ToList();
 
@@ -189,13 +194,12 @@ public class NotificationWatcherService
                 }
                 else if (elements.Count == 1)
                 {
-                    return (n.AppInfo?.DisplayInfo?.DisplayName ?? "Notification", elements[0]!);
+                    return (fallbackApp, elements[0]!);
                 }
             }
         }
         catch { }
 
-        string fallbackApp = n.AppInfo?.DisplayInfo?.DisplayName ?? "Notification";
         return (fallbackApp, "New notification received");
     }
 

@@ -1533,7 +1533,8 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() =>
         {
             _isAlarmActive = isRinging;
-            CompactAlarmTitleText.Text = string.IsNullOrWhiteSpace(alarmTitle) ? "Alarm" : alarmTitle;
+            string cleanTitle = UwpResourceResolver.Clean(alarmTitle, "Alarm");
+            CompactAlarmTitleText.Text = string.IsNullOrWhiteSpace(cleanTitle) ? "Alarm" : cleanTitle;
 
             if (isRinging)
             {
@@ -2774,10 +2775,17 @@ public partial class MainWindow : Window
                        app.Contains("Clock", StringComparison.OrdinalIgnoreCase) ||
                        app.Contains("Alarms", StringComparison.OrdinalIgnoreCase);
 
-        bool isAlarmWord = title.Contains("Alarm", StringComparison.OrdinalIgnoreCase) ||
-                           msg.Contains("Alarm", StringComparison.OrdinalIgnoreCase);
+        if (!isClock) return false;
 
-        return (isClock && isAlarmWord) || (isClock && !title.Contains("Timer", StringComparison.OrdinalIgnoreCase));
+        // If it's a timer notification, it belongs to the timer notification flow, NOT the alarm ringer
+        if (title.Contains("Timer", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("Timer", StringComparison.OrdinalIgnoreCase) ||
+            title.Contains("TimerDone", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private void OnNotificationReceived(IslandNotification notif)

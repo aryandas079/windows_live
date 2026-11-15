@@ -222,7 +222,7 @@ public class WindowsClockWatcherService
                 var resolved = new WindowsClockTimerInfo
                 {
                     Key = "UIAutomationClockTimer",
-                    Name = string.IsNullOrWhiteSpace(activeTimerName) ? "Timer" : activeTimerName,
+                    Name = UwpResourceResolver.Clean(activeTimerName, "Timer"),
                     Duration = remaining,
                     RemainingTime = remaining,
                     EndTime = DateTime.Now + remaining,
@@ -400,7 +400,7 @@ public class WindowsClockWatcherService
             {
                 if (pair.Value is Windows.Storage.ApplicationDataCompositeValue comp)
                 {
-                    string name = comp.ContainsKey("Name") ? comp["Name"]?.ToString() ?? "Timer" : "Timer";
+                    string name = UwpResourceResolver.Clean(comp.ContainsKey("Name") ? comp["Name"]?.ToString() : null, "Timer");
                     long durationTicks = comp.ContainsKey("Duration") && comp["Duration"] != null ? Convert.ToInt64(comp["Duration"]) : 0;
                     long remainingTicks = comp.ContainsKey("RemainingTime") && comp["RemainingTime"] != null ? Convert.ToInt64(comp["RemainingTime"]) : 0;
                     long startTicks = comp.ContainsKey("StartTime") && comp["StartTime"] != null ? Convert.ToInt64(comp["StartTime"]) : 0;

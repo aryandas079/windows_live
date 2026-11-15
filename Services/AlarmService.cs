@@ -32,7 +32,8 @@ public class AlarmService
     public void TriggerAlarm(string title = "Alarm", uint? notifId = null)
     {
         _isRinging = true;
-        _currentTitle = string.IsNullOrWhiteSpace(title) ? "Alarm" : title;
+        string cleaned = UwpResourceResolver.Clean(title, "Alarm");
+        _currentTitle = string.IsNullOrWhiteSpace(cleaned) ? "Alarm" : cleaned;
         _activeNotificationId = notifId;
         _snoozeTimer.Stop();
 

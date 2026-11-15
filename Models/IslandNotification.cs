@@ -81,12 +81,13 @@ public class IslandNotification
                     return "System";
             }
 
-            if (!string.IsNullOrWhiteSpace(Title) && !IsBrowserOrGeneric(Title))
+            string cleanTitle = WindowsLive.Services.UwpResourceResolver.Clean(Title, AppName);
+            if (!string.IsNullOrWhiteSpace(cleanTitle) && !IsBrowserOrGeneric(cleanTitle))
             {
-                return Title;
+                return cleanTitle;
             }
 
-            return !string.IsNullOrWhiteSpace(AppName) ? AppName : "Notification";
+            return !string.IsNullOrWhiteSpace(AppName) ? WindowsLive.Services.UwpResourceResolver.Clean(AppName, "Notification") : "Notification";
         }
     }
 

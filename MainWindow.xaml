@@ -362,29 +362,23 @@
                                Margin="0,0,8,0" />
                 </Grid>
 
-                <!-- 5. Device Unlock Mode: Matches iOS Dynamic Island (Full Opening Animation from Zero) -->
+                <!-- 5. Device Lock & Unlock Mode (Matches Reference Images media_1794722062518_8479b98f.png & media_1794722073217_776a4e86.png) -->
                 <Grid x:Name="CompactUnlockView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
                       Margin="16,0,16,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Left: Slick Premium Animated Padlock -->
-                    <Viewbox Grid.Column="0" Width="18" Height="22" HorizontalAlignment="Left" VerticalAlignment="Center">
-                        <Canvas Width="24" Height="26">
-                            <!-- Padlock Body: Smooth curved metal body -->
-                            <Rectangle Canvas.Left="3.5" Canvas.Top="10.5"
-                                       Width="17" Height="13.5"
-                                       RadiusX="3.8" RadiusY="3.8"
+                    <!-- Left-aligned clean minimalist padlock icon matching reference images exactly -->
+                    <Viewbox Width="17" Height="22" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Canvas Width="22" Height="26">
+                            <!-- Padlock Body: Rounded rectangle with smooth corners -->
+                            <Rectangle Canvas.Left="2.5" Canvas.Top="11"
+                                       Width="17" Height="13"
+                                       RadiusX="3.5" RadiusY="3.5"
                                        Fill="White" />
 
-                            <!-- Shackle (Arch): Pivots and unlatches cleanly out of the body -->
-                            <!-- Anchor pivot at the left leg base (X=7.5, Y=11.5) so it twists/swings open gracefully -->
-                            <Canvas x:Name="LockShackleContainer" Width="24" Height="26" Canvas.Left="0" Canvas.Top="0"
-                                    RenderTransformOrigin="0.3125,0.4423">
+                            <!-- Shackle: Clean arch with pivot on the left leg (X=6.5, Y=11) -->
+                            <Canvas x:Name="LockShackleContainer" Width="22" Height="26" Canvas.Left="0" Canvas.Top="0"
+                                    RenderTransformOrigin="0.295,0.423">
                                 <Canvas.RenderTransform>
                                     <TransformGroup>
                                         <TranslateTransform x:Name="LockShackleTranslate" X="0" Y="0" />
@@ -395,13 +389,10 @@
                                       StrokeThickness="2.6"
                                       StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round"
-                                      Data="M 7.5,12.5 V 6.8 C 7.5,3.6 9.4,1.8 12.0,1.8 C 14.6,1.8 16.5,3.6 16.5,6.8 V 12.5" />
+                                      Data="M 6.5,12.5 V 6.5 C 6.5,3.8 8.4,2.0 11.0,2.0 C 13.6,2.0 15.5,3.8 15.5,6.5 V 12.5" />
                             </Canvas>
                         </Canvas>
                     </Viewbox>
-
-                    <!-- Center: Spacious black pill surface -->
-                    <Grid Grid.Column="1" />
                 </Grid>
 
                 <!-- 6. Silent / Ring Alert Mode (Matches User Uploaded Image 1 & 2) -->

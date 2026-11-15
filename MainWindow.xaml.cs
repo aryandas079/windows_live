@@ -43,7 +43,7 @@ public partial class MainWindow : Window
     private const double CompactMediaWidth = 240.0;
     private const double CompactChargingWidth = 260.0;
     private const double CompactNotificationWidth = 220.0;
-    private const double CompactUnlockWidth = 190.0;
+    private const double CompactUnlockWidth = 210.0;
     private const double CompactSilentRingWidth = 200.0;
     private const double CompactDndWidth = 240.0;
     private const double CompactNightModeWidth = 240.0;
@@ -2156,6 +2156,7 @@ public partial class MainWindow : Window
 
     private void SystemEvents_SessionSwitch(object sender, Microsoft.Win32.SessionSwitchEventArgs e)
     {
+        App.Log($"SystemEvents_SessionSwitch: Reason={e.Reason}");
         if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock)
         {
             Dispatcher.Invoke(() =>
@@ -2163,6 +2164,13 @@ public partial class MainWindow : Window
                 PositionWindow();
                 WindowHelper.EnsureTopMost(this);
                 TriggerUnlockAnimation();
+            });
+        }
+        else if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionLock)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                TriggerLockAnimation();
             });
         }
     }
@@ -2223,7 +2231,7 @@ public partial class MainWindow : Window
         CompactUnlockView.Opacity = 0.0;
         CompactUnlockView.Visibility = Visibility.Visible;
 
-        // Reset shackle transforms to closed/locked state (Image 1)
+        // Reset shackle transforms to initial closed/locked position (Locked state from image)
         LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, null);
         LockShackleTranslate.BeginAnimation(TranslateTransform.XProperty, null);
         LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, null);
@@ -2231,49 +2239,102 @@ public partial class MainWindow : Window
         LockShackleTranslate.Y = 0;
         LockShackleRotate.Angle = 0;
 
-        // Animate island container width to 190.0 (compact height 36.0)
+        // Animate island container width to 210.0 (compact height 36.0)
         AnimateIsland(CompactUnlockWidth, CompactHeight);
 
         // Smooth fade-in of the unlock view in fully locked state
         var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
         CompactUnlockView.BeginAnimation(OpacityProperty, fadeIn);
 
-        // 1. Shackle lifts straight up out of the padlock body (unlatching from zero)
+        // Transition from Locked to Unlocked:
+        // 1. Shackle lifts cleanly up out of the padlock body
         var liftAnim = new DoubleAnimation
         {
             From = 0.0,
-            To = -4.0,
-            Duration = TimeSpan.FromMilliseconds(240),
-            BeginTime = TimeSpan.FromMilliseconds(220),
+            To = -4.5,
+            Duration = TimeSpan.FromMilliseconds(220),
+            BeginTime = TimeSpan.FromMilliseconds(250),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
 
-        // 2. Shackle swings/rotates cleanly outward to the right into the open unlocked position (Image 2)
+        // 2. Shackle swings/rotates smoothly outward into open unlocked position
         var rotateAnim = new DoubleAnimation
         {
             From = 0.0,
-            To = 38.0,
-            Duration = TimeSpan.FromMilliseconds(320),
+            To = 42.0,
+            Duration = TimeSpan.FromMilliseconds(280),
             BeginTime = TimeSpan.FromMilliseconds(320),
-            EasingFunction = new BackEase { Amplitude = 0.45, EasingMode = EasingMode.EaseOut }
+            EasingFunction = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut }
         };
-
-        // 3. Play crisp mechanical unlock click sound strictly through device speakers synchronized with the shackle pop
-        var soundTimer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(220)
-        };
-        soundTimer.Tick += (s, e) =>
-        {
-            soundTimer.Stop();
-            PlayUnlockSound();
-        };
-        soundTimer.Start();
 
         LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, liftAnim);
         LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, rotateAnim);
 
-        // Stay on screen for 3.0 seconds, then return to normal
+        // Stay on screen for 2.8 seconds, then fade out smoothly
+        _unlockAlertTimer.Interval = TimeSpan.FromSeconds(2.8);
+        _unlockAlertTimer.Start();
+    }
+
+    public void TriggerLockAnimation()
+    {
+        _isUnlockAlertActive = true;
+        _unlockAlertTimer.Stop();
+
+        // If currently expanded, collapse into compact notch
+        if (_isExpanded)
+        {
+            _isExpanded = false;
+            ExpandedContainer.Visibility = Visibility.Collapsed;
+            CompactView.Visibility = Visibility.Visible;
+            CompactView.Opacity = 1.0;
+        }
+
+        // Hide other compact views and activate lock view
+        CompactClockView.Visibility = Visibility.Collapsed;
+        CompactMediaView.Visibility = Visibility.Collapsed;
+        CompactNotificationView.Visibility = Visibility.Collapsed;
+        CompactChargingView.Visibility = Visibility.Collapsed;
+        CompactUnlockView.Opacity = 0.0;
+        CompactUnlockView.Visibility = Visibility.Visible;
+
+        // Start shackle in open unlocked position (unlocked arch)
+        LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+        LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+        LockShackleTranslate.Y = -4.5;
+        LockShackleRotate.Angle = 42.0;
+
+        // Animate island container width to 210.0
+        AnimateIsland(CompactUnlockWidth, CompactHeight);
+
+        // Smooth fade-in
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
+        CompactUnlockView.BeginAnimation(OpacityProperty, fadeIn);
+
+        // Transition from Unlocked to Locked:
+        // 1. Shackle rotates back from open (42 deg) to straight (0 deg)
+        var rotateCloseAnim = new DoubleAnimation
+        {
+            From = 42.0,
+            To = 0.0,
+            Duration = TimeSpan.FromMilliseconds(220),
+            BeginTime = TimeSpan.FromMilliseconds(220),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+
+        // 2. Shackle drops securely into the lock body (-4.5 to 0)
+        var dropAnim = new DoubleAnimation
+        {
+            From = -4.5,
+            To = 0.0,
+            Duration = TimeSpan.FromMilliseconds(160),
+            BeginTime = TimeSpan.FromMilliseconds(420),
+            EasingFunction = new BounceEase { Bounces = 1, Bounciness = 2, EasingMode = EasingMode.EaseOut }
+        };
+
+        LockShackleRotate.BeginAnimation(RotateTransform.AngleProperty, rotateCloseAnim);
+        LockShackleTranslate.BeginAnimation(TranslateTransform.YProperty, dropAnim);
+
+        _unlockAlertTimer.Interval = TimeSpan.FromSeconds(2.5);
         _unlockAlertTimer.Start();
     }
 

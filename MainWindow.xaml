@@ -73,6 +73,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <TextBlock x:Name="CompactTimeText"
@@ -116,6 +117,31 @@
                             <TextBlock x:Name="CompactBatteryPercentText" Text="85%" FontSize="11" FontWeight="SemiBold" Foreground="#30D158" VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
+
+                    <!-- Orange Moon Crescent Pill for Night Mode -->
+                    <Border x:Name="CompactNightModePill"
+                            Grid.Column="4"
+                            Visibility="Collapsed"
+                            Background="#1AFF9F0A"
+                            BorderBrush="#40FF9F0A"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="5,1.5,5,1.5"
+                            Margin="6,0,0,0"
+                            VerticalAlignment="Center"
+                            Cursor="Hand"
+                            ToolTip="Night Mode is On (Click to open settings)"
+                            MouseDown="CompactNightModePill_MouseDown">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="11" Height="11" VerticalAlignment="Center" Margin="0,0,3,0">
+                                <Canvas Width="16" Height="16">
+                                    <Path Fill="#FF9F0A"
+                                          Data="M 12.3,10.2 C 7.5,10.2 3.6,6.3 3.6,1.5 C 3.6,1.0 3.7,0.5 3.8,0 C 1.5,1.2 0,3.6 0,6.4 C 0,10.5 3.3,13.8 7.4,13.8 C 10.2,13.8 12.6,12.3 13.8,10.0 C 13.3,10.1 12.8,10.2 12.3,10.2 Z" />
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Night" FontSize="11" FontWeight="SemiBold" Foreground="#FF9F0A" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
                 </Grid>
 
                 <!-- 2. Media Mode: Matches Image 3 (disc icon left, animated equalizer right) -->
@@ -153,13 +179,18 @@
                     <!-- Center: Spacious Island Gap -->
                     <Grid Grid.Column="1" />
 
-                    <!-- Right: Animated Accent Equalizer -->
-                    <controls:EqualizerControl x:Name="CompactEqualizer"
-                                               Grid.Column="2"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,2,0"
-                                               AccentBrush="{DynamicResource AccentColorBrush}"
-                                               IsPlaying="True" />
+                    <!-- Right: Animated Accent Equalizer and Night Mode indicator -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,2,0">
+                        <Viewbox x:Name="CompactMediaNightMoon" Width="11" Height="11" VerticalAlignment="Center" Margin="0,0,6,0" Visibility="Collapsed">
+                            <Canvas Width="16" Height="16">
+                                <Path Fill="#FF9F0A" Data="M 12.3,10.2 C 7.5,10.2 3.6,6.3 3.6,1.5 C 3.6,1.0 3.7,0.5 3.8,0 C 1.5,1.2 0,3.6 0,6.4 C 0,10.5 3.3,13.8 7.4,13.8 C 10.2,13.8 12.6,12.3 13.8,10.0 C 13.3,10.1 12.8,10.2 12.3,10.2 Z" />
+                            </Canvas>
+                        </Viewbox>
+                        <controls:EqualizerControl x:Name="CompactEqualizer"
+                                                   VerticalAlignment="Center"
+                                                   AccentBrush="{DynamicResource AccentColorBrush}"
+                                                   IsPlaying="True" />
+                    </StackPanel>
                 </Grid>
 
                 <!-- 3. Charging & Battery Alerts: Matches Image ("Low Battery", "Unplugged", "Power Saver", "Charging") -->
@@ -505,6 +536,11 @@
 
                     <!-- Right: "Timer mm:ss" in Vibrant iOS Amber (#F59E0B) -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                        <Viewbox x:Name="CompactTimerNightMoon" Width="11" Height="11" VerticalAlignment="Center" Margin="0,0,6,0" Visibility="Collapsed">
+                            <Canvas Width="16" Height="16">
+                                <Path Fill="#FF9F0A" Data="M 12.3,10.2 C 7.5,10.2 3.6,6.3 3.6,1.5 C 3.6,1.0 3.7,0.5 3.8,0 C 1.5,1.2 0,3.6 0,6.4 C 0,10.5 3.3,13.8 7.4,13.8 C 10.2,13.8 12.6,12.3 13.8,10.0 C 13.3,10.1 12.8,10.2 12.3,10.2 Z" />
+                            </Canvas>
+                        </Viewbox>
                         <TextBlock Text="Timer "
                                    FontSize="15"
                                    FontWeight="SemiBold"
@@ -672,6 +708,46 @@
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center" />
                     </Border>
+                </Grid>
+
+                <!-- 12. Night Mode Alert Mode (Orange Crescent Moon) -->
+                <Grid x:Name="CompactNightModeView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="8,0,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Orange Moon Capsule Badge -->
+                    <Border x:Name="CompactNightModeBadge"
+                            Grid.Column="0"
+                            Width="54" Height="28"
+                            CornerRadius="14"
+                            Background="#FF9500"
+                            VerticalAlignment="Center">
+                        <!-- Crescent Moon Icon -->
+                        <Canvas Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Path x:Name="CompactNightModeMoonIcon"
+                                  Fill="White"
+                                  Data="M 12.3,10.2 C 7.5,10.2 3.6,6.3 3.6,1.5 C 3.6,1.0 3.7,0.5 3.8,0 C 1.5,1.2 0,3.6 0,6.4 C 0,10.5 3.3,13.8 7.4,13.8 C 10.2,13.8 12.6,12.3 13.8,10.0 C 13.3,10.1 12.8,10.2 12.3,10.2 Z" />
+                        </Canvas>
+                    </Border>
+
+                    <!-- Center: Notch Space -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Text "Night Mode On" (in #FF9F0A) -->
+                    <TextBlock x:Name="CompactNightModeText"
+                               Grid.Column="2"
+                               Text="Night Mode On"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="#FF9F0A"
+                               VerticalAlignment="Center"
+                               Margin="0,0,4,0" />
                 </Grid>
             </Grid>
 

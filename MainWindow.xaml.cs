@@ -89,9 +89,11 @@ public partial class MainWindow : Window
     private readonly AlarmService _alarmService;
     private readonly BluetoothWatcherService _bluetoothService;
     private readonly PowerModeWatcherService _powerModeService;
+    private readonly PrivacyIndicatorService _privacyService;
     private readonly WindowsClockWatcherService _windowsClockService;
     private readonly VoiceRecordingService _voiceRecordingService;
     private readonly ScreenRecordingService _screenRecordingService;
+    private bool _isPrivacyIndicatorActive = false;
     private bool _lastMuteState = false;
     private bool _muteStateInitialized = false;
 
@@ -226,9 +228,13 @@ public partial class MainWindow : Window
             _powerModeService = new PowerModeWatcherService();
             _powerModeService.PowerModeChanged += OnPowerModeChanged;
             _powerModeService.Start();
+            _privacyService = new PrivacyIndicatorService();
+            _privacyService.PrivacyStateChanged += OnPrivacyStateChanged;
+            _privacyService.Start();
             _windowsClockService.TimerStateChanged += OnWindowsClockTimerChanged;
             _windowsClockService.Start();
             _voiceRecordingService.RecordingStateChanged += OnVoiceRecordingStateChanged;
+            _voiceRecordingService.RecordingStateChanged += info => _privacyService.SetWasapiMicState(info.IsRecording);
             _voiceRecordingService.Start();
             _screenRecordingService.RecordingStateChanged += OnScreenRecordingStateChanged;
             _screenRecordingService.Start();
@@ -495,6 +501,7 @@ public partial class MainWindow : Window
             IslandContainer.MouseEnter += OnIslandMouseEnter;
             IslandContainer.MouseLeave += OnIslandMouseLeave;
             IslandContainer.MouseDown += OnIslandMouseDown;
+            KeyDown += MainWindow_KeyDown;
             App.Log("MainWindow constructor finished");
         }
         catch (Exception ex)
@@ -739,7 +746,15 @@ public partial class MainWindow : Window
     private void OnIslandMouseEnter(object sender, MouseEventArgs e)
     {
         _autoCollapseTimer.Stop();
-        IslandContainer.Cursor = HasActiveContent ? Cursors.Hand : Cursors.Arrow;
+
+        // User explicit requirement: "no need to expand for sound recording, timer, screen recording... it should just show in the notch..."
+        if (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive)
+        {
+            IslandContainer.Cursor = Cursors.Arrow;
+            return;
+        }
+
+        IslandContainer.Cursor = (IsMusicActive || _isBluetoothAlertActive || HasActiveContent) ? Cursors.Hand : Cursors.Arrow;
         if (!_isExpanded)
         {
             if (_isBluetoothAlertActive)
@@ -750,11 +765,10 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // Only expand on hover if there is live content to interact with (screen recording, voice recording, active timer or music active/paused)
-            // Notifications only show once on arrival and NEVER re-open on hover after disappearing
-            if (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive || IsMusicActive)
+            // Only expand on hover if music is active/paused
+            if (IsMusicActive)
             {
-                ExpandDock();
+                ExpandDock(IslandCategory.MediaPlayback);
             }
         }
         else if (_isBluetoothAlertActive && _activeCategory == IslandCategory.BluetoothDevice)
@@ -785,15 +799,38 @@ public partial class MainWindow : Window
 
     private void OnIslandMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.LeftButton == MouseButtonState.Pressed && !_isExpanded && HasActiveContent)
+        if (e.LeftButton == MouseButtonState.Pressed && !_isExpanded)
         {
-            ExpandDock();
+            // User explicit requirement: "no need to expand for sound recording, timer, screen recording... it should just show in the notch..."
+            if (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive)
+            {
+                return;
+            }
+
+            if (HasActiveContent)
+            {
+                ExpandDock();
+            }
         }
     }
 
     private void ExpandDock(IslandCategory? preferredCategory = null)
     {
         if (_isExpanded) return;
+
+        // User explicit requirement: "no need to expand for sound recording, timer, screen recording... it should just show in the notch..."
+        if (preferredCategory == IslandCategory.ScreenRecording ||
+            preferredCategory == IslandCategory.VoiceRecording ||
+            preferredCategory == IslandCategory.FocusTimer)
+        {
+            return;
+        }
+
+        if (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive)
+        {
+            return;
+        }
+
         if (!HasActiveContent && !_isNotificationAlertActive) return;
         _isExpanded = true;
 
@@ -813,18 +850,6 @@ public partial class MainWindow : Window
         {
             // By default hovering the split island expands to the music player
             _activeCategory = IslandCategory.MediaPlayback;
-        }
-        else if (IsScreenRecordingActive)
-        {
-            _activeCategory = IslandCategory.ScreenRecording;
-        }
-        else if (IsVoiceRecordingActive)
-        {
-            _activeCategory = IslandCategory.VoiceRecording;
-        }
-        else if (IsAnyTimerActive)
-        {
-            _activeCategory = IslandCategory.FocusTimer;
         }
         else if (IsMusicActive)
         {
@@ -1344,7 +1369,11 @@ public partial class MainWindow : Window
         else if (e.ChangedButton == MouseButton.Right)
         {
             e.Handled = true;
-            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                _privacyService.CycleSimulation();
+            }
+            else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             {
                 _bluetoothService.SimulateConnection("AirPods", 85);
             }
@@ -2955,11 +2984,7 @@ public partial class MainWindow : Window
     private void DetachedBubbleContainer_MouseEnter(object sender, MouseEventArgs e)
     {
         _autoCollapseTimer.Stop();
-        if (!_isExpanded)
-        {
-            // Hovering directly over the detached timer bubble expands directly into the timer controls
-            ExpandDock(IslandCategory.FocusTimer);
-        }
+        // User explicit requirement: timer stays in notch / bubble without expanding
     }
 
     private void DetachedBubbleContainer_MouseLeave(object sender, MouseEventArgs e)
@@ -2973,9 +2998,54 @@ public partial class MainWindow : Window
 
     private void DetachedBubbleContainer_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.LeftButton == MouseButtonState.Pressed && !_isExpanded)
+        // User explicit requirement: timer stays in notch / bubble without expanding
+    }
+
+    private void OnPrivacyStateChanged(bool isCameraInUse, bool isMicInUse)
+    {
+        Dispatcher.Invoke(() =>
         {
-            ExpandDock(IslandCategory.FocusTimer);
+            bool anyActive = isCameraInUse || isMicInUse;
+            _isPrivacyIndicatorActive = anyActive;
+
+            CameraPrivacyDot.Visibility = isCameraInUse ? Visibility.Visible : Visibility.Collapsed;
+            MicPrivacyDot.Visibility = isMicInUse ? Visibility.Visible : Visibility.Collapsed;
+
+            if (anyActive)
+            {
+                PrivacyIndicatorPanel.Visibility = Visibility.Visible;
+                var anim = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(180));
+                PrivacyIndicatorPanel.BeginAnimation(OpacityProperty, anim);
+            }
+            else
+            {
+                var anim = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(180));
+                anim.Completed += (s, e) =>
+                {
+                    if (!_isPrivacyIndicatorActive)
+                    {
+                        PrivacyIndicatorPanel.Visibility = Visibility.Collapsed;
+                    }
+                };
+                PrivacyIndicatorPanel.BeginAnimation(OpacityProperty, anim);
+            }
+        });
+    }
+
+    private void MainWindow_KeyDown(object sender, KeyEventArgs e)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && (Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        {
+            if (e.Key == Key.C)
+            {
+                _privacyService.ToggleCameraSimulation();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.M)
+            {
+                _privacyService.ToggleMicrophoneSimulation();
+                e.Handled = true;
+            }
         }
     }
 }

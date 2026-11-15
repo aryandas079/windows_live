@@ -1489,6 +1489,37 @@
 
                 </Grid>
             </Grid>
+
+            <!-- Privacy Indicator Lights (Camera = Green, Microphone = Orange) in the Notch -->
+            <StackPanel x:Name="PrivacyIndicatorPanel"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed"
+                        Opacity="0.0">
+                <!-- Camera Green Dot -->
+                <Ellipse x:Name="CameraPrivacyDot"
+                         Width="7.5" Height="7.5"
+                         Fill="#30D158"
+                         Margin="3,0,3,0"
+                         Visibility="Collapsed">
+                    <Ellipse.Effect>
+                        <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                    </Ellipse.Effect>
+                </Ellipse>
+
+                <!-- Microphone Orange Dot -->
+                <Ellipse x:Name="MicPrivacyDot"
+                         Width="7.5" Height="7.5"
+                         Fill="#FF9F0A"
+                         Margin="3,0,3,0"
+                         Visibility="Collapsed">
+                    <Ellipse.Effect>
+                        <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                    </Ellipse.Effect>
+                </Ellipse>
+            </StackPanel>
         </Grid>
 
         <!-- ========================================================================================= -->

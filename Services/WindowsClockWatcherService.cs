@@ -33,10 +33,10 @@ public class WindowsClockWatcherService
     private AutomationElement? _cachedStartBtn = null;
     private AutomationElement? _cachedResetBtn = null;
 
-    private static readonly Regex TimeRegex = new Regex(@"^\d{1,2}:\d{2}(:\d{2})?$", RegexOptions.Compiled);
+    private static readonly Regex TimeRegex = new Regex(@"(?<!\d)\d{1,2}:\d{2}(?::\d{2})?(?!\d)", RegexOptions.Compiled);
 
     public WindowsClockTimerInfo? ActiveTimer => _activeTimer;
-    public bool HasActiveTimer => _activeTimer != null && (_activeTimer.IsRunning || _activeTimer.RemainingTime.TotalSeconds > 0);
+    public bool HasActiveTimer => _activeTimer != null && _activeTimer.IsRunning && _activeTimer.RemainingTime.TotalSeconds > 0;
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
@@ -174,7 +174,7 @@ public class WindowsClockWatcherService
                     string name = btn.Current.Name ?? string.Empty;
                     string aid = btn.Current.AutomationId ?? string.Empty;
 
-                    if (name.Equals("Pause", StringComparison.OrdinalIgnoreCase) ||
+                    if (name.Contains("Pause", StringComparison.OrdinalIgnoreCase) ||
                         aid.IndexOf("Pause", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         activePause = btn;
@@ -196,7 +196,7 @@ public class WindowsClockWatcherService
                         string name = btn.Current.Name ?? string.Empty;
                         string aid = btn.Current.AutomationId ?? string.Empty;
 
-                        if ((name.Equals("Reset", StringComparison.OrdinalIgnoreCase) ||
+                    if ((name.Contains("Reset", StringComparison.OrdinalIgnoreCase) ||
                              aid.IndexOf("Reset", StringComparison.OrdinalIgnoreCase) >= 0) &&
                             btn.Current.IsEnabled)
                         {
@@ -236,6 +236,7 @@ public class WindowsClockWatcherService
                 if (changed || (_activeTimer != null && !_activeTimer.IsRunning))
                 {
                     _activeTimer = resolved;
+                    App.Log($"Windows Clock timer detected: {resolved.Name}, remaining={resolved.RemainingTime:c}, running={resolved.IsRunning}");
                     TimerStateChanged?.Invoke(_activeTimer);
                 }
                 return true;
@@ -258,101 +259,92 @@ public class WindowsClockWatcherService
 
     private static void ExtractCardDetails(AutomationElement actionBtn, out string? timeStr, out AutomationElement? resetBtn, out string? timerName)
     {
-        timeStr = null;
-        resetBtn = null;
-        timerName = null;
-
-        try
-        {
-            var parent = TreeWalker.ControlViewWalker.GetParent(actionBtn);
-            if (parent == null) return;
-
-            var texts = parent.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text));
-            foreach (AutomationElement txt in texts)
-            {
-                try
-                {
-                    string val = txt.Current.Name ?? string.Empty;
-                    if (IsTimeFormat(val))
-                    {
-                        timeStr = val;
-                    }
-                    else if (!string.IsNullOrWhiteSpace(val) && timerName == null &&
-                             !val.Contains("AM", StringComparison.OrdinalIgnoreCase) &&
-                             !val.Contains("PM", StringComparison.OrdinalIgnoreCase))
-                    {
-                        timerName = val;
-                    }
-                }
-                catch { }
-            }
-
-            var btns = parent.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button));
-            foreach (AutomationElement b in btns)
-            {
-                try
-                {
-                    string bName = b.Current.Name ?? string.Empty;
-                    string bAid = b.Current.AutomationId ?? string.Empty;
-                    if (bName.Equals("Reset", StringComparison.OrdinalIgnoreCase) || bAid.IndexOf("Reset", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        resetBtn = b;
-                        break;
-                    }
-                }
-                catch { }
-            }
-        }
-        catch { }
+        FindTimerCardDetails(actionBtn, out timeStr, out resetBtn, out timerName);
     }
 
     private static void ExtractCardDetailsForReset(AutomationElement resetBtn, out string? timeStr, out AutomationElement? startBtn, out string? timerName)
     {
+        FindTimerCardDetails(resetBtn, out timeStr, out startBtn, out timerName);
+    }
+
+    private static void FindTimerCardDetails(AutomationElement actionBtn, out string? timeStr, out AutomationElement? relatedActionBtn, out string? timerName)
+    {
         timeStr = null;
-        startBtn = null;
+        relatedActionBtn = null;
         timerName = null;
 
         try
         {
-            var parent = TreeWalker.ControlViewWalker.GetParent(resetBtn);
-            if (parent == null) return;
+            var actionBounds = actionBtn.Current.BoundingRectangle;
+            double actionCenterX = actionBounds.Left + actionBounds.Width / 2.0;
+            double actionCenterY = actionBounds.Top + actionBounds.Height / 2.0;
+            double bestScore = double.MaxValue;
 
-            var texts = parent.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text));
-            foreach (AutomationElement txt in texts)
+            // The countdown can be a sibling several UIA levels above the Pause
+            // button, so search upward, but only accept time text spatially associated
+            // with this button. This prevents unrelated clock labels elsewhere in
+            // the app from being mistaken for a running timer.
+            AutomationElement? scope = TreeWalker.ControlViewWalker.GetParent(actionBtn);
+            for (int depth = 0; scope != null && depth < 8; depth++)
             {
-                try
+                var texts = scope.FindAll(TreeScope.Descendants,
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text));
+                foreach (AutomationElement txt in texts)
                 {
-                    string val = txt.Current.Name ?? string.Empty;
-                    if (IsTimeFormat(val))
+                    try
                     {
-                        timeStr = val;
-                    }
-                    else if (!string.IsNullOrWhiteSpace(val) && timerName == null &&
-                             !val.Contains("AM", StringComparison.OrdinalIgnoreCase) &&
-                             !val.Contains("PM", StringComparison.OrdinalIgnoreCase))
-                    {
-                        timerName = val;
-                    }
-                }
-                catch { }
-            }
+                        string val = txt.Current.Name ?? string.Empty;
+                        var match = TimeRegex.Match(val);
+                        if (match.Success)
+                        {
+                            var textBounds = txt.Current.BoundingRectangle;
+                            if (textBounds.IsEmpty || textBounds.Width <= 0 || textBounds.Height <= 0) continue;
 
-            var btns = parent.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button));
-            foreach (AutomationElement b in btns)
-            {
-                try
-                {
-                    string bName = b.Current.Name ?? string.Empty;
-                    string bAid = b.Current.AutomationId ?? string.Empty;
-                    if (bName.Equals("Start", StringComparison.OrdinalIgnoreCase) ||
-                        bName.Equals("Play", StringComparison.OrdinalIgnoreCase) ||
-                        bAid.IndexOf("Start", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        startBtn = b;
-                        break;
+                            double textCenterX = textBounds.Left + textBounds.Width / 2.0;
+                            double textCenterY = textBounds.Top + textBounds.Height / 2.0;
+                            double deltaX = Math.Abs(textCenterX - actionCenterX);
+                            double deltaY = Math.Abs(textCenterY - actionCenterY);
+                            if (deltaX > 240 || deltaY > 280) continue;
+
+                            double score = (deltaX * deltaX) + (deltaY * deltaY * 0.35);
+                            if (score < bestScore)
+                            {
+                                bestScore = score;
+                                timeStr = match.Value;
+                                timerName = "Timer";
+                            }
+                        }
                     }
+                    catch { }
                 }
-                catch { }
+
+                if (timeStr != null)
+                {
+                    var buttons = scope.FindAll(TreeScope.Descendants,
+                        new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button));
+                    foreach (AutomationElement button in buttons)
+                    {
+                        try
+                        {
+                            if (button == actionBtn) continue;
+                            string name = button.Current.Name ?? string.Empty;
+                            string id = button.Current.AutomationId ?? string.Empty;
+                            if (name.Contains("Reset", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("Start", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("Play", StringComparison.OrdinalIgnoreCase) ||
+                                id.Contains("Reset", StringComparison.OrdinalIgnoreCase) ||
+                                id.Contains("Start", StringComparison.OrdinalIgnoreCase))
+                            {
+                                relatedActionBtn = button;
+                                break;
+                            }
+                        }
+                        catch { }
+                    }
+                    return;
+                }
+
+                scope = TreeWalker.ControlViewWalker.GetParent(scope);
             }
         }
         catch { }

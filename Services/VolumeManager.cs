@@ -22,7 +22,7 @@ public class VolumeManager
 
         _pollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(500)
+            Interval = TimeSpan.FromMilliseconds(150)
         };
         _pollTimer.Tick += (s, e) => PollVolumeState();
         _pollTimer.Start();
@@ -32,18 +32,43 @@ public class VolumeManager
     {
         try
         {
-            var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumerator();
-            enumerator.GetDefaultAudioEndpoint(0, 1, out var device);
-            if (device != null)
+            Type? enumType = Type.GetTypeFromCLSID(new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E"));
+            if (enumType == null)
+            {
+                App.Log("VolumeManager: Failed to get MMDeviceEnumerator CLSID type");
+                return;
+            }
+            var enumerator = Activator.CreateInstance(enumType) as IMMDeviceEnumerator;
+            if (enumerator == null)
+            {
+                App.Log("VolumeManager: Failed to create IMMDeviceEnumerator instance");
+                return;
+            }
+
+            int hr = enumerator.GetDefaultAudioEndpoint(0, 1, out var device);
+            if (hr == 0 && device != null)
             {
                 var iid = typeof(IAudioEndpointVolume).GUID;
-                device.Activate(ref iid, 1, IntPtr.Zero, out var obj);
-                _audioEndpoint = obj as IAudioEndpointVolume;
-                PollVolumeState(forceNotify: true);
+                hr = device.Activate(ref iid, 1, IntPtr.Zero, out var obj);
+                if (hr == 0 && obj is IAudioEndpointVolume ep)
+                {
+                    _audioEndpoint = ep;
+                    App.Log("VolumeManager: AudioEndpoint successfully activated");
+                    PollVolumeState(forceNotify: true);
+                }
+                else
+                {
+                    App.Log($"VolumeManager: Failed to activate IAudioEndpointVolume, hr={hr}");
+                }
+            }
+            else
+            {
+                App.Log($"VolumeManager: GetDefaultAudioEndpoint failed, hr={hr}");
             }
         }
-        catch
+        catch (Exception ex)
         {
+            App.Log($"VolumeManager InitializeEndpoint error: {ex.Message}");
             _audioEndpoint = null;
         }
     }
@@ -59,8 +84,13 @@ public class VolumeManager
 
             if (forceNotify || Math.Abs(vol - _lastVolume) > 0.01f || mute != _lastMute)
             {
+                bool muteChanged = (mute != _lastMute);
                 _lastVolume = vol;
                 _lastMute = mute;
+                if (muteChanged)
+                {
+                    App.Log($"VolumeManager PollVolumeState: Mute changed to {mute}, Vol={vol:F2}");
+                }
                 VolumeChanged?.Invoke(vol, mute);
             }
         }

@@ -1,73 +1,100 @@
-# Windows Live — Dynamic Island Dock for Windows 11
+# Windows Live
 
-A native, lightweight Dynamic Island style dock anchored at the top of your screen, designed with authentic **WinUI 3 & Fluent System Icon** styling, real-time Windows media integration, dynamic theme adaptation, and smart full-screen/maximized app detection.
+![Platform](https://img.shields.io/badge/Platform-Windows%2011-0078D4?logo=windows11&logoColor=white)
+![Language](https://img.shields.io/badge/Language-C%23%2014-512BD4?logo=sharp&logoColor=white)
+![Framework](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)
+![UI](https://img.shields.io/badge/UI-WPF-0078D4)
+![WPF--UI](https://img.shields.io/badge/WPF--UI-4.3.0-4B6EAF)
+![System.Management](https://img.shields.io/badge/System.Management-9.0.2-4B6EAF)
+![License](https://img.shields.io/badge/License-Apache--2.0-blue)
 
-![Compact Dock](dock_compact.png)
-![Expanded Dock](dock_expanded.png)
+Windows Live is a lightweight Windows desktop companion inspired by the Dynamic Island. It places a compact, animated dock at the top of the screen and surfaces media, timers, recordings, notifications, and other live system activity.
 
----
+The app is built with WPF and .NET 10 for Windows. It uses Windows media controls and system APIs to read activity and provide controls where Windows makes them available.
 
-## Features
+## Technology details
 
-- **Dynamic Island Silhouette & Geometry**:
-  - Matches top notch hardware/bezel style with concave ear fillets curving into the screen edge.
-  - Smooth rounded bottom corners and dynamic OLED dark / frosted light backgrounds with a 1px WinUI 3 Fluent border.
-  - Seamless toggle between **Attached Top Notch** and **Floating Capsule Pill** modes.
+| Area | Technology | Used for |
+| --- | --- | --- |
+| Language and runtime | C# 14, .NET 10 | Application logic; C# 14 is the SDK default for this target framework. |
+| Desktop UI | WPF, XAML | Dock, compact and expanded activity views, animation, and controls. |
+| UI components | WPF-UI 4.3.0 | Fluent-styled icons and interface components. |
+| Media | Windows Runtime `GlobalSystemMediaTransportControlsSessionManager` | Discover media sessions and read track, artwork, playback, and timeline state. |
+| Windows integrations | Windows Runtime APIs | Battery and power status, Bluetooth discovery, notifications, clipboard, and native Share UI. |
+| Native Windows interop | Win32 P/Invoke and COM | Window positioning and hit testing, topmost behavior, Core Audio endpoint volume, and selected system signals. |
+| Brightness | `System.Management` 9.0.2 and WMI | Read and change monitor brightness where supported by the display and driver. |
+| Clock timers | Windows UI Automation and Windows Clock app settings | Read active timer state and remaining time. |
+| Startup | Current-user registry, Startup folder, Task Scheduler | Launch Windows Live when the user signs in. |
+| License | Apache License 2.0 | See [`LICENSE`](LICENSE). |
 
-- **Intelligent Window State Detection**:
-  - **Full-Screen Apps (Games, Fullscreen Video, Presentations)**: The dock hides completely (`Visibility="Collapsed"`) so it never obstructs immersion or controls.
-  - **Maximized Apps (Browser, Office, IDE)**: The dock auto-hides so titles, tabs, and top toolbars remain clean and unobstructed. Moving the cursor to the top-center edge smoothly reveals the dynamic island. Leaving the dock smoothly auto-hides it back.
-  - **Normal / Desktop State**: Visible by default at the top of your screen.
+The project targets `net10.0-windows10.0.22621.0` and uses the .NET SDK's default C# language version. It does not explicitly pin a C# version in the project file. Windows API features can depend on the Windows build, driver, hardware, permissions, and the source app exposing the relevant information.
 
-- **Device Theme & Accent Color Synchronization**:
-  - Follows Windows Light / Dark mode in real time.
-  - Applies your system accent color to the scrubber, circular progress ring, equalizer bars, Play button, and active badges.
+## What it can do
 
-- **WinUI 3 & Fluent System Icons**:
-  - Official Fluent System Icons: `Play24`, `Pause24`, `Previous24`, `Next24`, `Speaker224`, `SpeakerMute24`, `BatteryCharge24`, `Pin24`, `ChevronUp24`, `MusicNote224`.
-  - WinUI 3 typography (Segoe UI Variable), subtle hover highlights, and fluid cubic ease animations.
+- **Media playback:** show current track information and artwork, with playback controls and an expanded player.
+- **Live timers:** show the app's focus timer and active Windows Clock timers. When several activities are active, the notch prioritizes the main activity and can show a timer in a separate compact pill.
+- **Recording indicators:** show voice or screen recording status, with a compact red indicator alongside media when activities overlap.
+- **Notifications:** surface recent Windows notifications in the compact dock and expanded notification view.
+- **Clipboard and sharing:** preview copied content, handle dropped files, and open the native Windows Share UI for supported items.
+- **System activity:** display battery and charging state, volume and brightness controls, power mode, Bluetooth changes, Focus Assist, Night Light, alarms, and camera/microphone privacy activity.
+- **Window snapping:** provide a dock entry point for window snapping actions.
+- **Adaptive presentation:** use a top-attached notch or floating pill, with compact and expanded layouts, system theme and accent colors, and foreground-window behavior.
+- **Startup support:** register the app to launch at sign-in. The installer and the app's startup service manage the startup entries.
 
-- **Dual-State Dynamic Morphing**:
-  - **Compact State (Idle)**:
-    - Left: Rotating circular album art / media disc surrounded by a circular progress arc in system accent color.
-    - Center: Live track title and artist ticker.
-    - Right: Dynamic 5-bar animated audio equalizer responding to playback.
-  - **Expanded State (Interactive Card)**:
-    - Smooth expansion animation on hover or click.
-    - Full high-resolution album artwork thumbnail with rounded corners and drop shadow.
-    - Interactive seek slider with live elapsed and remaining timestamps.
-    - Media controls: Shuffle, Previous, Play/Pause accent button, Next, Repeat.
-    - Real Windows master volume control slider and mute toggle.
-    - Real-time battery indicator with percentage and charging status.
-    - Quick actions: Dock style switch (Notch vs Floating Pill), Pin expanded state, and Collapse.
+Windows and application versions expose different information. Media artwork, notification access, Clock timer details, and some recording or privacy signals depend on the source app and Windows permissions/APIs.
 
-- **Real-Time Windows Integration**:
-  - Uses `Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager` (WinRT) to listen to Spotify, Apple Music, YouTube in Chrome/Edge, Windows Media Player, etc.
-  - Native volume control via Windows CoreAudio `IAudioEndpointVolume`.
-  - Battery percentage & status via Windows `PowerManager`.
-  - Native `WM_NCHITTEST` click-through: only the island surface receives clicks, while transparent surrounding areas pass clicks directly to underlying applications and windows.
+## Requirements
 
----
+- Windows 11 (the project targets `net10.0-windows10.0.22621.0`).
+- .NET 10 SDK with the Windows Desktop components.
 
-## Installation and Background Service
+## Build and run
 
-### Install and Run in Background
-Double-click `install.bat` from the directory:
-- Compiles/installs the application to `%LOCALAPPDATA%\WindowsLive`.
-- Registers the application to run silently in the background on Windows startup (Registry Run key and Windows Startup shortcut).
-- Starts the dynamic island immediately in the background without any console or taskbar distraction.
+From the repository directory, run:
 
-### Uninstall
-To stop and completely remove the application and its startup entries:
-- Double-click `uninstall.bat` from the project directory.
-- Terminates all running background instances and removes startup registration and installed binaries.
-
-### Manual Launch / Development
-To build and run directly during development:
 ```powershell
-dotnet run --project WindowsLive.csproj
+dotnet restore .\WindowsLive.csproj
+dotnet run --project .\WindowsLive.csproj
 ```
 
-### Pre-requisites
-- Windows 10 (Build 19041+) or Windows 11
-- .NET 8.0 or .NET 10.0 Windows Desktop SDK
+To create the Release files used by `install.bat`:
+
+```powershell
+dotnet publish .\WindowsLive.csproj -c Release -o .\publish --no-self-contained
+```
+
+The publish output is framework-dependent; install the .NET 10 Windows Desktop Runtime on machines that do not have it already.
+
+## Install and uninstall
+
+1. Build the publish directory using the command above.
+2. Run `install.bat` from the repository. It copies `publish\` to `%LOCALAPPDATA%\WindowsLive`, configures sign-in startup, and launches the app.
+3. To remove the installed app and its startup entries, run `uninstall.bat`.
+
+You can also launch a published build directly from `publish\WindowsLive.exe`.
+
+## Project layout
+
+```text
+WindowsLive.csproj       WPF project and package references
+App.xaml(.cs)            Application startup, single-instance guard, logging
+MainWindow.xaml(.cs)     Dock layout, compact activity selection, interactions
+Controls/                Reusable notch, icon, progress, and equalizer controls
+Models/                  Activity and media data models
+Services/                Windows integration and activity watchers
+Resources/               Styles and small bundled assets
+install.bat              Install a published build and configure startup
+uninstall.bat            Remove the installed build and startup entries
+```
+
+## Configuration and permissions
+
+Windows may ask for access to notifications or other system information the first time a related feature is used. Grant only the access you want Windows Live to use. The app writes its diagnostic log beside the running executable as `app_debug.log`; the log may include detected application names and activity transitions, so review it before sharing.
+
+## Contributing
+
+Bug reports and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. For security concerns, follow [SECURITY.md](SECURITY.md). Everyone participating in the project is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+Windows Live is distributed under the [Apache License 2.0](LICENSE). See the license file for permissions, conditions, and limitations.

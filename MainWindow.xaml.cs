@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -13,11 +16,72 @@ using Wpf.Ui.Controls;
 using WindowsLive.Controls;
 using WindowsLive.Models;
 using WindowsLive.Services;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
 
 namespace WindowsLive;
 
+[ComImport]
+[Guid("3A3DCD6C-3EAB-43DC-BCDE-45671CE800C8")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IDataTransferManagerInterop
+{
+    IntPtr GetForWindow([In] IntPtr appWindow, [In] ref Guid riid);
+    void ShowShareUIForWindow([In] IntPtr appWindow);
+}
+
 public partial class MainWindow : Window
 {
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint GwOwner = 4;
+    private const uint MonitorDefaultToNearest = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMonitorInfo
+    {
+        public int Size;
+        public NativeRect Monitor;
+        public NativeRect Work;
+        public uint Flags;
+    }
+
+    private delegate bool EnumWindowsCallback(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindow(IntPtr hWnd, uint command);
+
+    [DllImport("user32.dll")]
+    private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maxCount);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out NativeRect rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref NativeMonitorInfo info);
+
     private readonly MediaManager _mediaManager;
     private readonly VolumeManager _volumeManager;
     private readonly PowerManagerService _powerService;
@@ -56,12 +120,11 @@ public partial class MainWindow : Window
     private const double CompactPowerPerformanceWidth = 235.0;
     private const double CompactTimerWidth = 240.0;
     private const double CompactRecordingWidth = 210.0;
-    private const double CompactScreenRecordingWidth = 240.0;
-    private const double CompactScreenRecordingHeight = 48.0;
-    private const double CompactSplitLeadingWidth = 140.0;
-    private const double DetachedBubbleWidth = 76.0;
-    private const double DetachedSecondaryWidth = 78.0;
-    private const double DetachedBubbleGap = 8.0;
+    private const double CompactScreenRecordingWidth = CompactDefaultWidth;
+    private const double CompactSplitLeadingWidth = CompactMediaWidth;
+    private const double DetachedBubbleWidth = 78.0;
+    private const double DetachedBubbleGap = 16.0;
+    private const double ActivityIndicatorBlinkIntervalMs = 1000.0;
     private const double CompactHeight = 36.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
@@ -89,6 +152,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _powerModeAlertTimer;
     private readonly DispatcherTimer _dragDropFeedbackTimer;
     private bool _isDragActive = false;
+    private bool _isDropFeedbackActive = false;
+    private bool IsFeedbackSurfaceActive => _isDragActive || _isDropFeedbackActive;
     private readonly FocusAssistWatcherService _focusAssistService;
     private readonly NightLightWatcherService _nightLightService;
     private readonly AlarmService _alarmService;
@@ -104,6 +169,7 @@ public partial class MainWindow : Window
 
     private bool IsVoiceRecordingActive => _voiceRecordingService?.IsRecording ?? false;
     private bool IsScreenRecordingActive => _screenRecordingService?.IsRecording ?? false;
+    private bool IsRecordingActivityActive => IsVoiceRecordingActive || IsScreenRecordingActive;
 
     private bool IsAnyTimerActive =>
         _focusService.IsRunning ||
@@ -187,7 +253,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private double CurrentCompactHeight => IsScreenRecordingActive ? CompactScreenRecordingHeight : CompactHeight;
+    private double CurrentCompactHeight => CompactHeight;
 
     private double CurrentCompactWidth
     {
@@ -211,9 +277,9 @@ public partial class MainWindow : Window
             else if (_isNightModeAlertActive) baseWidth = CompactNightModeWidth;
             else if (_isChargingAlertActive) baseWidth = CompactChargingWidth;
             else if (_isNotificationAlertActive && _currentNotification != null) baseWidth = CompactNotificationWidth;
-            else if (IsSplitActive) baseWidth = CompactSplitLeadingWidth;
+            else if (IsSplitActive && IsMusicActive) baseWidth = CompactSplitLeadingWidth;
             else if (IsScreenRecordingActive) baseWidth = CompactScreenRecordingWidth;
-            else if (IsVoiceRecordingActive) baseWidth = CompactRecordingWidth;
+            else if (IsVoiceRecordingActive && !IsMusicActive) baseWidth = CompactRecordingWidth;
             else if (IsAnyTimerActive) baseWidth = CompactTimerWidth;
             else if (IsMusicActive) baseWidth = CompactMediaWidth;
             else if (_isPrivacyIndicatorActive) baseWidth = CompactDefaultWidth + 10.0;
@@ -648,6 +714,10 @@ public partial class MainWindow : Window
 
     private void HideDockSmooth()
     {
+        // Active work (playback, recording, or a timer) keeps the notch present even
+        // when the foreground window is fullscreen or the pointer leaves the dock.
+        if (HasActiveContent || HasActiveAlert) return;
+
         var anim = new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(160));
         anim.Completed += (s, e) =>
         {
@@ -757,8 +827,8 @@ public partial class MainWindow : Window
         IslandContainer.Height = CurrentCompactHeight;
         _volumeManager.PollVolumeState(forceNotify: true);
 
-        // Breathing/pulsing red recording dot animation
-        var pulse = new DoubleAnimation(1.0, 0.25, TimeSpan.FromMilliseconds(700))
+        // Simple recording indicator: blink once per second without scaling or glow.
+        var pulse = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(500))
         {
             AutoReverse = true,
             RepeatBehavior = RepeatBehavior.Forever
@@ -832,6 +902,18 @@ public partial class MainWindow : Window
                 }
             }
 
+            if (DetachedLeftContainer.Visibility == Visibility.Visible && DetachedLeftContainer.Opacity > 0.1)
+            {
+                Point leftBubblePoint = DetachedLeftContainer.TranslatePoint(new Point(0, 0), this);
+                Rect leftBubbleRect = new Rect(leftBubblePoint.X, leftBubblePoint.Y, DetachedLeftContainer.ActualWidth, DetachedLeftContainer.ActualHeight);
+
+                if (leftBubbleRect.Contains(windowPoint))
+                {
+                    handled = true;
+                    return (IntPtr)WindowHelper.HTCLIENT;
+                }
+            }
+
             if (TopEdgeHotspot.Visibility == Visibility.Visible)
             {
                 Point hotspotPoint = TopEdgeHotspot.TranslatePoint(new Point(0, 0), this);
@@ -856,7 +938,8 @@ public partial class MainWindow : Window
         _autoCollapseTimer.Stop();
 
         // User explicit requirement: "no need to expand for sound recording, timer, screen recording... it should just show in the notch..."
-        if (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive)
+        // If music is active in the notch, allow expanding music player
+        if (!IsMusicActive && (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive))
         {
             IslandContainer.Cursor = Cursors.Arrow;
             return;
@@ -961,6 +1044,7 @@ public partial class MainWindow : Window
 
     private void ExpandDock(IslandCategory? preferredCategory = null)
     {
+        if (IsFeedbackSurfaceActive) return;
         if (_isExpanded) return;
 
         // User explicit requirement: "no need to expand for sound recording, timer, screen recording... it should just show in the notch..."
@@ -971,7 +1055,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive)
+        if (!IsMusicActive && !_isNotificationAlertActive && (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive))
         {
             return;
         }
@@ -1017,11 +1101,19 @@ public partial class MainWindow : Window
             ? ExpandedBluetoothWidth
             : ExpandedWidth;
 
+        DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+        DetachedLeftContainer.Visibility = Visibility.Collapsed;
+
         AnimateIsland(targetWidth, targetHeight);
 
         var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(100));
         fadeOut.Completed += (s, e) =>
         {
+            if (_isDropFeedbackActive || !_isExpanded)
+            {
+                return;
+            }
+
             CompactView.Visibility = Visibility.Collapsed;
             ExpandedContainer.Visibility = Visibility.Visible;
             ShowActiveCategoryView();
@@ -1033,6 +1125,7 @@ public partial class MainWindow : Window
 
     private void CollapseDock()
     {
+        if (IsFeedbackSurfaceActive) return;
         if (!_isExpanded) return;
         _isExpanded = false;
 
@@ -1055,6 +1148,11 @@ public partial class MainWindow : Window
         var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(100));
         fadeOut.Completed += (s, e) =>
         {
+            if (_isDropFeedbackActive || _isExpanded)
+            {
+                return;
+            }
+
             ExpandedContainer.Visibility = Visibility.Collapsed;
             CompactView.Visibility = Visibility.Visible;
             UpdateCompactViewVisibility();
@@ -1066,6 +1164,14 @@ public partial class MainWindow : Window
 
     private void AnimateIsland(double targetWidth, double targetHeight)
     {
+        // Copy/share feedback owns both the dock surface and its geometry. Background
+        // services can keep reporting state, but cannot resize or morph the dock until
+        // the feedback timeout restores the normal presentation.
+        if (IsFeedbackSurfaceActive)
+        {
+            return;
+        }
+
         var ease = new QuinticEase { EasingMode = EasingMode.EaseOut };
 
         var widthAnim = new DoubleAnimation
@@ -1092,61 +1198,143 @@ public partial class MainWindow : Window
     {
         if (IsSplitActive)
         {
-            // Position detached satellite capsules row adjacent to the right edge of the main island
-            // Offset from center = (mainIslandWidth / 2) + gap
-            double startX = (mainIslandTargetWidth / 2.0) + DetachedBubbleGap;
-            DetachedSatellitesRow.Margin = new Thickness(startX * 2.0, 0, 0, 0);
+            bool showTimerOnRight = IsAnyTimerActive && (IsMusicActive || IsRecordingActivityActive);
+            bool showRecordingOnLeft = false;
+            // Position detached satellite capsules smoothly on either side of the notch:
+            // Right Pill (e.g. Timer): (mainIslandTargetWidth / 2) + DetachedBubbleGap + (RightPillWidth / 2)
+            // Left Pill (e.g. Call / Recording): -((mainIslandTargetWidth / 2) + DetachedBubbleGap + (LeftPillWidth / 2))
+            var ease = new QuinticEase { EasingMode = EasingMode.EaseOut };
+            var dur = TimeSpan.FromMilliseconds(220);
 
-            // Configure secondary capsule if 3 or more concurrent tasks are running
-            if (ActiveRunningTasksCount >= 3)
+            if (showTimerOnRight)
             {
-                DetachedSecondaryContainer.Visibility = Visibility.Visible;
-                if (IsVoiceRecordingActive)
+                double rightPillW = DetachedBubbleContainer.ActualWidth > 0 ? DetachedBubbleContainer.ActualWidth : DetachedBubbleWidth;
+                double rightX = (mainIslandTargetWidth / 2.0) + DetachedBubbleGap + (rightPillW / 2.0);
+                var rightAnim = new DoubleAnimation { To = rightX, Duration = dur, EasingFunction = ease };
+                DetachedRightTranslate.BeginAnimation(TranslateTransform.XProperty, rightAnim);
+
+                if (DetachedBubbleContainer.Visibility != Visibility.Visible || DetachedBubbleContainer.Opacity < 0.1)
                 {
-                    DetachedSecondaryText.Text = "call";
+                    DetachedBubbleContainer.Visibility = Visibility.Visible;
+                    var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(200)) { EasingFunction = ease };
+                    DetachedBubbleContainer.BeginAnimation(OpacityProperty, fadeIn);
                 }
-                else if (IsScreenRecordingActive)
+            }
+
+            // Left Pill: If 3 tasks are running, show a detached capsule on the left side of the notch as well
+            if (showRecordingOnLeft)
+            {
+                double leftPillW = DetachedLeftContainer.ActualWidth > 0 ? DetachedLeftContainer.ActualWidth : DetachedBubbleWidth;
+                double leftX = -((mainIslandTargetWidth / 2.0) + DetachedBubbleGap + (leftPillW / 2.0));
+
+                var leftAnim = new DoubleAnimation
                 {
-                    DetachedSecondaryText.Text = "rec";
-                }
-                else
+                    To = leftX,
+                    Duration = dur,
+                    EasingFunction = ease
+                };
+                DetachedLeftTranslate.BeginAnimation(TranslateTransform.XProperty, leftAnim);
+
+                UpdateDetachedLeftContent();
+
+                if (DetachedLeftContainer.Visibility != Visibility.Visible || DetachedLeftContainer.Opacity < 0.1)
                 {
-                    DetachedSecondaryText.Text = "task";
+                    DetachedLeftContainer.Visibility = Visibility.Visible;
+                    var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(200))
+                    {
+                        EasingFunction = ease
+                    };
+                    DetachedLeftContainer.BeginAnimation(OpacityProperty, fadeIn);
                 }
             }
             else
             {
-                DetachedSecondaryContainer.Visibility = Visibility.Collapsed;
+                if (DetachedLeftContainer.Visibility == Visibility.Visible)
+                {
+                    var fadeOut = new DoubleAnimation(DetachedLeftContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
+                    {
+                        EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseIn }
+                    };
+                    fadeOut.Completed += (s, e) =>
+                    {
+                        DetachedLeftContainer.Visibility = Visibility.Collapsed;
+                    };
+                    DetachedLeftContainer.BeginAnimation(OpacityProperty, fadeOut);
+                }
             }
 
-            if (DetachedSatellitesRow.Visibility != Visibility.Visible || DetachedSatellitesRow.Opacity < 0.1)
+            if (!showTimerOnRight)
             {
-                DetachedSatellitesRow.Visibility = Visibility.Visible;
-                var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(220))
+                if (DetachedBubbleContainer.Visibility == Visibility.Visible)
                 {
-                    EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseOut }
-                };
-                DetachedSatellitesRow.BeginAnimation(OpacityProperty, fadeIn);
+                    var fadeOut = new DoubleAnimation(DetachedBubbleContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150));
+                    fadeOut.Completed += (s, e) => DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+                    DetachedBubbleContainer.BeginAnimation(OpacityProperty, fadeOut);
+                }
+                else
+                {
+                    DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+                }
             }
         }
         else
         {
-            if (DetachedSatellitesRow.Visibility == Visibility.Visible && DetachedSatellitesRow.Opacity > 0.0)
+            if (DetachedBubbleContainer.Visibility == Visibility.Visible && DetachedBubbleContainer.Opacity > 0.0)
             {
-                var fadeOut = new DoubleAnimation(DetachedSatellitesRow.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
+                var fadeOut = new DoubleAnimation(DetachedBubbleContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
                 {
                     EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseIn }
                 };
                 fadeOut.Completed += (s, e) =>
                 {
-                    DetachedSatellitesRow.Visibility = Visibility.Collapsed;
+                    DetachedBubbleContainer.Visibility = Visibility.Collapsed;
                 };
-                DetachedSatellitesRow.BeginAnimation(OpacityProperty, fadeOut);
+                DetachedBubbleContainer.BeginAnimation(OpacityProperty, fadeOut);
             }
             else
             {
-                DetachedSatellitesRow.Visibility = Visibility.Collapsed;
+                DetachedBubbleContainer.Visibility = Visibility.Collapsed;
             }
+
+            if (DetachedLeftContainer.Visibility == Visibility.Visible && DetachedLeftContainer.Opacity > 0.0)
+            {
+                var fadeOut = new DoubleAnimation(DetachedLeftContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
+                {
+                    EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseIn }
+                };
+                fadeOut.Completed += (s, e) =>
+                {
+                    DetachedLeftContainer.Visibility = Visibility.Collapsed;
+                };
+                DetachedLeftContainer.BeginAnimation(OpacityProperty, fadeOut);
+            }
+            else
+            {
+                DetachedLeftContainer.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private void UpdateDetachedLeftContent()
+    {
+        if (IsVoiceRecordingActive)
+        {
+            bool isCall = _voiceRecordingService?.IsCallActive ?? false;
+            DetachedLeftMicIcon.Visibility = isCall ? Visibility.Collapsed : Visibility.Visible;
+            DetachedLeftCallIcon.Visibility = isCall ? Visibility.Visible : Visibility.Collapsed;
+            DetachedLeftTimerIcon.Visibility = Visibility.Collapsed;
+
+            DetachedLeftTimerText.Foreground = isCall ? CallGreenBrush : RecRedBrush;
+            DetachedLeftTimerText.Text = isCall ? "call" : "rec";
+        }
+        else if (IsAnyTimerActive)
+        {
+            DetachedLeftMicIcon.Visibility = Visibility.Collapsed;
+            DetachedLeftCallIcon.Visibility = Visibility.Collapsed;
+            DetachedLeftTimerIcon.Visibility = Visibility.Visible;
+
+            DetachedLeftTimerText.Foreground = Brushes.White;
+            DetachedLeftTimerText.Text = DetachedTimerCountdownText.Text;
         }
     }
 
@@ -1158,6 +1346,7 @@ public partial class MainWindow : Window
 
     private void ShowActiveCategoryView()
     {
+        if (IsFeedbackSurfaceActive) return;
         ViewMediaPlayback.Visibility = _activeCategory == IslandCategory.MediaPlayback ? Visibility.Visible : Visibility.Collapsed;
         ViewDeviceBattery.Visibility = _activeCategory == IslandCategory.DeviceBattery ? Visibility.Visible : Visibility.Collapsed;
         ViewAppNotification.Visibility = _activeCategory == IslandCategory.AppNotification ? Visibility.Visible : Visibility.Collapsed;
@@ -1168,7 +1357,6 @@ public partial class MainWindow : Window
         ViewWindowSnapping.Visibility = _activeCategory == IslandCategory.WindowSnapping ? Visibility.Visible : Visibility.Collapsed;
         ViewTimerQuickSet.Visibility = _activeCategory == IslandCategory.TimerQuickSet ? Visibility.Visible : Visibility.Collapsed;
         ViewVoiceRecording.Visibility = _activeCategory == IslandCategory.VoiceRecording ? Visibility.Visible : Visibility.Collapsed;
-        ViewScreenRecording.Visibility = _activeCategory == IslandCategory.ScreenRecording ? Visibility.Visible : Visibility.Collapsed;
         ViewBluetoothDevice.Visibility = _activeCategory == IslandCategory.BluetoothDevice ? Visibility.Visible : Visibility.Collapsed;
 
         if (_isExpanded)
@@ -1181,7 +1369,10 @@ public partial class MainWindow : Window
             double targetWidth = _activeCategory == IslandCategory.BluetoothDevice
                 ? ExpandedBluetoothWidth
                 : ExpandedWidth;
-            AnimateIsland(targetWidth, targetHeight);
+            DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+        DetachedLeftContainer.Visibility = Visibility.Collapsed;
+
+        AnimateIsland(targetWidth, targetHeight);
         }
     }
 
@@ -2682,6 +2873,9 @@ public partial class MainWindow : Window
         }
     }
 
+    private static readonly SolidColorBrush CallGreenBrush = new(Color.FromRgb(0x30, 0xD1, 0x58)); // #30D158 Vibrant Call Green
+    private static readonly SolidColorBrush RecRedBrush = new(Color.FromRgb(0xFF, 0x45, 0x3A));   // #FF453A Vibrant Recording Red
+
     private void OnVoiceRecordingStateChanged(VoiceRecordingInfo info)
     {
         Dispatcher.Invoke(() =>
@@ -2698,7 +2892,27 @@ public partial class MainWindow : Window
                 RecordingDurationSubtext.Text = $"{durStr} recorded";
                 RecordingAppNameText.Text = $"{info.AppName} Recording";
 
+                // User Requirement: The green telephone icon & waveform bars should ONLY be shown during calls.
+                // When sound/voice/screen recording is on, show red colored bar and recording icon.
+                bool isCall = info.IsCall;
+                var themeBrush = isCall ? CallGreenBrush : RecRedBrush;
+
+                CompactCallIcon.Visibility = isCall ? Visibility.Visible : Visibility.Collapsed;
+                CompactRecordingMicIcon.Visibility = isCall ? Visibility.Collapsed : Visibility.Visible;
+                CompactRecordingDurationText.Foreground = themeBrush;
+
+                // Update all waveform bars color dynamically
+                Border[] bars = { RecBar1, RecBar2, RecBar3, RecBar4, RecBar5, RecBar6, RecBar7, RecBar8, RecBar9, RecBar10, RecBar11, RecBar12, RecBar13 };
+                foreach (var bar in bars)
+                {
+                    bar.Background = themeBrush;
+                }
+
                 StartRecordingWaveformAnimation();
+        if (IsSplitActive && !IsScreenRecordingActive)
+        {
+            UpdateDetachedLeftContent();
+        }
             }
             else
             {
@@ -2716,25 +2930,12 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            if (info.IsRecording)
+            if (!info.IsRecording)
             {
-                int totalMins = (int)info.Duration.TotalMinutes;
-                int secs = info.Duration.Seconds;
-                string durStr = info.Duration.Hours > 0
-                    ? $"{info.Duration.Hours}:{info.Duration.Minutes:D2}:{secs:D2}"
-                    : $"{totalMins}:{secs:D2}";
+                if (_isExpanded && _activeCategory == IslandCategory.ScreenRecording) CollapseDock();
+            }
 
-                CompactScreenRecDurationText.Text = durStr;
-                ScreenRecDurationSubtext.Text = $"{durStr} recorded";
-                ScreenRecAppNameText.Text = $"{info.AppName} Active";
-            }
-            else
-            {
-                if (_isExpanded && _activeCategory == IslandCategory.ScreenRecording)
-                {
-                    CollapseDock();
-                }
-            }
+            UpdateSplitBubbleAnimation(CurrentCompactWidth);
             UpdateCompactViewVisibility();
         });
     }
@@ -2750,8 +2951,14 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() =>
         {
             // Dynamic trigger: new clipboard copy automatically brings up clipboard preview
-            ClipboardPreviewText.Text = text;
             _activeCategory = IslandCategory.LiveClipboard;
+            // A clipboard change can be raised by our own drag-and-drop copy operation.
+            // Keep the drop confirmation as the sole dock content until its timeout ends.
+            if (_isDropFeedbackActive)
+            {
+                return;
+            }
+
             if (_isExpanded)
             {
                 ShowActiveCategoryView();
@@ -3046,6 +3253,60 @@ public partial class MainWindow : Window
 
     private void UpdateCompactViewVisibility()
     {
+        if (_isExpanded)
+        {
+            CompactView.Visibility = Visibility.Collapsed;
+            DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+            DetachedLeftContainer.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (_isDragActive || _isDropFeedbackActive || _dragDropFeedbackTimer.IsEnabled)
+        {
+            CompactView.Visibility = Visibility.Collapsed;
+            ExpandedContainer.Visibility = Visibility.Collapsed;
+            DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+            DetachedLeftContainer.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // Recover from stale expanded/animation visibility state. A background
+        // activity should always have a visible compact presentation when collapsed.
+        CompactView.Visibility = Visibility.Visible;
+        ExpandedContainer.Visibility = Visibility.Collapsed;
+        if (HasActiveContent &&
+            (IslandContainer.Visibility != Visibility.Visible || IslandContainer.Opacity < 0.99))
+        {
+            ShowDockSmooth();
+        }
+
+        bool showRecordingDotWithMedia = IsMusicActive && IsRecordingActivityActive && !(_voiceRecordingService?.IsCallActive ?? false);
+        if (showRecordingDotWithMedia)
+        {
+            CompactRecordingActivityDot.Visibility = Visibility.Visible;
+            if (!CompactRecordingActivityDot.HasAnimatedProperties)
+            {
+                CompactRecordingActivityDot.BeginAnimation(OpacityProperty, new DoubleAnimation(1.0, 0.15,
+                    TimeSpan.FromMilliseconds(ActivityIndicatorBlinkIntervalMs / 2.0))
+                {
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever
+                });
+            }
+        }
+        else
+        {
+            CompactRecordingActivityDot.BeginAnimation(OpacityProperty, null);
+            CompactRecordingActivityDot.Opacity = 1.0;
+            CompactRecordingActivityDot.Visibility = Visibility.Collapsed;
+        }
+
+        if (HasActiveAlert)
+        {
+            DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+            DetachedLeftContainer.Visibility = Visibility.Collapsed;
+        }
+
         if (_isAlarmActive)
         {
             CompactClockView.Visibility = Visibility.Collapsed;
@@ -3079,6 +3340,7 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Visible;
         }
         else if (_isSilentRingAlertActive)
@@ -3096,6 +3358,7 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Visible;
         }
         else if (_isDndAlertActive)
@@ -3113,6 +3376,7 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Visible;
         }
         else if (_isNightModeAlertActive)
@@ -3130,6 +3394,7 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Visible;
         }
         else if (_isChargingAlertActive)
@@ -3147,6 +3412,7 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Visible;
         }
         else if (_isBluetoothAlertActive)
@@ -3200,7 +3466,62 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Visible;
+        }
+        else if (IsMusicActive && IsRecordingActivityActive && IsAnyTimerActive)
+        {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
+            CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Visible;
+        }
+        else if (IsMusicActive && IsRecordingActivityActive)
+        {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
+            CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Visible;
+        }
+        else if (IsMusicActive && IsAnyTimerActive)
+        {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
+            CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
+            CompactPowerModeView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Visible;
         }
         else if (IsScreenRecordingActive)
         {
@@ -3313,17 +3634,8 @@ public partial class MainWindow : Window
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
 
-            if (_nightLightService?.IsNightModeActive == true)
-            {
-                // When Night Mode is active, show the orange crescent moon pill in the dock
-                CompactNightModePill.Visibility = Visibility.Visible;
-                CompactClockView.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                CompactNightModePill.Visibility = Visibility.Collapsed;
-                CompactClockView.Visibility = Visibility.Collapsed;
-            }
+            CompactNightModePill.Visibility = Visibility.Collapsed;
+            CompactClockView.Visibility = Visibility.Collapsed;
         }
 
         UpdateNightModePillVisibility();
@@ -3350,6 +3662,24 @@ public partial class MainWindow : Window
     {
         _focusService.Start(5);
         SwitchCategory(IslandCategory.FocusTimer);
+    }
+
+    private void DetachedLeftContainer_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _autoCollapseTimer.Stop();
+    }
+
+    private void DetachedLeftContainer_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (_isExpanded && !_isPinned && !_isDraggingSlider)
+        {
+            _autoCollapseTimer.Stop();
+            _autoCollapseTimer.Start();
+        }
+    }
+
+    private void DetachedLeftContainer_MouseDown(object sender, MouseButtonEventArgs e)
+    {
     }
 
     private void DetachedBubbleContainer_MouseEnter(object sender, MouseEventArgs e)
@@ -3435,10 +3765,6 @@ public partial class MainWindow : Window
         VoiceMicDot.Visibility = micVis;
 
         // 4. Screen Recording View
-        ScreenRecPrivacyPanel.Visibility = anyVis;
-        ScreenRecCameraDot.Visibility = camVis;
-        ScreenRecMicDot.Visibility = micVis;
-
         // 5. Live Timer View
         TimerPrivacyPanel.Visibility = anyVis;
         TimerCameraDot.Visibility = camVis;
@@ -3512,13 +3838,25 @@ public partial class MainWindow : Window
 
     private void IslandContainer_PreviewDragEnter(object sender, DragEventArgs e)
     {
+        App.Log($"DragEnter: DataFormats={string.Join(", ", e.Data.GetFormats())}");
         e.Handled = true;
         _isDragActive = true;
+        _isDropFeedbackActive = false;
         _dragDropFeedbackTimer.Stop();
-
-        // Enlarge dock smoothly to provide a blank landing target
-        AnimateIsland(DragHoverWidth, DragHoverHeight);
+        _isExpanded = false;
+        CompactView.BeginAnimation(OpacityProperty, null);
+        ExpandedContainer.BeginAnimation(OpacityProperty, null);
         CompactView.Visibility = Visibility.Collapsed;
+        ExpandedContainer.Visibility = Visibility.Collapsed;
+        DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+        DetachedLeftContainer.Visibility = Visibility.Collapsed;
+        IslandContainer.BeginAnimation(WidthProperty, null);
+        IslandContainer.BeginAnimation(HeightProperty, null);
+        IslandContainer.Width = DragHoverWidth;
+        IslandContainer.Height = DragHoverHeight;
+
+        // Switch synchronously to the drag surface so no expanded/compact content can
+        // render beneath the success indicator during the WPF drop event sequence.
         DragDropFeedbackOverlay.Visibility = Visibility.Visible;
         DragDropFeedbackOverlay.Opacity = 1.0;
         DragCopiedSuccessIndicator.Visibility = Visibility.Collapsed;
@@ -3561,12 +3899,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void IslandContainer_DragLeave(object sender, DragEventArgs e)
+    private void IslandContainer_QueryContinueDrag(object sender, QueryContinueDragEventArgs e)
     {
-        e.Handled = true;
-        // Check if cursor actually left the island container boundaries
-        Point pos = e.GetPosition(IslandContainer);
-        if (pos.X < 0 || pos.Y < 0 || pos.X > IslandContainer.ActualWidth || pos.Y > IslandContainer.ActualHeight)
+        // DragLeave is not a reliable cancel signal: Windows raises it while a valid drag
+        // crosses hit-test boundaries. Only restore the dock when WPF reports cancellation.
+        if (_isDragActive && e.Action == DragAction.Cancel)
         {
             ResetDragDropState();
         }
@@ -3578,6 +3915,7 @@ public partial class MainWindow : Window
         Point dropPos = e.GetPosition(IslandContainer);
         double width = IslandContainer.ActualWidth > 0 ? IslandContainer.ActualWidth : DragHoverWidth;
         double ratio = Math.Clamp(dropPos.X / width, 0.0, 1.0);
+        App.Log($"PreviewDrop: ratio={ratio:F2}, Pos=({dropPos.X:F1}, {dropPos.Y:F1}), Formats={string.Join(", ", e.Data.GetFormats())}");
 
         DragCopyIndicator.Visibility = Visibility.Collapsed;
         DragShareIndicator.Visibility = Visibility.Collapsed;
@@ -3585,11 +3923,13 @@ public partial class MainWindow : Window
         if (ratio < 0.35)
         {
             // Left Edge Drop -> Copy to Windows Clipboard
+            BeginDropFeedback();
             ExecuteCopyDrop(e.Data);
         }
         else if (ratio > 0.65)
         {
             // Right Edge Drop -> Open Windows Share Menu
+            BeginDropFeedback();
             ExecuteShareDrop(e.Data);
         }
         else
@@ -3599,18 +3939,84 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ExecuteCopyDrop(IDataObject data)
+    private async void ExecuteCopyDrop(IDataObject data)
     {
         try
         {
+            bool copied = false;
             if (data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = (string[]?)data.GetData(DataFormats.FileDrop);
                 if (files != null && files.Length > 0)
                 {
-                    var fileCollection = new System.Collections.Specialized.StringCollection();
-                    fileCollection.AddRange(files);
-                    Clipboard.SetFileDropList(fileCollection);
+                    bool isImage = files.Length == 1 && IsImageExtension(Path.GetExtension(files[0]));
+                    if (isImage && File.Exists(files[0]))
+                    {
+                        try
+                        {
+                            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                            bmp.BeginInit();
+                            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                            bmp.UriSource = new Uri(files[0]);
+                            bmp.EndInit();
+                            bmp.Freeze();
+
+                            // Put pixels, rather than a file reference, on the standard
+                            // clipboard. This lets paste targets and clipboard history
+                            // receive an actual image instead of a filesystem path.
+                            System.Windows.Clipboard.SetImage(bmp);
+
+                            var imagePackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                            var imageFile = await StorageFile.GetFileFromPathAsync(files[0]);
+                            imagePackage.SetBitmap(Windows.Storage.Streams.RandomAccessStreamReference.CreateFromFile(imageFile));
+                            Windows.ApplicationModel.DataTransfer.Clipboard.SetContentWithOptions(imagePackage,
+                                new ClipboardContentOptions { IsAllowedInHistory = true, IsRoamable = true });
+                            Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+                            copied = true;
+                            App.Log($"Copied image pixels to clipboard: {files[0]}");
+                        }
+                        catch (Exception imageEx)
+                        {
+                            App.Log($"Image clipboard copy error: {imageEx.Message}");
+                        }
+                    }
+                    else
+                    {
+                        // Files retain their native file-drop representation.
+                        var fileCollection = new System.Collections.Specialized.StringCollection();
+                        fileCollection.AddRange(files);
+                        var dataObj = new System.Windows.DataObject();
+                        dataObj.SetFileDropList(fileCollection);
+                        dataObj.SetText(string.Join(Environment.NewLine, files));
+                        System.Windows.Clipboard.SetDataObject(dataObj, true);
+
+                        try
+                        {
+                            var filePackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                            filePackage.RequestedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
+                            var items = new System.Collections.Generic.List<IStorageItem>();
+                            foreach (var f in files)
+                            {
+                                if (File.Exists(f)) items.Add(await StorageFile.GetFileFromPathAsync(f));
+                                else if (Directory.Exists(f)) items.Add(await StorageFolder.GetFolderFromPathAsync(f));
+                            }
+                            if (items.Count > 0)
+                            {
+                                filePackage.SetStorageItems(items);
+                            }
+                            filePackage.SetText(string.Join(Environment.NewLine, files));
+                            Windows.ApplicationModel.DataTransfer.Clipboard.SetContentWithOptions(filePackage,
+                                new ClipboardContentOptions { IsAllowedInHistory = true, IsRoamable = true });
+                            Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+                        }
+                        catch (Exception fileEx)
+                        {
+                            App.Log($"File clipboard history copy error: {fileEx.Message}");
+                        }
+                        copied = true;
+                    }
+
+                    App.Log($"Copied {files.Length} files to clipboard: {string.Join(", ", files)}");
                 }
             }
             else if (data.GetDataPresent(DataFormats.UnicodeText))
@@ -3618,7 +4024,23 @@ public partial class MainWindow : Window
                 string? text = data.GetData(DataFormats.UnicodeText) as string;
                 if (!string.IsNullOrEmpty(text))
                 {
-                    Clipboard.SetText(text);
+                    System.Windows.Clipboard.SetText(text);
+                    try
+                    {
+                        var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                        dp.SetText(text);
+                        var options = new ClipboardContentOptions
+                        {
+                            IsAllowedInHistory = true,
+                            IsRoamable = true
+                        };
+                        Windows.ApplicationModel.DataTransfer.Clipboard.SetContentWithOptions(dp, options);
+                        Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+                    }
+                    catch { }
+
+                    copied = true;
+                    App.Log($"Copied UnicodeText to clipboard ({text.Length} chars)");
                 }
             }
             else if (data.GetDataPresent(DataFormats.Text))
@@ -3626,7 +4048,23 @@ public partial class MainWindow : Window
                 string? text = data.GetData(DataFormats.Text) as string;
                 if (!string.IsNullOrEmpty(text))
                 {
-                    Clipboard.SetText(text);
+                    System.Windows.Clipboard.SetText(text);
+                    try
+                    {
+                        var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                        dp.SetText(text);
+                        var options = new ClipboardContentOptions
+                        {
+                            IsAllowedInHistory = true,
+                            IsRoamable = true
+                        };
+                        Windows.ApplicationModel.DataTransfer.Clipboard.SetContentWithOptions(dp, options);
+                        Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+                    }
+                    catch { }
+
+                    copied = true;
+                    App.Log($"Copied Text to clipboard ({text.Length} chars)");
                 }
             }
             else if (data.GetDataPresent(DataFormats.Bitmap))
@@ -3634,15 +4072,16 @@ public partial class MainWindow : Window
                 var bmp = data.GetData(DataFormats.Bitmap) as BitmapSource;
                 if (bmp != null)
                 {
-                    Clipboard.SetImage(bmp);
+                    System.Windows.Clipboard.SetImage(bmp);
+                    copied = true;
+                    App.Log("Copied image to clipboard");
                 }
             }
 
-            // Pop out confirmed "Copied" with green tick as requested
+            // Pop out confirmed "Copied" on its own surface, never over media controls.
             DragCopiedSuccessIndicator.Visibility = Visibility.Visible;
             DragShareSuccessIndicator.Visibility = Visibility.Collapsed;
-            _dragDropFeedbackTimer.Stop();
-            _dragDropFeedbackTimer.Start();
+            CompleteDropFeedback();
         }
         catch (Exception ex)
         {
@@ -3657,8 +4096,6 @@ public partial class MainWindow : Window
         {
             DragShareSuccessIndicator.Visibility = Visibility.Visible;
             DragCopiedSuccessIndicator.Visibility = Visibility.Collapsed;
-            _dragDropFeedbackTimer.Stop();
-            _dragDropFeedbackTimer.Start();
 
             // Extract file or text to share
             string? firstFile = null;
@@ -3670,19 +4107,23 @@ public partial class MainWindow : Window
                 if (files != null && files.Length > 0)
                 {
                     firstFile = files[0];
+                    App.Log($"Share dropped file: {firstFile}");
                 }
             }
             else if (data.GetDataPresent(DataFormats.UnicodeText))
             {
                 textContent = data.GetData(DataFormats.UnicodeText) as string;
+                App.Log("Share dropped text");
             }
             else if (data.GetDataPresent(DataFormats.Text))
             {
                 textContent = data.GetData(DataFormats.Text) as string;
+                App.Log("Share dropped text");
             }
 
-            // Launch Windows Share Contract UI or native Share flyout
+            // Launch Windows native Share Menu
             OpenWindowsShareDialog(firstFile, textContent);
+            CompleteDropFeedback();
         }
         catch (Exception ex)
         {
@@ -3695,38 +4136,119 @@ public partial class MainWindow : Window
     {
         try
         {
-            // If it's a file, launch the shell open/share verb or Windows 11 context share
-            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+            App.Log($"OpenWindowsShareDialog: filePath='{filePath}', textContent='{textContent}'");
+            IntPtr hostHwnd = new WindowInteropHelper(this).Handle;
+            if (hostHwnd == IntPtr.Zero)
             {
-                // In Windows 10/11, launching explorer with file selection or shell share command
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = $"-WindowStyle Hidden -Command \"try {{ [Windows.ApplicationModel.DataTransfer.DataTransferManager, Windows.ApplicationModel.DataTransfer, ContentType = WindowsRuntime] | Out-Null; }} catch {{}}; Start-Process -FilePath '{filePath.Replace("'", "''")}' -Verb share -ErrorAction SilentlyContinue\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                Process.Start(psi);
+                App.Log("Share sheet could not open because the notch window has no handle.");
+                return;
             }
-            else if (!string.IsNullOrEmpty(textContent))
+
+            Guid dtmIid = new Guid("a5caee9b-8708-49d1-8d36-67d25a8da00c");
+            var interop = DataTransferManager.As<IDataTransferManagerInterop>();
+            IntPtr pDtm = interop.GetForWindow(hostHwnd, ref dtmIid);
+            var dtm = WinRT.MarshalInterface<DataTransferManager>.FromAbi(pDtm);
+
+            dtm.DataRequested += async (sender, args) =>
             {
-                Clipboard.SetText(textContent);
-                // Also trigger modern Windows share flyout via ms-actioncenter or protocol
-                var psi = new ProcessStartInfo
+                var deferral = args.Request.GetDeferral();
+                try
                 {
-                    FileName = "ms-settings:workplace",
-                    UseShellExecute = true
-                };
-            }
+                    if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+                    {
+                        args.Request.Data.Properties.Title = Path.GetFileName(filePath);
+                        var storageFile = await StorageFile.GetFileFromPathAsync(filePath);
+                        args.Request.Data.SetStorageItems(new[] { storageFile });
+                        App.Log($"Share Sheet: attached storage file '{filePath}'");
+                    }
+                    else if (!string.IsNullOrEmpty(textContent))
+                    {
+                        args.Request.Data.Properties.Title = "Shared Text";
+                        args.Request.Data.SetText(textContent);
+                    }
+                }
+                catch (Exception dataEx)
+                {
+                    App.Log($"Share data error: {dataEx.Message}");
+                }
+                finally
+                {
+                    deferral.Complete();
+                }
+            };
+
+            WindowHelper.SetActivationEnabled(this, true);
+            Activate();
+            interop.ShowShareUIForWindow(hostHwnd);
+            App.Log("Requested native Windows Share UI from the notch window.");
+            _ = CenterNativeShareSheetAsync(hostHwnd);
         }
         catch (Exception ex)
         {
-            App.Log($"Share invocation: {ex.Message}");
+            App.Log($"Share invocation error: {ex.Message}");
         }
+    }
+
+    private static async Task CenterNativeShareSheetAsync(IntPtr shareHostHwnd)
+    {
+        // The Share system dialog is created asynchronously by the shell. Retry briefly
+        // until its owned window exists, then center that actual window in the host's
+        // monitor work area. Windows Share ignores the host's y coordinate when placing
+        // the sheet, so move the created system window itself.
+        for (int attempt = 0; attempt < 16; attempt++)
+        {
+            await Task.Delay(125);
+            IntPtr shareSheet = IntPtr.Zero;
+            EnumWindows((candidate, _) =>
+            {
+                if (!IsWindowVisible(candidate) || candidate == shareHostHwnd)
+                {
+                    return true;
+                }
+
+                bool isOwnedByHost = GetWindow(candidate, GwOwner) == shareHostHwnd;
+                var title = new StringBuilder(64);
+                GetWindowText(candidate, title, title.Capacity);
+                if (isOwnedByHost || string.Equals(title.ToString(), "Share", StringComparison.OrdinalIgnoreCase))
+                {
+                    shareSheet = candidate;
+                    return false;
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            if (shareSheet == IntPtr.Zero || !GetWindowRect(shareSheet, out var shareRect))
+            {
+                continue;
+            }
+
+            int width = shareRect.Right - shareRect.Left;
+            int height = shareRect.Bottom - shareRect.Top;
+            IntPtr monitor = MonitorFromWindow(shareHostHwnd, MonitorDefaultToNearest);
+            var monitorInfo = new NativeMonitorInfo { Size = Marshal.SizeOf<NativeMonitorInfo>() };
+            if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref monitorInfo)) continue;
+            int hostCenterX = (monitorInfo.Work.Left + monitorInfo.Work.Right) / 2;
+            int hostCenterY = (monitorInfo.Work.Top + monitorInfo.Work.Bottom) / 2;
+            SetWindowPos(shareSheet, IntPtr.Zero,
+                hostCenterX - (width / 2),
+                hostCenterY - (height / 2),
+                0, 0, SwpNoSize | SwpNoZOrder | SwpNoActivate);
+            App.Log($"Centered native Windows Share UI on pass {attempt + 1}.");
+        }
+
+        App.Log("Finished native Windows Share UI centering passes.");
+    }
+
+    private static bool IsImageExtension(string? ext)
+    {
+        if (string.IsNullOrEmpty(ext)) return false;
+        ext = ext.ToLowerInvariant();
+        return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".webp" || ext == ".gif";
     }
 
     private void ResetDragDropState()
     {
+        _isDropFeedbackActive = false;
         _isDragActive = false;
         DragDropFeedbackOverlay.Visibility = Visibility.Collapsed;
         DragCopyIndicator.Visibility = Visibility.Collapsed;
@@ -3737,6 +4259,49 @@ public partial class MainWindow : Window
         CompactView.Visibility = Visibility.Visible;
         UpdateCompactViewVisibility();
         AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
+    }
+
+    private void BeginDropFeedback()
+    {
+        _isDropFeedbackActive = true;
+        _isDragActive = false;
+        _dragDropFeedbackTimer.Stop();
+        _isExpanded = false;
+        CompactView.BeginAnimation(OpacityProperty, null);
+        ExpandedContainer.BeginAnimation(OpacityProperty, null);
+        IslandContainer.BeginAnimation(WidthProperty, null);
+        IslandContainer.BeginAnimation(HeightProperty, null);
+        CompactView.Opacity = 0.0;
+        ExpandedContainer.Opacity = 0.0;
+        CompactView.Visibility = Visibility.Collapsed;
+        ExpandedContainer.Visibility = Visibility.Collapsed;
+        DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+        DetachedLeftContainer.Visibility = Visibility.Collapsed;
+        DragDropFeedbackOverlay.Visibility = Visibility.Visible;
+        DragDropFeedbackOverlay.Opacity = 1.0;
+        IslandContainer.Width = DragHoverWidth;
+        IslandContainer.Height = DragHoverHeight;
+        DragCopyIndicator.Visibility = Visibility.Collapsed;
+        DragShareIndicator.Visibility = Visibility.Collapsed;
+        DragCopiedSuccessIndicator.Visibility = Visibility.Collapsed;
+        DragShareSuccessIndicator.Visibility = Visibility.Collapsed;
+    }
+
+    private void CompleteDropFeedback()
+    {
+        _isDropFeedbackActive = true;
+        _isDragActive = false;
+        _isExpanded = false;
+        CompactView.BeginAnimation(OpacityProperty, null);
+        ExpandedContainer.BeginAnimation(OpacityProperty, null);
+        CompactView.Opacity = 0.0;
+        ExpandedContainer.Opacity = 0.0;
+        CompactView.Visibility = Visibility.Collapsed;
+        ExpandedContainer.Visibility = Visibility.Collapsed;
+        DragDropFeedbackOverlay.Visibility = Visibility.Visible;
+        DragDropFeedbackOverlay.Opacity = 1.0;
+        _dragDropFeedbackTimer.Stop();
+        _dragDropFeedbackTimer.Start();
     }
 
     #endregion

@@ -25,6 +25,15 @@ public static class WindowHelper
     public const int HTTRANSPARENT = -1;
     public const int HTCLIENT = 1;
 
+    // Windows Messages for Drag & Drop UIPI filter bypass
+    private const uint WM_DROPFILES = 0x0233;
+    private const uint WM_COPYDATA = 0x004A;
+    private const uint WM_COPYGLOBALDATA = 0x0049;
+    private const uint MSGFLT_ALLOW = 1;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool ChangeWindowMessageFilterEx(IntPtr hWnd, uint message, uint action, IntPtr pChangeFilterStruct);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct WINDOWPOS
     {
@@ -149,6 +158,16 @@ public static class WindowHelper
 
             // 5. Apply frame change
             SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+
+            // 6. Allow Drag & Drop messages from all processes (bypasses Windows UIPI restriction)
+            try
+            {
+                ChangeWindowMessageFilterEx(hWnd, WM_DROPFILES, MSGFLT_ALLOW, IntPtr.Zero);
+                ChangeWindowMessageFilterEx(hWnd, WM_COPYDATA, MSGFLT_ALLOW, IntPtr.Zero);
+                ChangeWindowMessageFilterEx(hWnd, WM_COPYGLOBALDATA, MSGFLT_ALLOW, IntPtr.Zero);
+                ChangeWindowMessageFilterEx(hWnd, 0x004D, MSGFLT_ALLOW, IntPtr.Zero); // WM_QUERYENDSESSION
+            }
+            catch { }
         }
     }
 

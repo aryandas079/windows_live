@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              x:Name="RootIconControl">
-    <Grid>
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
         <!-- 1. Instagram: Vibrant multi-stop gradient with camera glyph -->
         <Border x:Name="IconInstagram" Visibility="Collapsed" ClipToBounds="True"
                 CornerRadius="{Binding CornerRadius, ElementName=RootIconControl}"

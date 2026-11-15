@@ -13,11 +13,10 @@
         Topmost="True"
         ShowInTaskbar="False"
         ShowActivated="False"
-        AllowDrop="True"
         Width="700" Height="260"
         FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
 
-    <Grid x:Name="RootGrid" Background="Transparent" VerticalAlignment="Top" HorizontalAlignment="Center" AllowDrop="True">
+    <Grid x:Name="RootGrid" Background="Transparent" VerticalAlignment="Top" HorizontalAlignment="Center">
         <!-- Top Edge Hover Zone for Maximized & Fullscreen Apps -->
         <Border x:Name="TopEdgeHotspot"
                 Height="12"
@@ -35,8 +34,8 @@
               AllowDrop="True"
               PreviewDragEnter="IslandContainer_PreviewDragEnter"
               PreviewDragOver="IslandContainer_PreviewDragOver"
-              DragLeave="IslandContainer_DragLeave"
               PreviewDrop="IslandContainer_PreviewDrop"
+              QueryContinueDrag="IslandContainer_QueryContinueDrag"
               Cursor="Arrow">
 
             <!-- Ambient Glow / Drop Shadow Layer -->
@@ -217,7 +216,14 @@
                     </Border>
 
                     <!-- Center: Spacious Island Gap -->
-                    <Grid Grid.Column="1" />
+                    <Grid Grid.Column="1">
+                        <Ellipse x:Name="CompactRecordingActivityDot"
+                                 Width="8" Height="8"
+                                 Fill="#FF453A"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"
+                                 Visibility="Collapsed" />
+                    </Grid>
 
                     <!-- Right: Animated Accent Equalizer, Night Mode indicator, and Privacy Indicators -->
                     <!-- Equalizer shifts to the left when Privacy Indicators (Camera Green, Mic Orange) are active -->
@@ -737,13 +743,21 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Vibrant Green Telephone Icon + Call Duration Timer (e.g. 00:03) -->
+                    <!-- Left: Call Icon (Green) or Sound Recording Icon (Red) + Duration Timer (e.g. 00:03) -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <!-- Apple-style Call Telephone Handset Vector Icon in #30D158 -->
-                        <Viewbox Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,7,0">
+                        <!-- Apple-style Call Telephone Handset Vector Icon in #30D158 (Visible only for calls) -->
+                        <Viewbox x:Name="CompactCallIcon" Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,7,0" Visibility="Collapsed">
                             <Canvas Width="24" Height="24">
                                 <Path Fill="#30D158"
                                       Data="M 6.62,10.79 C 8.06,13.62 10.38,15.94 13.21,17.38 L 15.41,15.18 C 15.69,14.9 16.08,14.82 16.43,14.93 C 17.55,15.3 18.75,15.5 20,15.5 C 20.55,15.5 21,15.95 21,16.5 L 21,20 C 21,20.55 20.55,21 20,21 C 10.61,21 3,13.39 3,4 C 3,3.45 3.45,3 4,3 L 7.5,3 C 8.05,3 8.5,3.45 8.5,4 C 8.5,5.25 8.7,6.45 9.07,7.57 C 9.18,7.92 9.1,8.31 8.82,8.59 L 6.62,10.79 Z" />
+                            </Canvas>
+                        </Viewbox>
+
+                        <!-- Apple-style Voice / Sound Recording Microphone Vector Icon in #FF453A (Visible only for recording) -->
+                        <Viewbox x:Name="CompactRecordingMicIcon" Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,7,0" Visibility="Visible">
+                            <Canvas Width="24" Height="24">
+                                <Path Fill="#FF453A"
+                                      Data="M 12,14 C 13.66,14 15,12.66 15,11 L 15,5 C 15,3.34 13.66,2 12,2 C 10.34,2 9,3.34 9,5 L 9,11 C 9,12.66 10.34,14 12,14 Z M 19,10 C 19,13.53 16.39,16.44 13,16.93 L 13,20 L 16,20 C 16.55,20 17,20.45 17,21 C 17,21.55 16.55,22 16,22 L 8,22 C 7.45,22 7,21.55 7,21 C 7,20.45 7.45,20 8,20 L 11,20 L 11,16.93 C 7.61,16.44 5,13.53 5,10 C 5,9.45 5.45,9 6,9 C 6.55,9 7,9.45 7,10 C 7,12.76 9.24,15 12,15 C 14.76,15 17,12.76 17,10 C 17,9.45 17.45,9 18,9 C 18.55,9 19,9.45 19,10 Z" />
                             </Canvas>
                         </Viewbox>
 
@@ -751,31 +765,31 @@
                                    Text="00:00"
                                    FontSize="16.5"
                                    FontWeight="SemiBold"
-                                   Foreground="#30D158"
+                                   Foreground="#FF453A"
                                    VerticalAlignment="Center" />
                     </StackPanel>
 
                     <!-- Center: Notch Space -->
                     <Grid Grid.Column="1" />
 
-                    <!-- Right: Dynamic Live Audio Call Waveform Bars in #30D158 and Privacy Indicators -->
+                    <!-- Right: Dynamic Live Audio Call Waveform Bars in #FF453A / #30D158 and Privacy Indicators -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <StackPanel x:Name="RecordingWaveformBars"
                                     Orientation="Horizontal"
                                     VerticalAlignment="Center">
-                            <Border x:Name="RecBar1" Width="2.8" Height="4" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar2" Width="2.8" Height="8" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar3" Width="2.8" Height="14" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar4" Width="2.8" Height="12" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar5" Width="2.8" Height="6" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar6" Width="2.8" Height="13" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar7" Width="2.8" Height="16" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar8" Width="2.8" Height="12" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar9" Width="2.8" Height="8" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar10" Width="2.8" Height="4" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar11" Width="2.8" Height="7" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar12" Width="2.8" Height="11" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
-                            <Border x:Name="RecBar13" Width="2.8" Height="4" CornerRadius="1.4" Background="#30D158" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar1" Width="2.8" Height="4" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar2" Width="2.8" Height="8" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar3" Width="2.8" Height="14" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar4" Width="2.8" Height="12" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar5" Width="2.8" Height="6" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar6" Width="2.8" Height="13" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar7" Width="2.8" Height="16" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar8" Width="2.8" Height="12" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar9" Width="2.8" Height="8" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar10" Width="2.8" Height="4" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar11" Width="2.8" Height="7" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar12" Width="2.8" Height="11" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar13" Width="2.8" Height="4" CornerRadius="1.4" Background="#FF453A" VerticalAlignment="Center" />
                         </StackPanel>
 
                         <StackPanel x:Name="VoicePrivacyPanel"
@@ -813,91 +827,12 @@
                 <Grid x:Name="CompactScreenRecordingView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="14,0,14,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Left: Red Dot + Live Duration on Top Row, "Screen Recording" on Bottom Row -->
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <!-- Top Row: Red recording indicator dot + Live Duration (e.g. "🔴 0:01" in red) -->
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,1.5">
-                            <!-- Live Pulsing Red Dot -->
-                            <Ellipse x:Name="ScreenRecPulseDot"
-                                     Width="8" Height="8"
-                                     Fill="#FF453A"
-                                     Margin="0,0,6,0"
-                                     VerticalAlignment="Center" />
-                            <!-- Live Elapsed Duration Text in Red -->
-                            <TextBlock x:Name="CompactScreenRecDurationText"
-                                       Text="0:00"
-                                       FontSize="12.5"
-                                       FontWeight="SemiBold"
-                                       Foreground="#FF453A"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <!-- Bottom Row: Clean White Text "Screen Recording" -->
-                        <TextBlock x:Name="CompactScreenRecTitleText"
-                                   Text="Screen Recording"
-                                   FontSize="13.5"
-                                   FontWeight="SemiBold"
-                                   Foreground="#FFFFFF"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-
-                    <!-- Center: Camera Notch Space -->
-                    <Grid Grid.Column="1" />
-
-                    <!-- Right: Stop Recording Button and Privacy Indicators -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="30" Height="30"
-                                CornerRadius="15"
-                                Background="#22FF453A"
-                                BorderBrush="#55FF453A"
-                                BorderThickness="1.5"
-                                VerticalAlignment="Center"
-                                Cursor="Hand"
-                                ToolTip="Stop Screen Recording"
-                                MouseDown="ScreenRecordingStop_MouseDown">
-                            <!-- Red Square Stop Icon -->
-                            <Border Width="10" Height="10"
-                                    CornerRadius="2.5"
-                                    Background="#FF453A"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center" />
-                        </Border>
-                        <StackPanel x:Name="ScreenRecPrivacyPanel"
-                                    Orientation="Horizontal"
-                                    VerticalAlignment="Center"
-                                    Margin="8,0,0,0"
-                                    Visibility="Collapsed">
-                            <Border x:Name="ScreenRecCameraDot"
-                                    Width="7.5" Height="7.5"
-                                    CornerRadius="3.75"
-                                    Background="#30D158"
-                                    Margin="2,0,2,0"
-                                    VerticalAlignment="Center"
-                                    Visibility="Collapsed">
-                                <Border.Effect>
-                                    <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
-                                </Border.Effect>
-                            </Border>
-                            <Border x:Name="ScreenRecMicDot"
-                                    Width="7.5" Height="7.5"
-                                    CornerRadius="3.75"
-                                    Background="#FF9F0A"
-                                    Margin="2,0,2,0"
-                                    VerticalAlignment="Center"
-                                    Visibility="Collapsed">
-                                <Border.Effect>
-                                    <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
-                                </Border.Effect>
-                            </Border>
-                        </StackPanel>
-                    </StackPanel>
+                      Margin="0">
+                    <Ellipse x:Name="ScreenRecPulseDot"
+                             Width="9" Height="9"
+                             Fill="#FF453A"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center" />
                 </Grid>
 
                 <!-- 12. Night Mode Alert Mode (Orange Crescent Moon) -->
@@ -1361,23 +1296,14 @@
                     <!-- 7. LIVE CLIPBOARD SHELF (Image 6)              -->
                     <!-- ============================================== -->
                     <Grid x:Name="ViewLiveClipboard" Visibility="Collapsed" VerticalAlignment="Center" Margin="4,8,4,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Purple Clipboard Badge -->
-                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="22" Background="#228764B8" BorderBrush="#448764B8" BorderThickness="1.5" Margin="0,0,12,0">
-                            <ui:SymbolIcon Symbol="ClipboardPaste24" FontSize="20" Foreground="#8764B8" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="Copied to the shelf" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                            <TextBlock x:Name="ClipboardPreviewText" Text="https://notchy.dev — 3 items today" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Viewbox Width="18" Height="18" Margin="0,0,8,0">
+                                <Canvas Width="24" Height="24">
+                                    <Path Fill="#30D158" Data="M 9,16.17 L 4.83,12 L 3.41,13.41 L 9,19 L 21,7 L 19.59,5.59 Z" />
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Copied" FontSize="14" FontWeight="SemiBold" Foreground="#30D158" VerticalAlignment="Center" />
                         </StackPanel>
-
-                        <ui:SymbolIcon Grid.Column="2" Symbol="ChevronRight24" FontSize="16" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
                     </Grid>
 
                     <!-- ============================================== -->
@@ -1473,45 +1399,6 @@
 
                         <Border Grid.Column="2" Background="#22FF453A" CornerRadius="12" Padding="10,4,10,4" VerticalAlignment="Center">
                             <TextBlock Text="RECORDING" FontSize="11" FontWeight="Bold" Foreground="#FF453A" />
-                        </Border>
-                    </Grid>
-
-                    <!-- ============================================== -->
-                    <!-- 11. SCREEN RECORDING EXPANDED MODE             -->
-                    <!-- ============================================== -->
-                    <Grid x:Name="ViewScreenRecording" Visibility="Collapsed" VerticalAlignment="Center" Margin="4,8,4,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Screen Recording Red Badge -->
-                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="22" Background="#22FF453A" BorderBrush="#44FF453A" BorderThickness="1.5" Margin="0,0,12,0">
-                            <ui:SymbolIcon Symbol="Video24" FontSize="20" Foreground="#FF453A" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock x:Name="ScreenRecAppNameText" Text="Screen Recording Active" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                            <TextBlock x:Name="ScreenRecDurationSubtext" Text="0:00 recorded" FontSize="12" Foreground="#FF453A" Margin="0,3,0,0" />
-                        </StackPanel>
-
-                        <!-- Red Stop Button -->
-                        <Border Grid.Column="2"
-                                Width="36" Height="36"
-                                CornerRadius="18"
-                                Background="#22FF453A"
-                                BorderBrush="#55FF453A"
-                                BorderThickness="1.5"
-                                VerticalAlignment="Center"
-                                Cursor="Hand"
-                                ToolTip="Stop Screen Recording"
-                                MouseDown="ScreenRecordingStop_MouseDown">
-                            <Border Width="12" Height="12"
-                                    CornerRadius="3"
-                                    Background="#FF453A"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center" />
                         </Border>
                     </Grid>
 
@@ -1631,8 +1518,19 @@
                   Visibility="Collapsed"
                   Opacity="0.0"
                   IsHitTestVisible="False"
+                  Panel.ZIndex="1000"
+                  ClipToBounds="True"
                   VerticalAlignment="Stretch"
                   HorizontalAlignment="Stretch">
+
+                <!-- Feedback uses the same attached-notch shape as the dock so it cannot
+                     turn into a rectangular panel while obscuring other content. -->
+                <controls:DynamicIslandNotch IsNotchMode="True"
+                                             EarFillet="12"
+                                             CornerRadius="16"
+                                             Fill="{DynamicResource SurfaceDarkBrush}"
+                                             Stroke="{DynamicResource SurfaceBorderBrush}"
+                                             StrokeThickness="1" />
 
                 <!-- Left Zone Preview: Clean Green Tick + "Copy" text -->
                 <StackPanel x:Name="DragCopyIndicator"
@@ -1717,123 +1615,131 @@
         </Grid>
 
         <!-- ========================================================================================= -->
-        <!-- DETACHED SATELLITE CAPSULES (Multi-Activity / Concurrent Tasks: 2 or 3 items)             -->
-        <!-- Satellite 1: Timer Capsule with amber clock icon + countdown timer (e.g., 14:52)            -->
-        <!-- Satellite 2: Secondary Activity Capsule (e.g., status/equalizer pill with cyan icon + text)-->
+        <!-- DETACHED SATELLITE CAPSULES (Multi-Activity: Up to 2 pills, placed on either side of notch) -->
+        <!-- Satellite Left: Detached Left Capsule (e.g. Timer or secondary activity)                    -->
+        <!-- Satellite Right: Detached Right Capsule (e.g. Timer, call, or task status)                 -->
         <!-- ========================================================================================= -->
-        <StackPanel x:Name="DetachedSatellitesRow"
-                    Orientation="Horizontal"
-                    VerticalAlignment="Top"
-                    HorizontalAlignment="Center"
-                    Visibility="Collapsed"
-                    Opacity="0.0">
+        <!-- Left Satellite Pill (position translated left of notch center) -->
+        <Grid x:Name="DetachedLeftContainer"
+              Height="36"
+              MinWidth="76"
+              VerticalAlignment="Top"
+              HorizontalAlignment="Center"
+              Cursor="Hand"
+              Visibility="Collapsed"
+              Opacity="0.0"
+              MouseEnter="DetachedLeftContainer_MouseEnter"
+              MouseLeave="DetachedLeftContainer_MouseLeave"
+              MouseDown="DetachedLeftContainer_MouseDown">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="DetachedLeftTranslate" X="0" Y="0" />
+            </Grid.RenderTransform>
+            <!-- Shadow -->
+            <controls:DynamicIslandNotch IsNotchMode="False"
+                                         CornerRadius="18"
+                                         Fill="#000000"
+                                         StrokeThickness="0">
+                <controls:DynamicIslandNotch.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="18" Opacity="0.45" ShadowDepth="3" Direction="270" />
+                </controls:DynamicIslandNotch.Effect>
+            </controls:DynamicIslandNotch>
+            <!-- Surface Base Pill -->
+            <controls:DynamicIslandNotch IsNotchMode="False"
+                                         CornerRadius="18"
+                                         Fill="{DynamicResource SurfaceDarkBrush}"
+                                         Stroke="{DynamicResource SurfaceBorderBrush}"
+                                         StrokeThickness="1" />
+            <!-- Content: Adaptive multi-task icon (mic, call, screen rec, timer) + text -->
+            <StackPanel x:Name="DetachedLeftContent" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="10,0,12,0">
+                <!-- Red Voice Recording Mic Icon -->
+                <Viewbox x:Name="DetachedLeftMicIcon" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,5,0" Visibility="Visible">
+                    <Canvas Width="24" Height="24">
+                        <Path Fill="#FF453A"
+                              Data="M 12,14 C 13.66,14 15,12.66 15,11 L 15,5 C 15,3.34 13.66,2 12,2 C 10.34,2 9,3.34 9,5 L 9,11 C 9,12.66 10.34,14 12,14 Z M 19,10 C 19,13.53 16.39,16.44 13,16.93 L 13,20 L 16,20 C 16.55,20 17,20.45 17,21 C 17,21.55 16.55,22 16,22 L 8,22 C 7.45,22 7,21.55 7,21 C 7,20.45 7.45,20 8,20 L 11,20 L 11,16.93 C 7.61,16.44 5,13.53 5,10 C 5,9.45 5.45,9 6,9 C 6.55,9 7,9.45 7,10 C 7,12.76 9.24,15 12,15 C 14.76,15 17,12.76 17,10 C 17,9.45 17.45,9 18,9 C 18.55,9 19,9.45 19,10 Z" />
+                    </Canvas>
+                </Viewbox>
 
-            <!-- Capsule 1: Timer Satellite Capsule (Matches Reference Image media_1794722524198_ddb74c27.png) -->
-            <Grid x:Name="DetachedBubbleContainer"
-                  Height="36"
-                  MinWidth="76"
-                  VerticalAlignment="Top"
-                  Cursor="Hand"
-                  Margin="0,0,8,0"
-                  MouseEnter="DetachedBubbleContainer_MouseEnter"
-                  MouseLeave="DetachedBubbleContainer_MouseLeave"
-                  MouseDown="DetachedBubbleContainer_MouseDown">
-                <!-- Shadow -->
-                <controls:DynamicIslandNotch x:Name="DetachedBubbleShadow"
-                                             IsNotchMode="False"
-                                             CornerRadius="18"
-                                             Fill="#000000"
-                                             StrokeThickness="0">
-                    <controls:DynamicIslandNotch.Effect>
-                        <DropShadowEffect x:Name="DetachedShadowEffect" Color="#000000" BlurRadius="18" Opacity="0.45" ShadowDepth="3" Direction="270" />
-                    </controls:DynamicIslandNotch.Effect>
-                </controls:DynamicIslandNotch>
+                <!-- Green Call Telephone Handset Icon -->
+                <Viewbox x:Name="DetachedLeftCallIcon" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,5,0" Visibility="Collapsed">
+                    <Canvas Width="24" Height="24">
+                        <Path Fill="#30D158"
+                              Data="M 6.62,10.79 C 8.06,13.62 10.38,15.94 13.21,17.38 L 15.41,15.18 C 15.69,14.9 16.08,14.82 16.43,14.93 C 17.55,15.3 18.75,15.5 20,15.5 C 20.55,15.5 21,15.95 21,16.5 L 21,20 C 21,20.55 20.55,21 20,21 C 10.61,21 3,13.39 3,4 C 3,3.45 3.45,3 4,3 L 7.5,3 C 8.05,3 8.5,3.45 8.5,4 C 8.5,5.25 8.7,6.45 9.07,7.57 C 9.18,7.92 9.1,8.31 8.82,8.59 L 6.62,10.79 Z" />
+                    </Canvas>
+                </Viewbox>
 
-                <!-- Surface Base Pill -->
-                <controls:DynamicIslandNotch x:Name="DetachedBubbleNotch"
-                                             IsNotchMode="False"
-                                             CornerRadius="18"
-                                             Fill="{DynamicResource SurfaceDarkBrush}"
-                                             Stroke="{DynamicResource SurfaceBorderBrush}"
-                                             StrokeThickness="1" />
+                <!-- Amber Timer Icon -->
+                <Viewbox x:Name="DetachedLeftTimerIcon" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,5,0" Visibility="Collapsed">
+                    <Canvas Width="20" Height="20">
+                        <Ellipse Width="18" Height="18" Canvas.Left="1" Canvas.Top="1"
+                                 Stroke="#FF9F0A" StrokeThickness="2.0" Fill="Transparent" />
+                        <Path Stroke="#FF9F0A" StrokeThickness="2.0" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Data="M 10,10 L 10,5 M 10,10 L 13.5,10" />
+                    </Canvas>
+                </Viewbox>
 
-                <!-- Content: Amber Clock / Timer Icon + Bold White Time Digits (e.g., 14:52) -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="10,0,12,0">
-                    <!-- Amber Timer Icon matching reference -->
-                    <Viewbox Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,5,0">
-                        <Canvas Width="20" Height="20">
-                            <!-- Circular Clock Face in Amber -->
-                            <Ellipse Width="18" Height="18" Canvas.Left="1" Canvas.Top="1"
-                                     Stroke="#FF9F0A" StrokeThickness="2.0" Fill="Transparent" />
-                            <!-- Clock Hands pointing to 10:10 / 2:50 -->
-                            <Path Stroke="#FF9F0A" StrokeThickness="2.0" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                  Data="M 10,10 L 10,5 M 10,10 L 13.5,10" />
-                        </Canvas>
-                    </Viewbox>
+                <TextBlock x:Name="DetachedLeftTimerText"
+                           Text="0:00"
+                           FontSize="13.5"
+                           FontWeight="SemiBold"
+                           Foreground="#FFFFFF"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
 
-                    <!-- Timer Countdown Digits (e.g., 14:52) -->
-                    <TextBlock x:Name="DetachedTimerCountdownText"
-                               Text="14:52"
-                               FontSize="13.5"
-                               FontWeight="SemiBold"
-                               Foreground="#FFFFFF"
-                               VerticalAlignment="Center" />
-                </StackPanel>
-            </Grid>
+        <!-- Right Satellite Pill (position translated right of notch center) -->
+        <Grid x:Name="DetachedBubbleContainer"
+              Height="36"
+              MinWidth="76"
+              VerticalAlignment="Top"
+              HorizontalAlignment="Center"
+              Cursor="Hand"
+              Visibility="Collapsed"
+              Opacity="0.0"
+              MouseEnter="DetachedBubbleContainer_MouseEnter"
+              MouseLeave="DetachedBubbleContainer_MouseLeave"
+              MouseDown="DetachedBubbleContainer_MouseDown">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="DetachedRightTranslate" X="0" Y="0" />
+            </Grid.RenderTransform>
+            <!-- Shadow -->
+            <controls:DynamicIslandNotch x:Name="DetachedBubbleShadow"
+                                         IsNotchMode="False"
+                                         CornerRadius="18"
+                                         Fill="#000000"
+                                         StrokeThickness="0">
+                <controls:DynamicIslandNotch.Effect>
+                    <DropShadowEffect x:Name="DetachedShadowEffect" Color="#000000" BlurRadius="18" Opacity="0.45" ShadowDepth="3" Direction="270" />
+                </controls:DynamicIslandNotch.Effect>
+            </controls:DynamicIslandNotch>
 
-            <!-- Capsule 2: Activity / Task Satellite Capsule (e.g. Sliders / Equalizer Icon + Status Label) -->
-            <Grid x:Name="DetachedSecondaryContainer"
-                  Height="36"
-                  MinWidth="78"
-                  VerticalAlignment="Top"
-                  Cursor="Hand"
-                  Visibility="Collapsed"
-                  MouseEnter="DetachedSecondaryContainer_MouseEnter"
-                  MouseLeave="DetachedSecondaryContainer_MouseLeave"
-                  MouseDown="DetachedSecondaryContainer_MouseDown">
-                <!-- Shadow -->
-                <controls:DynamicIslandNotch IsNotchMode="False"
-                                             CornerRadius="18"
-                                             Fill="#000000"
-                                             StrokeThickness="0">
-                    <controls:DynamicIslandNotch.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="18" Opacity="0.45" ShadowDepth="3" Direction="270" />
-                    </controls:DynamicIslandNotch.Effect>
-                </controls:DynamicIslandNotch>
+            <!-- Surface Base Pill -->
+            <controls:DynamicIslandNotch x:Name="DetachedBubbleNotch"
+                                         IsNotchMode="False"
+                                         CornerRadius="18"
+                                         Fill="{DynamicResource SurfaceDarkBrush}"
+                                         Stroke="{DynamicResource SurfaceBorderBrush}"
+                                         StrokeThickness="1" />
 
-                <!-- Surface Base Pill -->
-                <controls:DynamicIslandNotch IsNotchMode="False"
-                                             CornerRadius="18"
-                                             Fill="{DynamicResource SurfaceDarkBrush}"
-                                             Stroke="{DynamicResource SurfaceBorderBrush}"
-                                             StrokeThickness="1" />
+            <!-- Content: Amber Clock / Timer Icon + Bold White Time Digits (e.g., 14:52) -->
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="10,0,12,0">
+                <!-- Amber Timer Icon matching reference -->
+                <Viewbox Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,5,0">
+                    <Canvas Width="20" Height="20">
+                        <Ellipse Width="18" Height="18" Canvas.Left="1" Canvas.Top="1"
+                                 Stroke="#FF9F0A" StrokeThickness="2.0" Fill="Transparent" />
+                        <Path Stroke="#FF9F0A" StrokeThickness="2.0" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Data="M 10,10 L 10,5 M 10,10 L 13.5,10" />
+                    </Canvas>
+                </Viewbox>
 
-                <!-- Content: Cyan Sliders / Settings Icon + White Status Label (e.g. "build" or active task) -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="10,0,12,0">
-                    <!-- Cyan Slider / Equalizer Tuning Icon matching reference image -->
-                    <Viewbox Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,5,0">
-                        <Canvas Width="20" Height="20">
-                            <!-- Top Slider Bar -->
-                            <Line X1="2" Y1="5" X2="18" Y2="5" Stroke="#00C7BE" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                            <Ellipse Width="4.5" Height="4.5" Canvas.Left="5" Canvas.Top="2.75" Fill="#00C7BE" />
-                            <!-- Middle Slider Bar -->
-                            <Line X1="2" Y1="10" X2="18" Y2="10" Stroke="#00C7BE" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                            <Ellipse Width="4.5" Height="4.5" Canvas.Left="12" Canvas.Top="7.75" Fill="#00C7BE" />
-                            <!-- Bottom Slider Bar -->
-                            <Line X1="2" Y1="15" X2="18" Y2="15" Stroke="#00C7BE" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                            <Ellipse Width="4.5" Height="4.5" Canvas.Left="7" Canvas.Top="12.75" Fill="#00C7BE" />
-                        </Canvas>
-                    </Viewbox>
-
-                    <!-- Activity Label -->
-                    <TextBlock x:Name="DetachedSecondaryText"
-                               Text="active"
-                               FontSize="13.5"
-                               FontWeight="SemiBold"
-                               Foreground="#FFFFFF"
-                               VerticalAlignment="Center" />
-                </StackPanel>
-            </Grid>
-        </StackPanel>
+                <!-- Timer Countdown Digits (e.g., 14:52) -->
+                <TextBlock x:Name="DetachedTimerCountdownText"
+                           Text="14:52"
+                           FontSize="13.5"
+                           FontWeight="SemiBold"
+                           Foreground="#FFFFFF"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

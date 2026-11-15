@@ -8,6 +8,7 @@ namespace WindowsLive.Services;
 public class VoiceRecordingInfo
 {
     public bool IsRecording { get; set; }
+    public bool IsCall { get; set; }
     public TimeSpan Duration { get; set; }
     public float PeakLevel { get; set; }
     public string AppName { get; set; } = "Microphone";
@@ -20,10 +21,12 @@ public class VoiceRecordingService
     private readonly DispatcherTimer _pollTimer;
     private DateTime _recordingStartTime = DateTime.MinValue;
     private bool _isRecording = false;
+    private bool _isDetectedCall = false;
     private string _activeAppName = "Microphone";
     private float _lastPeak = 0f;
 
     public bool IsRecording => _isRecording;
+    public bool IsCallActive => _isRecording && _isDetectedCall;
     public TimeSpan CurrentDuration => _isRecording ? (DateTime.Now - _recordingStartTime) : TimeSpan.Zero;
     public string ActiveAppName => _activeAppName;
 
@@ -260,6 +263,7 @@ public class VoiceRecordingService
             bool anySessionActive = false;
             float currentPeak = GetCurrentPeak();
             string detectedApp = "Microphone";
+            bool isDetectedCall = false;
 
             var enumerator = CreateEnumerator();
             if (enumerator == null) return;
@@ -294,50 +298,74 @@ public class VoiceRecordingService
                                         {
                                             var proc = Process.GetProcessById(pid);
                                             string pName = proc.ProcessName;
+                                            string title = proc.MainWindowTitle ?? string.Empty;
                                             if (pName.IndexOf("SoundRec", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                pName.IndexOf("VoiceRecord", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                pName.IndexOf("VoiceRecord", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                title.IndexOf("Sound Recorder", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                title.IndexOf("Voice Recorder", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "Voice Recorder";
+                                                isDetectedCall = false;
                                             }
                                             else if (pName.IndexOf("WhatsApp", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "WhatsApp Voice";
+                                                isDetectedCall = true;
                                             }
                                             else if (pName.IndexOf("Telegram", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "Telegram Voice";
-                                            }
-                                            else if (pName.IndexOf("Audacity", StringComparison.OrdinalIgnoreCase) >= 0)
-                                            {
-                                                detectedApp = "Audacity";
-                                            }
-                                            else if (pName.IndexOf("OBS", StringComparison.OrdinalIgnoreCase) >= 0)
-                                            {
-                                                detectedApp = "OBS Recording";
-                                            }
-                                            else if (pName.IndexOf("chrome", StringComparison.OrdinalIgnoreCase) >= 0)
-                                            {
-                                                detectedApp = "Chrome (Mic)";
-                                            }
-                                            else if (pName.IndexOf("msedge", StringComparison.OrdinalIgnoreCase) >= 0)
-                                            {
-                                                detectedApp = "Edge (Mic)";
-                                            }
-                                            else if (pName.IndexOf("discord", StringComparison.OrdinalIgnoreCase) >= 0)
-                                            {
-                                                detectedApp = "Discord";
+                                                isDetectedCall = true;
                                             }
                                             else if (pName.IndexOf("teams", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "Microsoft Teams";
+                                                isDetectedCall = true;
                                             }
                                             else if (pName.IndexOf("zoom", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "Zoom Meeting";
+                                                isDetectedCall = true;
+                                            }
+                                            else if (pName.IndexOf("skype", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                     pName.IndexOf("lync", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                detectedApp = "Skype";
+                                                isDetectedCall = true;
+                                            }
+                                            else if (pName.IndexOf("discord", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                detectedApp = "Discord";
+                                                isDetectedCall = true;
+                                            }
+                                            else if (pName.IndexOf("Audacity", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                detectedApp = "Audacity";
+                                                isDetectedCall = false;
+                                            }
+                                            else if (pName.IndexOf("OBS", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                detectedApp = "OBS Recording";
+                                                isDetectedCall = false;
+                                            }
+                                            else if (pName.IndexOf("chrome", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                detectedApp = "Chrome (Mic)";
+                                                isDetectedCall = false;
+                                            }
+                                            else if (pName.IndexOf("msedge", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                detectedApp = "Edge (Mic)";
+                                                isDetectedCall = false;
                                             }
                                             else if (!string.IsNullOrWhiteSpace(proc.MainWindowTitle))
                                             {
                                                 detectedApp = proc.MainWindowTitle;
+                                                string titleLower = proc.MainWindowTitle.ToLowerInvariant();
+                                                if (titleLower.Contains("call") || titleLower.Contains("meet") || titleLower.Contains("huddle"))
+                                                {
+                                                    isDetectedCall = true;
+                                                }
                                             }
                                             else
                                             {
@@ -362,18 +390,20 @@ public class VoiceRecordingService
 
             if (anySessionActive)
             {
+                _isDetectedCall = isDetectedCall;
                 if (!_isRecording)
                 {
                     _isRecording = true;
                     _recordingStartTime = DateTime.Now;
                     _activeAppName = detectedApp;
-                    App.Log($"Voice recording started by '{_activeAppName}'");
+                    App.Log($"Voice recording started by '{_activeAppName}' (IsCall={isDetectedCall})");
                 }
 
                 TimeSpan duration = DateTime.Now - _recordingStartTime;
                 RecordingStateChanged?.Invoke(new VoiceRecordingInfo
                 {
                     IsRecording = true,
+                    IsCall = isDetectedCall,
                     Duration = duration,
                     PeakLevel = currentPeak,
                     AppName = _activeAppName
@@ -384,10 +414,12 @@ public class VoiceRecordingService
                 if (_isRecording)
                 {
                     _isRecording = false;
+                    _isDetectedCall = false;
                     App.Log("Voice recording ended");
                     RecordingStateChanged?.Invoke(new VoiceRecordingInfo
                     {
                         IsRecording = false,
+                        IsCall = false,
                         Duration = TimeSpan.Zero,
                         PeakLevel = 0f,
                         AppName = _activeAppName

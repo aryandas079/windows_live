@@ -51,9 +51,9 @@ public partial class MainWindow : Window
     private const double CompactBluetoothWidth = 230.0;
     private const double ExpandedBluetoothWidth = 450.0;
     private const double ExpandedBluetoothHeight = 68.0;
-    private const double CompactPowerEfficiencyWidth = 265.0;
-    private const double CompactPowerBalancedWidth = 220.0;
-    private const double CompactPowerPerformanceWidth = 255.0;
+    private const double CompactPowerEfficiencyWidth = 250.0;
+    private const double CompactPowerBalancedWidth = 200.0;
+    private const double CompactPowerPerformanceWidth = 235.0;
     private const double CompactTimerWidth = 240.0;
     private const double CompactRecordingWidth = 230.0;
     private const double CompactScreenRecordingWidth = 240.0;
@@ -1647,36 +1647,28 @@ public partial class MainWindow : Window
             case WindowsPowerMode.BestPowerEfficiency:
                 title = "Best Power Efficiency";
                 accentColor = Color.FromRgb(48, 209, 88); // #30D158 Apple Green
-                badgeBrush = new SolidColorBrush(Color.FromRgb(52, 199, 89));
+                badgeBrush = new SolidColorBrush(Color.FromRgb(48, 209, 88));
                 targetWidth = CompactPowerEfficiencyWidth;
-                PowerIconEfficiency.Visibility = Visibility.Visible;
-                PowerIconBalanced.Visibility = Visibility.Collapsed;
-                PowerIconPerformance.Visibility = Visibility.Collapsed;
                 break;
 
             case WindowsPowerMode.BestPerformance:
                 title = "Best Performance";
-                accentColor = Color.FromRgb(255, 69, 58); // #FF453A Red-Orange
+                accentColor = Color.FromRgb(255, 59, 48); // #FF3B30 Apple Red
                 badgeBrush = new SolidColorBrush(Color.FromRgb(255, 59, 48));
                 targetWidth = CompactPowerPerformanceWidth;
-                PowerIconEfficiency.Visibility = Visibility.Collapsed;
-                PowerIconBalanced.Visibility = Visibility.Collapsed;
-                PowerIconPerformance.Visibility = Visibility.Visible;
                 break;
 
             case WindowsPowerMode.Balanced:
             default:
                 title = "Balanced";
-                accentColor = Color.FromRgb(10, 132, 255); // #0A84FF Apple Blue
+                accentColor = Color.FromRgb(0, 122, 255); // #007AFF Apple Blue
                 badgeBrush = new SolidColorBrush(Color.FromRgb(0, 122, 255));
                 targetWidth = CompactPowerBalancedWidth;
-                PowerIconEfficiency.Visibility = Visibility.Collapsed;
-                PowerIconBalanced.Visibility = Visibility.Visible;
-                PowerIconPerformance.Visibility = Visibility.Collapsed;
                 break;
         }
 
         CompactPowerModeBadge.Background = badgeBrush;
+        PowerModeBadgeGlow.Color = accentColor;
         CompactPowerModeText.Text = title;
         CompactPowerModeText.Foreground = new SolidColorBrush(accentColor);
 

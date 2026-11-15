@@ -756,7 +756,7 @@
                 <Grid x:Name="CompactPowerModeView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="8,0,16,0"
+                      Margin="10,0,16,0"
                       Background="Transparent"
                       Cursor="Hand"
                       MouseDown="CompactPowerModeView_MouseDown">
@@ -766,34 +766,16 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Capsule Badge with Mode Icon -->
+                    <!-- Left: Solid Color Oval Rectangle (Pure Green, Blue, or Red pill with no logo) -->
                     <Border x:Name="CompactPowerModeBadge"
                             Grid.Column="0"
-                            Width="54" Height="28"
-                            CornerRadius="14"
+                            Width="36" Height="18"
+                            CornerRadius="9"
                             Background="#30D158"
                             VerticalAlignment="Center">
-                        <!-- Mode Icons Viewbox -->
-                        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <!-- 1. Eco Leaf (Best Power Efficiency) -->
-                            <Canvas x:Name="PowerIconEfficiency" Width="16" Height="16" Visibility="Visible">
-                                <Path Fill="White" Data="M 14,2 C 7,2 2,7 2,13 C 2,14.5 2.5,15.5 3.5,15.5 C 4.5,15.5 5.5,14 6,13 C 7.5,10 10,7.5 13,6 M 14,2 C 14,9 9,14 2,14" Stroke="White" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                            </Canvas>
-
-                            <!-- 2. Balanced Sliders / Gauge (Balanced) -->
-                            <Canvas x:Name="PowerIconBalanced" Width="16" Height="16" Visibility="Collapsed">
-                                <Path Fill="White" Data="M 2,4 L 14,4 M 2,8 L 14,8 M 2,12 L 14,12" Stroke="White" StrokeThickness="1.6" StrokeStartLineCap="Round" />
-                                <Ellipse Canvas.Left="4" Canvas.Top="2.5" Width="3" Height="3" Fill="White" />
-                                <Ellipse Canvas.Left="9" Canvas.Top="6.5" Width="3" Height="3" Fill="White" />
-                                <Ellipse Canvas.Left="6" Canvas.Top="10.5" Width="3" Height="3" Fill="White" />
-                            </Canvas>
-
-                            <!-- 3. Performance Rocket / Speedometer (Best Performance) -->
-                            <Canvas x:Name="PowerIconPerformance" Width="16" Height="16" Visibility="Collapsed">
-                                <Path Fill="White" Data="M 8,1 C 11.5,3.5 13,7.5 12,12 L 14,13.5 L 12.5,15 L 10.5,13.5 C 9.5,14 8,14 7,13.5 L 5,15 L 3.5,13.5 L 5.5,12 C 4.5,7.5 6,3.5 8,1 Z" />
-                                <Ellipse Canvas.Left="6.5" Canvas.Top="5" Width="2.5" Height="2.5" Fill="#FF3B30" />
-                            </Canvas>
-                        </Grid>
+                        <Border.Effect>
+                            <DropShadowEffect x:Name="PowerModeBadgeGlow" Color="#30D158" BlurRadius="8" ShadowDepth="0" Opacity="0.6" />
+                        </Border.Effect>
                     </Border>
 
                     <!-- Center: Notch Space -->

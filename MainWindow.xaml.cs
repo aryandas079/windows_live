@@ -443,7 +443,7 @@ public partial class MainWindow : Window
 
             _powerModeAlertTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(3.5)
+                Interval = TimeSpan.FromSeconds(3.0)
             };
             _powerModeAlertTimer.Tick += (s, e) =>
             {
@@ -455,7 +455,12 @@ public partial class MainWindow : Window
                     fadeOut.Completed += (s2, e2) =>
                     {
                         CompactPowerModeView.Visibility = Visibility.Collapsed;
+                        // Restore island shadow
+                        IslandShadowEffect.Color = _themeService.IsDarkTheme ? Colors.Black : Color.FromArgb(255, 60, 60, 70);
+                        IslandShadowEffect.Opacity = _themeService.IsDarkTheme ? 0.55 : 0.25;
+                        IslandShadowEffect.BlurRadius = _themeService.IsDarkTheme ? 22 : 18;
                         UpdateCompactViewVisibility();
+                        AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
                     };
                     CompactPowerModeView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -1529,7 +1534,7 @@ public partial class MainWindow : Window
         AlarmIconRotate.Angle = 0;
     }
 
-    private void ClearTemporaryAlerts()
+    private void ClearTemporaryAlerts(bool keepPowerMode = false)
     {
         if (_isUnlockAlertActive)
         {
@@ -1561,7 +1566,7 @@ public partial class MainWindow : Window
             _chargingAlertTimer.Stop();
             CompactChargingView.Visibility = Visibility.Collapsed;
         }
-        if (_isPowerModeAlertActive)
+        if (!keepPowerMode && _isPowerModeAlertActive)
         {
             _isPowerModeAlertActive = false;
             _powerModeAlertTimer.Stop();
@@ -1587,11 +1592,11 @@ public partial class MainWindow : Window
 
     public void ShowPowerModeAlert(WindowsPowerMode mode)
     {
+        ClearTemporaryAlerts(keepPowerMode: true);
         _activePowerMode = mode;
         _isPowerModeAlertActive = true;
         _powerModeAlertTimer.Stop();
-
-        ClearTemporaryAlerts();
+        _powerModeAlertTimer.Interval = TimeSpan.FromSeconds(3.0);
 
         Color accentColor;
         SolidColorBrush badgeBrush;

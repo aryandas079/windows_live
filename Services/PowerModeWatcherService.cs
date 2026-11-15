@@ -121,6 +121,7 @@ public class PowerModeWatcherService
         // Suppress notification on cold launch; only notify on actual subsequent changes
         if (!isFirst && mode != previous)
         {
+            App.Log($"PowerModeWatcherService: Dispatched PowerModeChanged({mode})");
             _dispatcher.Invoke(() =>
             {
                 PowerModeChanged?.Invoke(mode);

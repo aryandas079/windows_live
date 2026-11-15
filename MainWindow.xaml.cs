@@ -55,7 +55,7 @@ public partial class MainWindow : Window
     private const double CompactPowerBalancedWidth = 200.0;
     private const double CompactPowerPerformanceWidth = 235.0;
     private const double CompactTimerWidth = 240.0;
-    private const double CompactRecordingWidth = 230.0;
+    private const double CompactRecordingWidth = 210.0;
     private const double CompactScreenRecordingWidth = 240.0;
     private const double CompactScreenRecordingHeight = 48.0;
     private const double CompactSplitLeadingWidth = 126.0;

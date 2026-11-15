@@ -717,51 +717,61 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- 10. Voice / Sound Recording Pill (Matches Reference Image media_1794687519215_9a21255f.png Exactly) -->
-                <!-- Left: Dynamic Red-Orange recording waveform bars in #FF453A -->
-                <!-- Center: Camera notch space -->
-                <!-- Right: Red-Orange live recording duration timer e.g. "02:42" in #FF453A -->
+                <!-- 10. Live Call / Audio Call Pill (Matches User Uploaded Reference media_1794722326989_0583e504.png) -->
+                <!-- Left: Green Telephone Handset Icon (#30D158) + Call Duration in #30D158 -->
+                <!-- Center: Camera Notch Space -->
+                <!-- Right: Active Call Waveform Bars in #30D158 + Privacy Indicators -->
                 <Grid x:Name="CompactVoiceRecordingView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="12,0,16,0">
+                      Margin="12,0,12,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Dynamic Live Waveform Visualizer in Vibrant Red-Orange (#FF453A) -->
-                    <StackPanel x:Name="RecordingWaveformBars"
-                                Grid.Column="0"
-                                Orientation="Horizontal"
-                                VerticalAlignment="Center">
-                        <Border x:Name="RecBar1" Width="3.5" Height="4" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar2" Width="3.5" Height="8" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar3" Width="3.5" Height="14" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar4" Width="3.5" Height="12" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar5" Width="3.5" Height="6" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar6" Width="3.5" Height="13" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar7" Width="3.5" Height="16" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar8" Width="3.5" Height="12" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar9" Width="3.5" Height="8" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar10" Width="3.5" Height="4" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar11" Width="3.5" Height="7" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar12" Width="3.5" Height="11" CornerRadius="1.75" Background="#FF453A" Margin="0,0,2.5,0" VerticalAlignment="Center" />
-                        <Border x:Name="RecBar13" Width="3.5" Height="4" CornerRadius="1.75" Background="#FF453A" VerticalAlignment="Center" />
+                    <!-- Left: Vibrant Green Telephone Icon + Call Duration Timer (e.g. 00:03) -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Apple-style Call Telephone Handset Vector Icon in #30D158 -->
+                        <Viewbox Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,7,0">
+                            <Canvas Width="24" Height="24">
+                                <Path Fill="#30D158"
+                                      Data="M 6.62,10.79 C 8.06,13.62 10.38,15.94 13.21,17.38 L 15.41,15.18 C 15.69,14.9 16.08,14.82 16.43,14.93 C 17.55,15.3 18.75,15.5 20,15.5 C 20.55,15.5 21,15.95 21,16.5 L 21,20 C 21,20.55 20.55,21 20,21 C 10.61,21 3,13.39 3,4 C 3,3.45 3.45,3 4,3 L 7.5,3 C 8.05,3 8.5,3.45 8.5,4 C 8.5,5.25 8.7,6.45 9.07,7.57 C 9.18,7.92 9.1,8.31 8.82,8.59 L 6.62,10.79 Z" />
+                            </Canvas>
+                        </Viewbox>
+
+                        <TextBlock x:Name="CompactRecordingDurationText"
+                                   Text="00:00"
+                                   FontSize="16.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="#30D158"
+                                   VerticalAlignment="Center" />
                     </StackPanel>
 
                     <!-- Center: Notch Space -->
                     <Grid Grid.Column="1" />
 
-                    <!-- Right: Live Duration (e.g. 02:42) in #FF453A and Privacy Indicators -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
-                        <TextBlock x:Name="CompactRecordingDurationText"
-                                   Text="00:00"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="#FF453A"
-                                   VerticalAlignment="Center" />
+                    <!-- Right: Dynamic Live Audio Call Waveform Bars in #30D158 and Privacy Indicators -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel x:Name="RecordingWaveformBars"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <Border x:Name="RecBar1" Width="2.8" Height="4" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar2" Width="2.8" Height="8" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar3" Width="2.8" Height="14" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar4" Width="2.8" Height="12" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar5" Width="2.8" Height="6" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar6" Width="2.8" Height="13" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar7" Width="2.8" Height="16" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar8" Width="2.8" Height="12" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar9" Width="2.8" Height="8" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar10" Width="2.8" Height="4" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar11" Width="2.8" Height="7" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar12" Width="2.8" Height="11" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border x:Name="RecBar13" Width="2.8" Height="4" CornerRadius="1.4" Background="#30D158" VerticalAlignment="Center" />
+                        </StackPanel>
+
                         <StackPanel x:Name="VoicePrivacyPanel"
                                     Orientation="Horizontal"
                                     VerticalAlignment="Center"

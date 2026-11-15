@@ -146,6 +146,17 @@ public partial class MainWindow : Window
         _isChargingAlertActive ||
         _isNotificationAlertActive;
 
+    private bool HasActiveAlert =>
+        _isPowerModeAlertActive ||
+        _isNotificationAlertActive ||
+        _isBluetoothAlertActive ||
+        _isAlarmActive ||
+        _isUnlockAlertActive ||
+        _isSilentRingAlertActive ||
+        _isDndAlertActive ||
+        _isNightModeAlertActive ||
+        _isChargingAlertActive;
+
     private double CurrentCompactHeight => IsScreenRecordingActive ? CompactScreenRecordingHeight : CompactHeight;
 
     private double CurrentCompactWidth
@@ -280,6 +291,11 @@ public partial class MainWindow : Window
                 {
                     UpdateCompactViewVisibility();
                 }
+
+                if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
+                {
+                    HideDockSmooth();
+                }
             };
 
             _autoCollapseTimer = new DispatcherTimer
@@ -292,7 +308,7 @@ public partial class MainWindow : Window
                 if (!_isPinned && !IslandContainer.IsMouseOver)
                 {
                     CollapseDock();
-                    if (_appStateTracker.CurrentState == ForegroundAppState.Maximized)
+                    if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert)
                     {
                         HideDockSmooth();
                     }
@@ -320,6 +336,10 @@ public partial class MainWindow : Window
                     {
                         CompactChargingView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
+                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
+                        {
+                            HideDockSmooth();
+                        }
                     };
                     CompactChargingView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -340,6 +360,10 @@ public partial class MainWindow : Window
                     {
                         CompactUnlockView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
+                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
+                        {
+                            HideDockSmooth();
+                        }
                     };
                     CompactUnlockView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -360,6 +384,10 @@ public partial class MainWindow : Window
                     {
                         CompactSilentRingView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
+                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
+                        {
+                            HideDockSmooth();
+                        }
                     };
                     CompactSilentRingView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -380,6 +408,10 @@ public partial class MainWindow : Window
                     {
                         CompactDndView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
+                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
+                        {
+                            HideDockSmooth();
+                        }
                     };
                     CompactDndView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -400,6 +432,10 @@ public partial class MainWindow : Window
                     {
                         CompactNightModeView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
+                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
+                        {
+                            HideDockSmooth();
+                        }
                     };
                     CompactNightModeView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -421,6 +457,10 @@ public partial class MainWindow : Window
                     {
                         CompactBluetoothView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
+                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
+                        {
+                            HideDockSmooth();
+                        }
                     };
                     CompactBluetoothView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -476,21 +516,13 @@ public partial class MainWindow : Window
             };
             _topMostTimer.Tick += (s, e) =>
             {
-                if (_appStateTracker.CurrentState != ForegroundAppState.Maximized &&
-                    _appStateTracker.CurrentState != ForegroundAppState.FullScreen)
-                {
-                    WindowHelper.EnsureTopMost(this);
-                }
+                WindowHelper.EnsureTopMost(this);
             };
             _topMostTimer.Start();
 
             Deactivated += (s, e) =>
             {
-                if (_appStateTracker.CurrentState != ForegroundAppState.Maximized &&
-                    _appStateTracker.CurrentState != ForegroundAppState.FullScreen)
-                {
-                    WindowHelper.EnsureTopMost(this);
-                }
+                WindowHelper.EnsureTopMost(this);
             };
 
             SourceInitialized += (s, e) =>
@@ -524,9 +556,12 @@ public partial class MainWindow : Window
             {
                 case ForegroundAppState.FullScreen:
                 case ForegroundAppState.Maximized:
-                    // Fullscreen or Maximized mode: disappear completely
-                    TopEdgeHotspot.Visibility = Visibility.Collapsed;
-                    HideDockSmooth();
+                    // Hotspot active in notch area for hovering popout
+                    TopEdgeHotspot.Visibility = Visibility.Visible;
+                    if (!HasActiveAlert && !IslandContainer.IsMouseOver)
+                    {
+                        HideDockSmooth();
+                    }
                     break;
 
                 case ForegroundAppState.Normal:
@@ -540,7 +575,8 @@ public partial class MainWindow : Window
 
     private void TopEdgeHotspot_MouseEnter(object sender, MouseEventArgs e)
     {
-        // Hotspot disabled when maximized/fullscreen as dock must disappear completely
+        ShowDockSmooth();
+        WindowHelper.EnsureTopMost(this);
     }
 
     private void HideDockSmooth()
@@ -548,7 +584,7 @@ public partial class MainWindow : Window
         var anim = new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(160));
         anim.Completed += (s, e) =>
         {
-            if (_appStateTracker.CurrentState != ForegroundAppState.Normal)
+            if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
             {
                 IslandContainer.Visibility = Visibility.Collapsed;
             }
@@ -559,6 +595,7 @@ public partial class MainWindow : Window
     private void ShowDockSmooth()
     {
         IslandContainer.Visibility = Visibility.Visible;
+        WindowHelper.EnsureTopMost(this);
         var anim = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(160));
         IslandContainer.BeginAnimation(OpacityProperty, anim);
     }
@@ -683,19 +720,15 @@ public partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == 0x0046) // WM_WINDOWPOSCHANGING: keep topmost unconditionally unless maximized/fullscreen
+        if (msg == 0x0046) // WM_WINDOWPOSCHANGING: keep topmost unconditionally
         {
-            if (_appStateTracker.CurrentState != ForegroundAppState.Maximized &&
-                _appStateTracker.CurrentState != ForegroundAppState.FullScreen)
+            try
             {
-                try
-                {
-                    var wp = System.Runtime.InteropServices.Marshal.PtrToStructure<WindowHelper.WINDOWPOS>(lParam);
-                    wp.hwndInsertAfter = (IntPtr)(-1); // HWND_TOPMOST
-                    System.Runtime.InteropServices.Marshal.StructureToPtr(wp, lParam, false);
-                }
-                catch { }
+                var wp = System.Runtime.InteropServices.Marshal.PtrToStructure<WindowHelper.WINDOWPOS>(lParam);
+                wp.hwndInsertAfter = (IntPtr)(-1); // HWND_TOPMOST
+                System.Runtime.InteropServices.Marshal.StructureToPtr(wp, lParam, false);
             }
+            catch { }
         }
 
         if (msg == WindowHelper.WM_NCHITTEST)
@@ -796,7 +829,7 @@ public partial class MainWindow : Window
             _autoCollapseTimer.Stop();
             _autoCollapseTimer.Start();
         }
-        else if (!_isExpanded && _appStateTracker.CurrentState == ForegroundAppState.Maximized)
+        else if (!_isExpanded && _appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert)
         {
             HideDockSmooth();
         }
@@ -1423,6 +1456,9 @@ public partial class MainWindow : Window
 
             if (isRinging)
             {
+                ShowDockSmooth();
+                WindowHelper.EnsureTopMost(this);
+
                 // Clear any temporary compact alerts
                 if (_isUnlockAlertActive)
                 {
@@ -1598,6 +1634,9 @@ public partial class MainWindow : Window
         _powerModeAlertTimer.Stop();
         _powerModeAlertTimer.Interval = TimeSpan.FromSeconds(3.0);
 
+        ShowDockSmooth();
+        WindowHelper.EnsureTopMost(this);
+
         Color accentColor;
         SolidColorBrush badgeBrush;
         string title;
@@ -1683,6 +1722,9 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
+            ShowDockSmooth();
+            WindowHelper.EnsureTopMost(this);
+
             _activeBluetoothDevice = dev;
             _isBluetoothAlertActive = true;
             _bluetoothAlertTimer.Stop();
@@ -1833,6 +1875,9 @@ public partial class MainWindow : Window
 
     public void ShowBatteryAlert(BatteryAlertType alertType)
     {
+        ShowDockSmooth();
+        WindowHelper.EnsureTopMost(this);
+
         _isChargingAlertActive = true;
         _chargingAlertTimer.Stop();
 
@@ -2622,6 +2667,9 @@ public partial class MainWindow : Window
             _isNotificationAlertActive = true;
             UpdateNotificationUI(notif);
             _activeCategory = IslandCategory.AppNotification;
+
+            ShowDockSmooth();
+            WindowHelper.EnsureTopMost(this);
 
             // Clear any active unlock alert
             if (_isUnlockAlertActive)

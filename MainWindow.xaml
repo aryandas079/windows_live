@@ -17,10 +17,10 @@
         FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
 
     <Grid x:Name="RootGrid" Background="Transparent" VerticalAlignment="Top" HorizontalAlignment="Center">
-        <!-- Top Edge Hover Zone for Maximized Apps -->
+        <!-- Top Edge Hover Zone for Maximized & Fullscreen Apps -->
         <Border x:Name="TopEdgeHotspot"
-                Height="5"
-                Width="380"
+                Height="12"
+                Width="340"
                 VerticalAlignment="Top"
                 HorizontalAlignment="Center"
                 Background="#01000000"

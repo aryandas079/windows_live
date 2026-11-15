@@ -41,7 +41,7 @@ public partial class MainWindow : Window
 
     private const double CompactDefaultWidth = 160.0;
     private const double CompactMediaWidth = 240.0;
-    private const double CompactChargingWidth = 320.0;
+    private const double CompactChargingWidth = 260.0;
     private const double CompactNotificationWidth = 220.0;
     private const double CompactUnlockWidth = 190.0;
     private const double CompactSilentRingWidth = 200.0;
@@ -155,6 +155,7 @@ public partial class MainWindow : Window
             _volumeManager.VolumeChanged += OnVolumeChanged;
             _powerService.PowerStatusChanged += OnPowerStatusChanged;
             _powerService.ChargingConnected += OnChargingConnected;
+            _powerService.BatteryAlert += OnBatteryAlert;
             _focusService.Tick += OnFocusTimerTick;
             _clipboardService.ClipboardTextChanged += OnClipboardTextChanged;
             _notificationService.NotificationReceived += OnNotificationReceived;
@@ -1050,11 +1051,21 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            ShowChargingAnimation();
+            ShowBatteryAlert(BatteryAlertType.Charging);
         });
     }
 
-    public void ShowChargingAnimation()
+    private void OnBatteryAlert(BatteryAlertType alertType)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            ShowBatteryAlert(alertType);
+        });
+    }
+
+    public void ShowChargingAnimation() => ShowBatteryAlert(BatteryAlertType.Charging);
+
+    public void ShowBatteryAlert(BatteryAlertType alertType)
     {
         _isChargingAlertActive = true;
         _chargingAlertTimer.Stop();
@@ -1065,14 +1076,69 @@ public partial class MainWindow : Window
         // Battery fill calculation (inner capsule usable width is 31px)
         double targetFillWidth = Math.Max(3.0, (percent / 100.0) * 31.0);
 
-        // Hide other compact views and activate charging view matching Image
+        Color glowColor;
+        SolidColorBrush fillBrush;
+        SolidColorBrush backBrush;
+        SolidColorBrush borderBrush;
+
+        switch (alertType)
+        {
+            case BatteryAlertType.LowBattery:
+                CompactBatteryAlertTitle.Text = "Low Battery";
+                CompactBatteryAlertTitle.FontWeight = FontWeights.Bold;
+                CompactChargingText.Foreground = new SolidColorBrush(Color.FromRgb(255, 69, 58)); // #FF453A Red
+                fillBrush = new SolidColorBrush(Color.FromRgb(255, 69, 58));
+                backBrush = new SolidColorBrush(Color.FromArgb(180, 53, 22, 22)); // #351616
+                borderBrush = new SolidColorBrush(Color.FromArgb(200, 80, 36, 36));
+                glowColor = Color.FromRgb(255, 69, 58);
+                break;
+
+            case BatteryAlertType.Unplugged:
+                CompactBatteryAlertTitle.Text = "Unplugged";
+                CompactBatteryAlertTitle.FontWeight = FontWeights.Bold;
+                CompactChargingText.Foreground = new SolidColorBrush(Color.FromRgb(199, 199, 204)); // #C7C7CC
+                fillBrush = new SolidColorBrush(Color.FromRgb(142, 142, 147)); // #8E8E93 Silver/Grey
+                backBrush = new SolidColorBrush(Color.FromArgb(180, 44, 44, 46)); // #2C2C2E
+                borderBrush = new SolidColorBrush(Color.FromArgb(200, 72, 72, 74));
+                glowColor = Colors.Black;
+                break;
+
+            case BatteryAlertType.PowerSaver:
+                CompactBatteryAlertTitle.Text = "Power Saver";
+                CompactBatteryAlertTitle.FontWeight = FontWeights.Bold;
+                CompactChargingText.Foreground = new SolidColorBrush(Color.FromRgb(255, 214, 10)); // #FFD60A Apple Yellow
+                fillBrush = new SolidColorBrush(Color.FromRgb(255, 214, 10));
+                backBrush = new SolidColorBrush(Color.FromArgb(180, 53, 48, 16)); // #353010
+                borderBrush = new SolidColorBrush(Color.FromArgb(200, 80, 72, 28));
+                glowColor = Color.FromRgb(255, 214, 10);
+                break;
+
+            case BatteryAlertType.Charging:
+            default:
+                CompactBatteryAlertTitle.Text = "Charging";
+                CompactBatteryAlertTitle.FontWeight = FontWeights.Normal;
+                CompactChargingText.Foreground = new SolidColorBrush(Color.FromRgb(48, 209, 88)); // #30D158 Apple Green
+                fillBrush = new SolidColorBrush(Color.FromRgb(48, 209, 88));
+                backBrush = new SolidColorBrush(Color.FromRgb(22, 53, 25)); // #163519
+                borderBrush = new SolidColorBrush(Color.FromRgb(36, 80, 40));
+                glowColor = Color.FromRgb(48, 209, 88);
+                break;
+        }
+
+        CompactChargingBatteryBack.Background = backBrush;
+        CompactChargingBatteryBack.BorderBrush = borderBrush;
+        CompactChargingBatteryFill.Background = fillBrush;
+        CompactChargingBatteryCap.Background = borderBrush;
+
+        // Hide other compact views and activate battery alert view
         CompactClockView.Visibility = Visibility.Collapsed;
         CompactMediaView.Visibility = Visibility.Collapsed;
         CompactNotificationView.Visibility = Visibility.Collapsed;
+        CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
         CompactChargingView.Opacity = 0.0;
         CompactChargingView.Visibility = Visibility.Visible;
 
-        // If currently expanded, collapse into compact charging notch
+        // If currently expanded, collapse into compact dock
         if (_isExpanded)
         {
             _isExpanded = false;
@@ -1081,15 +1147,24 @@ public partial class MainWindow : Window
             CompactView.Opacity = 1.0;
         }
 
-        // Animate island container width to 320.0 (compact height 36.0)
+        // Animate island container width to 260.0 (compact height 36.0)
         AnimateIsland(CompactChargingWidth, CompactHeight);
 
-        // Gentle emerald ambient glow around notch while charging alert displays
-        IslandShadowEffect.Color = Color.FromRgb(48, 209, 88);
-        IslandShadowEffect.Opacity = 0.40;
-        IslandShadowEffect.BlurRadius = 24;
+        // Ambient glow
+        if (alertType == BatteryAlertType.Unplugged)
+        {
+            IslandShadowEffect.Color = _themeService.IsDarkTheme ? Colors.Black : Color.FromArgb(255, 60, 60, 70);
+            IslandShadowEffect.Opacity = _themeService.IsDarkTheme ? 0.55 : 0.25;
+            IslandShadowEffect.BlurRadius = _themeService.IsDarkTheme ? 22 : 18;
+        }
+        else
+        {
+            IslandShadowEffect.Color = glowColor;
+            IslandShadowEffect.Opacity = 0.38;
+            IslandShadowEffect.BlurRadius = 24;
+        }
 
-        // Smooth fade-in of the charging view
+        // Smooth fade-in of the battery alert view
         var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
         CompactChargingView.BeginAnimation(OpacityProperty, fadeIn);
 
@@ -1100,14 +1175,17 @@ public partial class MainWindow : Window
         };
         CompactChargingBatteryFill.BeginAnimation(WidthProperty, fillAnim);
 
-        // Display for exactly 5.0 seconds then smoothly disappear
+        // Display for at max 5.0 seconds then smoothly disappear
         _chargingAlertTimer.Start();
     }
 
+    private int _testBatteryAlertIndex = 0;
     private void CompactChargingPill_MouseDown(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
-        ShowChargingAnimation();
+        var alerts = new[] { BatteryAlertType.LowBattery, BatteryAlertType.Unplugged, BatteryAlertType.PowerSaver, BatteryAlertType.Charging };
+        ShowBatteryAlert(alerts[_testBatteryAlertIndex % alerts.Length]);
+        _testBatteryAlertIndex++;
     }
 
     private void SystemEvents_SessionSwitch(object sender, Microsoft.Win32.SessionSwitchEventArgs e)

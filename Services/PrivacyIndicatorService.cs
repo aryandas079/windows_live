@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows.Threading;
@@ -42,7 +43,7 @@ public class PrivacyIndicatorService
 
         _pollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(400)
+            Interval = TimeSpan.FromMilliseconds(300)
         };
         _pollTimer.Tick += (s, e) => PollPrivacyStatus();
     }
@@ -96,7 +97,8 @@ public class PrivacyIndicatorService
     {
         try
         {
-            bool cameraInUse = _simulatedCamera || CheckRegistryStore(WebcamPaths);
+            bool cameraProcessActive = IsCameraAppActive();
+            bool cameraInUse = _simulatedCamera || cameraProcessActive || CheckRegistryStore(WebcamPaths);
             bool micInUse = _simulatedMicrophone || _wasapiMicActive || CheckRegistryStore(MicPaths);
 
             if (cameraInUse != IsCameraInUse || micInUse != IsMicrophoneInUse)
@@ -116,44 +118,63 @@ public class PrivacyIndicatorService
         }
     }
 
+    private static bool IsCameraAppActive()
+    {
+        try
+        {
+            // Detect Windows Camera app process running in foreground
+            var camProcs = Process.GetProcessesByName("WindowsCamera");
+            if (camProcs.Length > 0) return true;
+        }
+        catch { }
+        return false;
+    }
+
     private static bool CheckRegistryStore(string[] paths)
     {
-        foreach (var subPath in paths)
+        var hives = new[]
         {
-            if (CheckRootKey(Registry.CurrentUser, subPath)) return true;
-            if (CheckRootKey(Registry.LocalMachine, subPath)) return true;
+            (RegistryHive.CurrentUser, RegistryView.Registry64),
+            (RegistryHive.CurrentUser, RegistryView.Registry32),
+            (RegistryHive.LocalMachine, RegistryView.Registry64),
+            (RegistryHive.LocalMachine, RegistryView.Registry32)
+        };
+
+        foreach (var (hive, view) in hives)
+        {
+            try
+            {
+                using var baseKey = RegistryKey.OpenBaseKey(hive, view);
+                foreach (var subPath in paths)
+                {
+                    using var subKey = baseKey.OpenSubKey(subPath);
+                    if (subKey != null && CheckKeyRecursive(subKey, 0))
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch { }
         }
         return false;
     }
 
-    private static bool CheckRootKey(RegistryKey root, string subPath)
+    private static bool CheckKeyRecursive(RegistryKey key, int depth)
     {
+        if (key == null || depth > 3) return false;
+
         try
         {
-            using var key = root.OpenSubKey(subPath);
-            if (key == null) return false;
+            if (IsSessionActive(key)) return true;
 
             foreach (var subKeyName in key.GetSubKeyNames())
             {
                 try
                 {
-                    using var subKey = key.OpenSubKey(subKeyName);
-                    if (subKey == null) continue;
-
-                    if (IsSessionActive(subKey)) return true;
-
-                    // Check NonPackaged subkeys (standard Win32 apps like Chrome, Zoom, OBS)
-                    if (subKeyName.Equals("NonPackaged", StringComparison.OrdinalIgnoreCase))
+                    using var child = key.OpenSubKey(subKeyName);
+                    if (child != null && CheckKeyRecursive(child, depth + 1))
                     {
-                        foreach (var appKeyName in subKey.GetSubKeyNames())
-                        {
-                            try
-                            {
-                                using var appKey = subKey.OpenSubKey(appKeyName);
-                                if (appKey != null && IsSessionActive(appKey)) return true;
-                            }
-                            catch { }
-                        }
+                        return true;
                     }
                 }
                 catch { }
@@ -169,23 +190,25 @@ public class PrivacyIndicatorService
         try
         {
             var valueNames = key.GetValueNames();
-            if (valueNames.Contains("LastUsedTimeStop") || valueNames.Contains("LastUsedTimeStart"))
+            if (valueNames.Contains("LastUsedTimeStart"))
             {
-                object? stopVal = key.GetValue("LastUsedTimeStop");
                 object? startVal = key.GetValue("LastUsedTimeStart");
+                object? stopVal = key.GetValue("LastUsedTimeStop");
 
-                long stop = 0;
                 long start = 0;
-
-                if (stopVal is long sl) stop = sl;
-                else if (stopVal != null) long.TryParse(stopVal.ToString(), out stop);
+                long stop = 0;
 
                 if (startVal is long stl) start = stl;
                 else if (startVal != null) long.TryParse(startVal.ToString(), out start);
 
+                if (stopVal is long sl) stop = sl;
+                else if (stopVal != null) long.TryParse(stopVal.ToString(), out stop);
+
                 // If session started and has not stopped (stop == 0), or start is more recent than stop
-                if (stop == 0 && start > 0) return true;
-                if (start > stop) return true;
+                if (start > 0 && (stop == 0 || start > stop))
+                {
+                    return true;
+                }
             }
         }
         catch { }

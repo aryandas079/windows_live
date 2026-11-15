@@ -76,6 +76,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <TextBlock x:Name="CompactTimeText"
@@ -144,6 +145,37 @@
                             <TextBlock Text="Night" FontSize="11" FontWeight="SemiBold" Foreground="#FF9F0A" VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
+
+                    <!-- Column 5: Privacy Indicators in Clock View (Camera Green, Mic Orange) -->
+                    <StackPanel x:Name="ClockPrivacyPanel"
+                                Grid.Column="5"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="6,0,0,0"
+                                Visibility="Collapsed">
+                        <Border x:Name="ClockCameraDot"
+                                Width="7.5" Height="7.5"
+                                CornerRadius="3.75"
+                                Background="#30D158"
+                                Margin="2,0,2,0"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                            </Border.Effect>
+                        </Border>
+                        <Border x:Name="ClockMicDot"
+                                Width="7.5" Height="7.5"
+                                CornerRadius="3.75"
+                                Background="#FF9F0A"
+                                Margin="2,0,2,0"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                            </Border.Effect>
+                        </Border>
+                    </StackPanel>
                 </Grid>
 
                 <!-- 2. Media Mode: Matches Image 3 (disc icon left, animated equalizer right) -->
@@ -181,7 +213,8 @@
                     <!-- Center: Spacious Island Gap -->
                     <Grid Grid.Column="1" />
 
-                    <!-- Right: Animated Accent Equalizer and Night Mode indicator -->
+                    <!-- Right: Animated Accent Equalizer, Night Mode indicator, and Privacy Indicators -->
+                    <!-- Equalizer shifts to the left when Privacy Indicators (Camera Green, Mic Orange) are active -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,2,0">
                         <Viewbox x:Name="CompactMediaNightMoon" Width="11" Height="11" VerticalAlignment="Center" Margin="0,0,6,0" Visibility="Collapsed">
                             <Canvas Width="16" Height="16">
@@ -192,6 +225,40 @@
                                                    VerticalAlignment="Center"
                                                    AccentBrush="{DynamicResource AccentColorBrush}"
                                                    IsPlaying="True" />
+                        <!-- Privacy Indicator Dots (Camera Green, Microphone Orange) positioned to the right of Equalizer -->
+                        <StackPanel x:Name="MediaPrivacyPanel"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="8,0,0,0"
+                                    Cursor="Hand"
+                                    ToolTip="Privacy Indicators (Click to cycle simulation)"
+                                    MouseDown="MediaPrivacyPanel_MouseDown"
+                                    Visibility="Collapsed">
+                            <!-- Camera Green Dot -->
+                            <Border x:Name="MediaCameraDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#30D158"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                            <!-- Microphone Orange Dot -->
+                            <Border x:Name="MediaMicDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#FF9F0A"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
 
@@ -536,7 +603,7 @@
                     <!-- Center: Notch Space -->
                     <Grid Grid.Column="1" />
 
-                    <!-- Right: "Timer mm:ss" in Vibrant iOS Amber (#F59E0B) -->
+                    <!-- Right: "Timer mm:ss" in Vibrant iOS Amber (#F59E0B) and Privacy Indicators -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
                         <Viewbox x:Name="CompactTimerNightMoon" Width="11" Height="11" VerticalAlignment="Center" Margin="0,0,6,0" Visibility="Collapsed">
                             <Canvas Width="16" Height="16">
@@ -554,6 +621,35 @@
                                    FontWeight="SemiBold"
                                    Foreground="#F59E0B"
                                    VerticalAlignment="Center" />
+                        <!-- Privacy Indicator Dots -->
+                        <StackPanel x:Name="TimerPrivacyPanel"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="8,0,0,0"
+                                    Visibility="Collapsed">
+                            <Border x:Name="TimerCameraDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#30D158"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="TimerMicDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#FF9F0A"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
 
@@ -593,13 +689,41 @@
                     <!-- Center Gap -->
                     <Grid Grid.Column="1" />
 
-                    <!-- Right: Animated Accent Equalizer Waveform -->
-                    <controls:EqualizerControl x:Name="SplitEqualizer"
-                                               Grid.Column="2"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,2,0"
-                                               AccentBrush="{DynamicResource AccentColorBrush}"
-                                               IsPlaying="True" />
+                    <!-- Right: Animated Accent Equalizer Waveform and Privacy Indicators -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,2,0">
+                        <controls:EqualizerControl x:Name="SplitEqualizer"
+                                                   VerticalAlignment="Center"
+                                                   AccentBrush="{DynamicResource AccentColorBrush}"
+                                                   IsPlaying="True" />
+                        <StackPanel x:Name="SplitPrivacyPanel"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="8,0,0,0"
+                                    Visibility="Collapsed">
+                            <Border x:Name="SplitCameraDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#30D158"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="SplitMicDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#FF9F0A"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
                 </Grid>
 
                 <!-- 10. Voice / Sound Recording Pill (Matches Reference Image media_1794687519215_9a21255f.png Exactly) -->
@@ -639,15 +763,43 @@
                     <!-- Center: Notch Space -->
                     <Grid Grid.Column="1" />
 
-                    <!-- Right: Live Duration (e.g. 02:42) in #FF453A -->
-                    <TextBlock x:Name="CompactRecordingDurationText"
-                               Grid.Column="2"
-                               Text="00:00"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="#FF453A"
-                               VerticalAlignment="Center"
-                               Margin="0,0,4,0" />
+                    <!-- Right: Live Duration (e.g. 02:42) in #FF453A and Privacy Indicators -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                        <TextBlock x:Name="CompactRecordingDurationText"
+                                   Text="00:00"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="#FF453A"
+                                   VerticalAlignment="Center" />
+                        <StackPanel x:Name="VoicePrivacyPanel"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="8,0,0,0"
+                                    Visibility="Collapsed">
+                            <Border x:Name="VoiceCameraDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#30D158"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="VoiceMicDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#FF9F0A"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
                 </Grid>
 
                 <!-- 11. Screen Recording Mode: Matches media_1794687755340_89cff412.png -->
@@ -692,24 +844,53 @@
                     <!-- Center: Camera Notch Space -->
                     <Grid Grid.Column="1" />
 
-                    <!-- Right: Stop Recording Button (Red circle with square stop symbol) -->
-                    <Border Grid.Column="2"
-                            Width="30" Height="30"
-                            CornerRadius="15"
-                            Background="#22FF453A"
-                            BorderBrush="#55FF453A"
-                            BorderThickness="1.5"
-                            VerticalAlignment="Center"
-                            Cursor="Hand"
-                            ToolTip="Stop Screen Recording"
-                            MouseDown="ScreenRecordingStop_MouseDown">
-                        <!-- Red Square Stop Icon -->
-                        <Border Width="10" Height="10"
-                                CornerRadius="2.5"
-                                Background="#FF453A"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center" />
-                    </Border>
+                    <!-- Right: Stop Recording Button and Privacy Indicators -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="30" Height="30"
+                                CornerRadius="15"
+                                Background="#22FF453A"
+                                BorderBrush="#55FF453A"
+                                BorderThickness="1.5"
+                                VerticalAlignment="Center"
+                                Cursor="Hand"
+                                ToolTip="Stop Screen Recording"
+                                MouseDown="ScreenRecordingStop_MouseDown">
+                            <!-- Red Square Stop Icon -->
+                            <Border Width="10" Height="10"
+                                    CornerRadius="2.5"
+                                    Background="#FF453A"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel x:Name="ScreenRecPrivacyPanel"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="8,0,0,0"
+                                    Visibility="Collapsed">
+                            <Border x:Name="ScreenRecCameraDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#30D158"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="ScreenRecMicDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#FF9F0A"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
                 </Grid>
 
                 <!-- 12. Night Mode Alert Mode (Orange Crescent Moon) -->
@@ -1475,8 +1656,9 @@
             <!-- Privacy Indicator Lights (Camera = Green, Microphone = Orange) in the Notch -->
             <StackPanel x:Name="PrivacyIndicatorPanel"
                         Orientation="Horizontal"
-                        HorizontalAlignment="Center"
+                        HorizontalAlignment="Right"
                         VerticalAlignment="Center"
+                        Margin="0,0,16,0"
                         IsHitTestVisible="False"
                         Visibility="Collapsed"
                         Opacity="0.0">

@@ -157,35 +157,52 @@ public partial class MainWindow : Window
         _isNightModeAlertActive ||
         _isChargingAlertActive;
 
+    private bool _isCameraActive = false;
+    private bool _isMicrophoneActive = false;
+
+    private double PrivacyIndicatorExtraWidth
+    {
+        get
+        {
+            if (!_isPrivacyIndicatorActive) return 0.0;
+            if (_isCameraActive && _isMicrophoneActive) return 30.0;
+            return 18.0;
+        }
+    }
+
     private double CurrentCompactHeight => IsScreenRecordingActive ? CompactScreenRecordingHeight : CompactHeight;
 
     private double CurrentCompactWidth
     {
         get
         {
-            if (_isAlarmActive) return CompactAlarmWidth;
-            if (_isBluetoothAlertActive) return CompactBluetoothWidth;
-            if (_isPowerModeAlertActive)
+            double baseWidth;
+            if (_isAlarmActive) baseWidth = CompactAlarmWidth;
+            else if (_isBluetoothAlertActive) baseWidth = CompactBluetoothWidth;
+            else if (_isPowerModeAlertActive)
             {
-                return _activePowerMode switch
+                baseWidth = _activePowerMode switch
                 {
                     WindowsPowerMode.BestPowerEfficiency => CompactPowerEfficiencyWidth,
                     WindowsPowerMode.BestPerformance => CompactPowerPerformanceWidth,
                     _ => CompactPowerBalancedWidth
                 };
             }
-            if (_isUnlockAlertActive) return CompactUnlockWidth;
-            if (_isSilentRingAlertActive) return CompactSilentRingWidth;
-            if (_isDndAlertActive) return CompactDndWidth;
-            if (_isNightModeAlertActive) return CompactNightModeWidth;
-            if (_isChargingAlertActive) return CompactChargingWidth;
-            if (_isNotificationAlertActive && _currentNotification != null) return CompactNotificationWidth;
-            if (IsScreenRecordingActive) return CompactScreenRecordingWidth;
-            if (IsVoiceRecordingActive) return CompactRecordingWidth;
-            if (IsAnyTimerActive && IsMusicActive) return CompactSplitLeadingWidth;
-            if (IsAnyTimerActive) return CompactTimerWidth;
-            if (IsMusicActive) return CompactMediaWidth;
-            return CompactDefaultWidth;
+            else if (_isUnlockAlertActive) baseWidth = CompactUnlockWidth;
+            else if (_isSilentRingAlertActive) baseWidth = CompactSilentRingWidth;
+            else if (_isDndAlertActive) baseWidth = CompactDndWidth;
+            else if (_isNightModeAlertActive) baseWidth = CompactNightModeWidth;
+            else if (_isChargingAlertActive) baseWidth = CompactChargingWidth;
+            else if (_isNotificationAlertActive && _currentNotification != null) baseWidth = CompactNotificationWidth;
+            else if (IsScreenRecordingActive) baseWidth = CompactScreenRecordingWidth;
+            else if (IsVoiceRecordingActive) baseWidth = CompactRecordingWidth;
+            else if (IsAnyTimerActive && IsMusicActive) baseWidth = CompactSplitLeadingWidth;
+            else if (IsAnyTimerActive) baseWidth = CompactTimerWidth;
+            else if (IsMusicActive) baseWidth = CompactMediaWidth;
+            else if (_isPrivacyIndicatorActive) baseWidth = CompactDefaultWidth + 10.0;
+            else baseWidth = CompactDefaultWidth;
+
+            return baseWidth + PrivacyIndicatorExtraWidth;
         }
     }
 
@@ -837,6 +854,13 @@ public partial class MainWindow : Window
 
     private void OnIslandMouseDown(object sender, MouseButtonEventArgs e)
     {
+        if (e.ChangedButton == MouseButton.Right && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+        {
+            e.Handled = true;
+            _privacyService.CycleSimulation();
+            return;
+        }
+
         if (e.LeftButton == MouseButtonState.Pressed && !_isExpanded)
         {
             // User explicit requirement: "no need to expand for sound recording, timer, screen recording... it should just show in the notch..."
@@ -3002,6 +3026,7 @@ public partial class MainWindow : Window
         }
 
         UpdateNightModePillVisibility();
+        UpdatePrivacyIndicatorsUI(_isCameraActive, _isMicrophoneActive);
 
         if (!_isExpanded)
         {
@@ -3050,31 +3075,84 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            bool anyActive = isCameraInUse || isMicInUse;
-            _isPrivacyIndicatorActive = anyActive;
-
-            CameraPrivacyDot.Visibility = isCameraInUse ? Visibility.Visible : Visibility.Collapsed;
-            MicPrivacyDot.Visibility = isMicInUse ? Visibility.Visible : Visibility.Collapsed;
-
-            if (anyActive)
-            {
-                PrivacyIndicatorPanel.Visibility = Visibility.Visible;
-                var anim = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(180));
-                PrivacyIndicatorPanel.BeginAnimation(OpacityProperty, anim);
-            }
-            else
-            {
-                var anim = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(180));
-                anim.Completed += (s, e) =>
-                {
-                    if (!_isPrivacyIndicatorActive)
-                    {
-                        PrivacyIndicatorPanel.Visibility = Visibility.Collapsed;
-                    }
-                };
-                PrivacyIndicatorPanel.BeginAnimation(OpacityProperty, anim);
-            }
+            UpdatePrivacyIndicatorsUI(isCameraInUse, isMicInUse);
         });
+    }
+
+    private void UpdatePrivacyIndicatorsUI(bool isCameraInUse, bool isMicInUse)
+    {
+        bool anyActive = isCameraInUse || isMicInUse;
+        _isPrivacyIndicatorActive = anyActive;
+        _isCameraActive = isCameraInUse;
+        _isMicrophoneActive = isMicInUse;
+
+        Visibility camVis = isCameraInUse ? Visibility.Visible : Visibility.Collapsed;
+        Visibility micVis = isMicInUse ? Visibility.Visible : Visibility.Collapsed;
+        Visibility anyVis = anyActive ? Visibility.Visible : Visibility.Collapsed;
+
+        // 1. Media View: Equalizer shifts to the left, privacy dots sit on the right
+        MediaPrivacyPanel.Visibility = anyVis;
+        MediaCameraDot.Visibility = camVis;
+        MediaMicDot.Visibility = micVis;
+
+        // 2. Split Leading Media View
+        SplitPrivacyPanel.Visibility = anyVis;
+        SplitCameraDot.Visibility = camVis;
+        SplitMicDot.Visibility = micVis;
+
+        // 3. Voice Recording View
+        VoicePrivacyPanel.Visibility = anyVis;
+        VoiceCameraDot.Visibility = camVis;
+        VoiceMicDot.Visibility = micVis;
+
+        // 4. Screen Recording View
+        ScreenRecPrivacyPanel.Visibility = anyVis;
+        ScreenRecCameraDot.Visibility = camVis;
+        ScreenRecMicDot.Visibility = micVis;
+
+        // 5. Live Timer View
+        TimerPrivacyPanel.Visibility = anyVis;
+        TimerCameraDot.Visibility = camVis;
+        TimerMicDot.Visibility = micVis;
+
+        // 6. Clock View
+        ClockPrivacyPanel.Visibility = anyVis;
+        ClockCameraDot.Visibility = camVis;
+        ClockMicDot.Visibility = micVis;
+
+        // 7. Standalone Notch Privacy Panel (for idle/blank notch when no specific view is showing)
+        bool isBlankNotch = !IsMusicActive && !IsVoiceRecordingActive && !IsScreenRecordingActive && !IsAnyTimerActive &&
+                            !_isAlarmActive && !_isBluetoothAlertActive && !_isPowerModeAlertActive &&
+                            !_isChargingAlertActive && !_isNotificationAlertActive && !_isUnlockAlertActive &&
+                            !_isSilentRingAlertActive && !_isDndAlertActive && !_isNightModeAlertActive &&
+                            CompactClockView.Visibility != Visibility.Visible;
+
+        PrivacyIndicatorPanel.Visibility = (anyActive && isBlankNotch) ? Visibility.Visible : Visibility.Collapsed;
+        CameraPrivacyDot.Visibility = camVis;
+        MicPrivacyDot.Visibility = micVis;
+
+        if (anyActive && isBlankNotch)
+        {
+            var anim = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(180));
+            PrivacyIndicatorPanel.BeginAnimation(OpacityProperty, anim);
+        }
+        else if (!anyActive)
+        {
+            var anim = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(180));
+            PrivacyIndicatorPanel.BeginAnimation(OpacityProperty, anim);
+        }
+
+        // Animate dock width to smoothly expand/contract
+        if (!_isExpanded)
+        {
+            AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
+        }
+    }
+
+    private void MediaPrivacyPanel_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _privacyService.CycleSimulation();
     }
 
     private void MainWindow_KeyDown(object sender, KeyEventArgs e)

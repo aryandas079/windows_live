@@ -47,7 +47,7 @@ public partial class MainWindow : Window
     private const double CompactSilentRingWidth = 200.0;
     private const double CompactDndWidth = 240.0;
     private const double CompactNightModeWidth = 240.0;
-    private const double CompactAlarmWidth = 250.0;
+    private const double CompactAlarmWidth = 130.0;
     private const double CompactBluetoothWidth = 230.0;
     private const double ExpandedBluetoothWidth = 450.0;
     private const double ExpandedBluetoothHeight = 68.0;
@@ -1608,6 +1608,17 @@ public partial class MainWindow : Window
         });
     }
 
+    private void CompactAlarmView_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        uint? nid = _alarmService.ActiveNotificationId;
+        _alarmService.Dismiss();
+        if (nid.HasValue)
+        {
+            _notificationService.Dismiss(nid.Value);
+        }
+    }
+
     private void OnAlarmSnoozeStarted(TimeSpan duration)
     {
         Dispatcher.Invoke(() =>
@@ -1628,28 +1639,6 @@ public partial class MainWindow : Window
             };
             timer.Start();
         });
-    }
-
-    private void CompactAlarmSnoozeBtn_Click(object sender, RoutedEventArgs e)
-    {
-        e.Handled = true;
-        uint? nid = _alarmService.ActiveNotificationId;
-        _alarmService.Snooze(9);
-        if (nid.HasValue)
-        {
-            _notificationService.Dismiss(nid.Value);
-        }
-    }
-
-    private void CompactAlarmDismissBtn_Click(object sender, RoutedEventArgs e)
-    {
-        e.Handled = true;
-        uint? nid = _alarmService.ActiveNotificationId;
-        _alarmService.Dismiss();
-        if (nid.HasValue)
-        {
-            _notificationService.Dismiss(nid.Value);
-        }
     }
 
     private void StartAlarmWiggleAnimation()
@@ -2915,6 +2904,18 @@ public partial class MainWindow : Window
                 if (_isExpanded && _activeCategory == IslandCategory.AppNotification)
                 {
                     CollapseDock();
+                }
+            }
+
+            // If an alarm is ringing and its notification was dismissed from Windows Action Center or banner, dismiss the alarm in dock
+            if (_isAlarmActive && _alarmService.ActiveNotificationId.HasValue)
+            {
+                uint alarmNotifId = _alarmService.ActiveNotificationId.Value;
+                bool stillPresent = _notificationService.ActiveNotifications.Any(n => n.Id == alarmNotifId);
+                if (!stillPresent)
+                {
+                    App.Log($"Alarm notification {alarmNotifId} is no longer present in Windows notifications; dismissing dock alarm.");
+                    _alarmService.Dismiss();
                 }
             }
 

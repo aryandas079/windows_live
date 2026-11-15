@@ -113,6 +113,11 @@ public class VoiceRecordingService
 
     #endregion
 
+    private IAudioMeterInformation? _cachedMeter;
+    private readonly object _meterLock = new();
+    private bool _isSimulated = false;
+    private double _simPhase = 0.0;
+
     public VoiceRecordingService()
     {
         _pollTimer = new DispatcherTimer
@@ -125,37 +130,145 @@ public class VoiceRecordingService
     public void Start()
     {
         App.Log("VoiceRecordingService started");
+        EnsureMeterInitialized();
         PollMicrophoneState();
         _pollTimer.Start();
     }
 
-    private void PollMicrophoneState()
+    public void SimulateToggle()
+    {
+        _isSimulated = !_isSimulated;
+        if (_isSimulated)
+        {
+            _isRecording = true;
+            _recordingStartTime = DateTime.Now;
+            _activeAppName = "Voice Recorder";
+            RecordingStateChanged?.Invoke(new VoiceRecordingInfo
+            {
+                IsRecording = true,
+                Duration = TimeSpan.Zero,
+                PeakLevel = 0.5f,
+                AppName = _activeAppName
+            });
+        }
+        else
+        {
+            _isRecording = false;
+            RecordingStateChanged?.Invoke(new VoiceRecordingInfo
+            {
+                IsRecording = false,
+                Duration = TimeSpan.Zero,
+                PeakLevel = 0f,
+                AppName = _activeAppName
+            });
+        }
+    }
+
+    public float GetCurrentPeak()
+    {
+        if (_isSimulated)
+        {
+            _simPhase += 0.22;
+            // Simulated speech envelope with active bursts and natural pauses
+            double burst = Math.Sin(_simPhase * 1.8) * Math.Sin(_simPhase * 0.45);
+            return (float)Math.Clamp(Math.Abs(burst) * 0.85, 0.08, 0.95);
+        }
+
+        lock (_meterLock)
+        {
+            if (_cachedMeter == null)
+            {
+                EnsureMeterInitialized();
+            }
+
+            if (_cachedMeter != null)
+            {
+                try
+                {
+                    int hr = _cachedMeter.GetPeakValue(out float peak);
+                    if (hr == 0 && peak >= 0f)
+                    {
+                        if (peak > 0f) _lastPeak = peak;
+                        return peak;
+                    }
+                }
+                catch { }
+            }
+            return _lastPeak;
+        }
+    }
+
+    private static IMMDeviceEnumerator? CreateEnumerator()
     {
         try
         {
+            Type? enumType = Type.GetTypeFromCLSID(new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E"));
+            if (enumType == null) return null;
+            return Activator.CreateInstance(enumType) as IMMDeviceEnumerator;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void EnsureMeterInitialized()
+    {
+        lock (_meterLock)
+        {
+            if (_cachedMeter != null) return;
+            try
+            {
+                var enumerator = CreateEnumerator();
+                if (enumerator == null) return;
+                // eCapture = 1, eConsole = 0
+                int hr = enumerator.GetDefaultAudioEndpoint(1, 0, out IMMDevice dev);
+                if (hr == 0 && dev != null)
+                {
+                    var meterGuid = new Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064");
+                    hr = dev.Activate(ref meterGuid, 1, IntPtr.Zero, out object meterObj);
+                    if (hr == 0 && meterObj is IAudioMeterInformation meter)
+                    {
+                        _cachedMeter = meter;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"VoiceRecordingService EnsureMeterInitialized: {ex.Message}");
+            }
+        }
+    }
+
+    private void PollMicrophoneState()
+    {
+        if (_isSimulated)
+        {
+            TimeSpan simDur = DateTime.Now - _recordingStartTime;
+            RecordingStateChanged?.Invoke(new VoiceRecordingInfo
+            {
+                IsRecording = true,
+                Duration = simDur,
+                PeakLevel = GetCurrentPeak(),
+                AppName = _activeAppName
+            });
+            return;
+        }
+
+        try
+        {
             bool anySessionActive = false;
-            float currentPeak = 0f;
+            float currentPeak = GetCurrentPeak();
             string detectedApp = "Microphone";
 
-            Type? enumType = Type.GetTypeFromCLSID(new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E"));
-            if (enumType == null) return;
-            var enumerator = Activator.CreateInstance(enumType) as IMMDeviceEnumerator;
+            var enumerator = CreateEnumerator();
             if (enumerator == null) return;
 
             // eCapture = 1, eConsole = 0
             int hr = enumerator.GetDefaultAudioEndpoint(1, 0, out IMMDevice dev);
             if (hr == 0 && dev != null)
             {
-                // 1. Read real-time mic meter level
-                var meterGuid = new Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064");
-                dev.Activate(ref meterGuid, 1, IntPtr.Zero, out object meterObj);
-                if (meterObj is IAudioMeterInformation meter)
-                {
-                    meter.GetPeakValue(out currentPeak);
-                    _lastPeak = currentPeak;
-                }
-
-                // 2. Read capture sessions to detect active recording streams
+                // Read capture sessions to detect active recording streams
                 var smGuid = new Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F");
                 dev.Activate(ref smGuid, 1, IntPtr.Zero, out object smObj);
                 if (smObj is IAudioSessionManager2 sm)
@@ -243,19 +356,27 @@ public class VoiceRecordingService
                     SafeRelease(se);
                 }
                 SafeRelease(smObj);
-                SafeRelease(meterObj);
                 SafeRelease(dev);
             }
             SafeRelease(enumerator);
 
-            // Also check if SoundRec process is actively recording
+            // Also check if SoundRec or VoiceRecorder process is open
             if (!anySessionActive)
             {
                 var soundRecs = Process.GetProcessesByName("SoundRec");
-                if (soundRecs.Length > 0 && currentPeak > 0.0001f)
+                if (soundRecs.Length > 0)
                 {
                     anySessionActive = true;
                     detectedApp = "Voice Recorder";
+                }
+                else
+                {
+                    var voiceRecs = Process.GetProcessesByName("VoiceRecorder");
+                    if (voiceRecs.Length > 0)
+                    {
+                        anySessionActive = true;
+                        detectedApp = "Voice Recorder";
+                    }
                 }
             }
 

@@ -1307,6 +1307,10 @@ public partial class MainWindow : Window
             {
                 _bluetoothService.SimulateConnection("AirPods", 85);
             }
+            else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                _voiceRecordingService.SimulateToggle();
+            }
             else if (_isAlarmActive)
             {
                 _alarmService.Dismiss();
@@ -2068,20 +2072,92 @@ public partial class MainWindow : Window
         });
     }
 
-    private static readonly double[] BaseWaveHeights = { 4, 8, 14, 12, 6, 13, 16, 12, 8, 4, 7, 11, 4 };
-    private double _wavePhase = 0;
+    private static readonly double[] BaseWaveProfile = { 4.5, 7.5, 13.0, 11.0, 6.0, 13.5, 17.0, 13.0, 7.5, 4.5, 8.0, 12.0, 4.5 };
+    private static readonly double[] BarSensitivity = { 0.65, 0.85, 1.25, 1.15, 0.75, 1.30, 1.45, 1.30, 0.85, 0.60, 0.95, 1.20, 0.60 };
 
-    private void AnimateRecordingWaveform(float peak)
+    private readonly double[] _currentRecBarHeights = new double[13] { 4.5, 7.5, 13.0, 11.0, 6.0, 13.5, 17.0, 13.0, 7.5, 4.5, 8.0, 12.0, 4.5 };
+    private readonly double[] _targetRecBarHeights = new double[13] { 4.5, 7.5, 13.0, 11.0, 6.0, 13.5, 17.0, 13.0, 7.5, 4.5, 8.0, 12.0, 4.5 };
+    private double _recWavePhase = 0.0;
+    private double _voiceEnergyEnvelope = 0.0;
+    private DispatcherTimer? _recordingWaveformTimer;
+
+    private void StartRecordingWaveformAnimation()
     {
-        _wavePhase += 0.35;
-        double factor = Math.Clamp(peak * 2.5, 0.25, 1.0);
+        if (_recordingWaveformTimer == null)
+        {
+            _recordingWaveformTimer = new DispatcherTimer(DispatcherPriority.Render)
+            {
+                Interval = TimeSpan.FromMilliseconds(25) // ~40 FPS high-refresh render loop
+            };
+            _recordingWaveformTimer.Tick += OnRecordingWaveformTick;
+        }
+
+        if (!_recordingWaveformTimer.IsEnabled)
+        {
+            _recordingWaveformTimer.Start();
+        }
+    }
+
+    private void StopRecordingWaveformAnimation()
+    {
+        _recordingWaveformTimer?.Stop();
+    }
+
+    private void OnRecordingWaveformTick(object? sender, EventArgs e)
+    {
+        if (!IsVoiceRecordingActive)
+        {
+            StopRecordingWaveformAnimation();
+            return;
+        }
+
+        // 1. Fetch instantaneous microphone audio peak directly with microseconds latency
+        float rawPeak = _voiceRecordingService.GetCurrentPeak();
+
+        // 2. Square-root expansion for authentic natural human voice dynamic range
+        double voiceEnergy = Math.Sqrt(Math.Clamp(rawPeak * 3.8, 0.0, 1.0));
+
+        // Fast attack / smooth release envelope follower
+        if (voiceEnergy > _voiceEnergyEnvelope)
+        {
+            _voiceEnergyEnvelope += (voiceEnergy - _voiceEnergyEnvelope) * 0.75; // Fast rise
+        }
+        else
+        {
+            _voiceEnergyEnvelope += (voiceEnergy - _voiceEnergyEnvelope) * 0.16; // Smooth audio release
+        }
+
+        // 3. Increment phase for traveling harmonic ripples
+        _recWavePhase += 0.18;
+
         Border[] bars = { RecBar1, RecBar2, RecBar3, RecBar4, RecBar5, RecBar6, RecBar7, RecBar8, RecBar9, RecBar10, RecBar11, RecBar12, RecBar13 };
-        
+
         for (int i = 0; i < bars.Length; i++)
         {
-            double waveMod = 0.75 + 0.25 * Math.Sin(_wavePhase + i * 0.6);
-            double targetH = Math.Max(3.0, BaseWaveHeights[i] * factor * waveMod);
-            bars[i].Height = targetH;
+            // Organic multi-harmonic wave: living ripple across the pill so bars are never flat dots
+            double wave = Math.Sin(_recWavePhase + i * 0.52) * 0.65 + Math.Sin(_recWavePhase * 1.8 + i * 0.95) * 0.35;
+            double ambientH = BaseWaveProfile[i] * (0.75 + 0.35 * wave);
+
+            // Spikes: surge upward when voice energy is detected, modulated per-bar
+            double spikeMod = 0.8 + 0.4 * Math.Sin(_recWavePhase * 2.2 + i * 0.7);
+            double spikeBonus = _voiceEnergyEnvelope * 13.5 * BarSensitivity[i] * spikeMod;
+
+            double targetH = Math.Clamp(ambientH + spikeBonus, 3.5, 26.0);
+            _targetRecBarHeights[i] = targetH;
+
+            // Liquid spring interpolation: fast attack, smooth decay
+            double delta = _targetRecBarHeights[i] - _currentRecBarHeights[i];
+            if (delta > 0)
+            {
+                _currentRecBarHeights[i] += delta * 0.60;
+            }
+            else
+            {
+                _currentRecBarHeights[i] += delta * 0.25;
+            }
+
+            double finalH = Math.Clamp(_currentRecBarHeights[i], 3.5, 26.0);
+            bars[i].Height = finalH;
         }
     }
 
@@ -2101,10 +2177,11 @@ public partial class MainWindow : Window
                 RecordingDurationSubtext.Text = $"{durStr} recorded";
                 RecordingAppNameText.Text = $"{info.AppName} Recording";
 
-                AnimateRecordingWaveform(info.PeakLevel);
+                StartRecordingWaveformAnimation();
             }
             else
             {
+                StopRecordingWaveformAnimation();
                 if (_isExpanded && _activeCategory == IslandCategory.VoiceRecording)
                 {
                     CollapseDock();

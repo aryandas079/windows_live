@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Linq;
 using System.Windows.Threading;
@@ -25,6 +26,10 @@ public class PrivacyIndicatorService
     private bool _simulatedMicrophone = false;
     private bool _wasapiMicActive = false;
 
+    private EventLogWatcher? _camEventWatcher;
+    private DateTime _lastCameraEventTime = DateTime.MinValue;
+    private readonly object _camLock = new();
+
     private static readonly string[] WebcamPaths =
     {
         @"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\webcam",
@@ -43,13 +48,14 @@ public class PrivacyIndicatorService
 
         _pollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(300)
+            Interval = TimeSpan.FromMilliseconds(250)
         };
         _pollTimer.Tick += (s, e) => PollPrivacyStatus();
     }
 
     public void Start()
     {
+        StartCameraEventWatcher();
         PollPrivacyStatus();
         _pollTimer.Start();
         App.Log("PrivacyIndicatorService started.");
@@ -58,6 +64,111 @@ public class PrivacyIndicatorService
     public void Stop()
     {
         _pollTimer.Stop();
+        try
+        {
+            if (_camEventWatcher != null)
+            {
+                _camEventWatcher.Enabled = false;
+                _camEventWatcher.Dispose();
+                _camEventWatcher = null;
+            }
+        }
+        catch { }
+    }
+
+    private void StartCameraEventWatcher()
+    {
+        try
+        {
+            CheckInitialCameraEvent();
+
+            var query = new EventLogQuery("Microsoft-Windows-MF-FrameServer/Camera_FrameServer", PathType.LogName, "*");
+            _camEventWatcher = new EventLogWatcher(query);
+            _camEventWatcher.EventRecordWritten += (s, e) =>
+            {
+                try
+                {
+                    if (e.EventRecord?.TimeCreated != null)
+                    {
+                        lock (_camLock)
+                        {
+                            _lastCameraEventTime = DateTime.UtcNow;
+                        }
+                        _dispatcher.InvokeAsync(PollPrivacyStatus);
+                    }
+                }
+                catch { }
+            };
+            _camEventWatcher.Enabled = true;
+            App.Log("PrivacyIndicatorService: Camera_FrameServer EventLogWatcher enabled successfully.");
+        }
+        catch (Exception ex)
+        {
+            App.Log($"PrivacyIndicatorService: EventLogWatcher start warning: {ex.Message}");
+        }
+    }
+
+    private void CheckInitialCameraEvent()
+    {
+        try
+        {
+            string query = "*[System[(Level=4 or Level=0)]]";
+            var logQuery = new EventLogQuery("Microsoft-Windows-MF-FrameServer/Camera_FrameServer", PathType.LogName, query)
+            {
+                ReverseDirection = true
+            };
+            using var reader = new EventLogReader(logQuery);
+            var record = reader.ReadEvent();
+            if (record != null && record.TimeCreated.HasValue)
+            {
+                var diff = DateTime.UtcNow - record.TimeCreated.Value.ToUniversalTime();
+                if (diff.TotalSeconds < 3.0)
+                {
+                    lock (_camLock)
+                    {
+                        _lastCameraEventTime = DateTime.UtcNow;
+                    }
+                }
+            }
+        }
+        catch { }
+    }
+
+    private bool IsCameraStreamingFromFrameServer()
+    {
+        lock (_camLock)
+        {
+            if ((DateTime.UtcNow - _lastCameraEventTime).TotalSeconds < 3.0)
+            {
+                return true;
+            }
+        }
+
+        try
+        {
+            string query = "*[System[(Level=4 or Level=0)]]";
+            var logQuery = new EventLogQuery("Microsoft-Windows-MF-FrameServer/Camera_FrameServer", PathType.LogName, query)
+            {
+                ReverseDirection = true
+            };
+            using var reader = new EventLogReader(logQuery);
+            var record = reader.ReadEvent();
+            if (record != null && record.TimeCreated.HasValue)
+            {
+                var diff = DateTime.UtcNow - record.TimeCreated.Value.ToUniversalTime();
+                if (diff.TotalSeconds < 3.0)
+                {
+                    lock (_camLock)
+                    {
+                        _lastCameraEventTime = DateTime.UtcNow;
+                    }
+                    return true;
+                }
+            }
+        }
+        catch { }
+
+        return false;
     }
 
     /// <summary>
@@ -97,14 +208,17 @@ public class PrivacyIndicatorService
     {
         try
         {
+            bool cameraStreaming = IsCameraStreamingFromFrameServer();
             bool cameraProcessActive = IsCameraAppActive();
-            bool cameraInUse = _simulatedCamera || cameraProcessActive || CheckRegistryStore(WebcamPaths);
+            bool cameraInUse = _simulatedCamera || cameraStreaming || cameraProcessActive || CheckRegistryStore(WebcamPaths);
             bool micInUse = _simulatedMicrophone || _wasapiMicActive || CheckRegistryStore(MicPaths);
 
             if (cameraInUse != IsCameraInUse || micInUse != IsMicrophoneInUse)
             {
                 IsCameraInUse = cameraInUse;
                 IsMicrophoneInUse = micInUse;
+
+                App.Log($"PrivacyIndicatorService StateChanged: Camera={IsCameraInUse}, Mic={IsMicrophoneInUse}");
 
                 _dispatcher.Invoke(() =>
                 {

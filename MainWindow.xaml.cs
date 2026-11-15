@@ -144,7 +144,8 @@ public partial class MainWindow : Window
         IsAnyTimerActive ||
         IsMusicActive ||
         _isChargingAlertActive ||
-        _isNotificationAlertActive;
+        _isNotificationAlertActive ||
+        _isPrivacyIndicatorActive;
 
     private bool HasActiveAlert =>
         _isPowerModeAlertActive ||
@@ -155,7 +156,8 @@ public partial class MainWindow : Window
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
         _isNightModeAlertActive ||
-        _isChargingAlertActive;
+        _isChargingAlertActive ||
+        _isPrivacyIndicatorActive;
 
     private bool _isCameraActive = false;
     private bool _isMicrophoneActive = false;
@@ -3242,6 +3244,11 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
+            if (isCameraInUse || isMicInUse)
+            {
+                ShowDockSmooth();
+                WindowHelper.EnsureTopMost(this);
+            }
             UpdatePrivacyIndicatorsUI(isCameraInUse, isMicInUse);
         });
     }
@@ -3307,6 +3314,10 @@ public partial class MainWindow : Window
         {
             var anim = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(180));
             PrivacyIndicatorPanel.BeginAnimation(OpacityProperty, anim);
+            if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
+            {
+                HideDockSmooth();
+            }
         }
 
         // Animate dock width to smoothly expand/contract

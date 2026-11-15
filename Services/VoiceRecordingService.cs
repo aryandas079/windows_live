@@ -360,26 +360,6 @@ public class VoiceRecordingService
             }
             SafeRelease(enumerator);
 
-            // Also check if SoundRec or VoiceRecorder process is open
-            if (!anySessionActive)
-            {
-                var soundRecs = Process.GetProcessesByName("SoundRec");
-                if (soundRecs.Length > 0)
-                {
-                    anySessionActive = true;
-                    detectedApp = "Voice Recorder";
-                }
-                else
-                {
-                    var voiceRecs = Process.GetProcessesByName("VoiceRecorder");
-                    if (voiceRecs.Length > 0)
-                    {
-                        anySessionActive = true;
-                        detectedApp = "Voice Recorder";
-                    }
-                }
-            }
-
             if (anySessionActive)
             {
                 if (!_isRecording)

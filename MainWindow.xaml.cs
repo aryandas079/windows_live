@@ -145,7 +145,7 @@ public partial class MainWindow : Window
         IsMusicActive ||
         _isChargingAlertActive ||
         _isNotificationAlertActive ||
-        _isPrivacyIndicatorActive;
+        (_isPrivacyIndicatorActive && _appStateTracker?.CurrentState != ForegroundAppState.FullScreen);
 
     private bool HasActiveAlert =>
         _isPowerModeAlertActive ||
@@ -157,7 +157,7 @@ public partial class MainWindow : Window
         _isDndAlertActive ||
         _isNightModeAlertActive ||
         _isChargingAlertActive ||
-        _isPrivacyIndicatorActive;
+        (_isPrivacyIndicatorActive && _appStateTracker?.CurrentState != ForegroundAppState.FullScreen);
 
     private bool _isCameraActive = false;
     private bool _isMicrophoneActive = false;
@@ -575,6 +575,14 @@ public partial class MainWindow : Window
             switch (state)
             {
                 case ForegroundAppState.FullScreen:
+                    // In FullScreen mode, privacy indicator and dock must not appear
+                    TopEdgeHotspot.Visibility = Visibility.Visible;
+                    if (!IslandContainer.IsMouseOver)
+                    {
+                        HideDockSmooth();
+                    }
+                    break;
+
                 case ForegroundAppState.Maximized:
                     // Hotspot active in notch area for hovering popout
                     TopEdgeHotspot.Visibility = Visibility.Visible;
@@ -1880,21 +1888,13 @@ public partial class MainWindow : Window
 
             ClearTemporaryAlerts();
 
-            // Set built-in Windows device icon (headset or smartphone)
-            var icon = GetBluetoothDeviceIcon(dev.DeviceKind);
-            if (icon != null)
-            {
-                CompactBluetoothDeviceIcon.Source = icon;
-                ExpandedBluetoothDeviceIcon.Source = icon;
-            }
-
-            // Populate compact glimpse UI (Windows device icon + device name)
+            // Populate compact glimpse UI (white Bluetooth icon + device name)
             CompactBluetoothDeviceName.Text = dev.Name;
             CompactBluetoothDeviceName.Visibility = Visibility.Visible;
 
-            // Populate expanded UI (Windows device icon + "Connected" + "[Device] ready to use" + Battery Ring)
+            // Populate expanded UI (white Bluetooth icon + "Connected" + "[Device] ready to use" + Battery Cell)
             ExpandedBluetoothTitleText.Text = $"{dev.Name} ready to use";
-            UpdateBluetoothBatteryArc(dev.BatteryPercent);
+            UpdateBluetoothBatteryCell(dev.BatteryPercent);
 
             // Play the smooth 2-tone chime
             BluetoothWatcherService.PlayConnectionChime();
@@ -1948,7 +1948,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private void UpdateBluetoothBatteryArc(int percent)
+    private void UpdateBluetoothBatteryCell(int percent)
     {
         int clamped = Math.Clamp(percent, 0, 100);
         string percentStr = $"{clamped}%";
@@ -1956,70 +1956,27 @@ public partial class MainWindow : Window
         CompactBluetoothBatteryPercentText.Text = percentStr;
 
         // Dynamic battery colors: Red (<=10%), Amber (<=20%), Green (>20%)
-        SolidColorBrush strokeBrush;
+        SolidColorBrush fillBrush;
         if (clamped <= 10)
         {
-            strokeBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x3A));
+            fillBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x3A));
         }
         else if (clamped <= 20)
         {
-            strokeBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x0A));
+            fillBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x0A));
         }
         else
         {
-            strokeBrush = new SolidColorBrush(Color.FromRgb(0x30, 0xD1, 0x58));
+            fillBrush = new SolidColorBrush(Color.FromRgb(0x30, 0xD1, 0x58));
         }
 
-        BluetoothBatteryArc.Stroke = strokeBrush;
-        ExpandedBluetoothBatteryPercentText.Foreground = strokeBrush;
+        ExpandedBluetoothBatteryPercentText.Foreground = fillBrush;
+        ExpandedBluetoothBatteryFill.Background = fillBrush;
+        ExpandedBluetoothBatteryFill.Width = Math.Max(2.5, (clamped / 100.0) * 22.0);
 
-        CompactBluetoothBatteryArc.Stroke = strokeBrush;
-        CompactBluetoothBatteryPercentText.Foreground = strokeBrush;
-
-        if (clamped <= 0)
-        {
-            BluetoothBatteryArc.Data = null;
-            CompactBluetoothBatteryArc.Data = null;
-            return;
-        }
-
-        // Expanded Arc (Grid 44x44, Center 21, 21, Radius 17.5)
-        BluetoothBatteryArc.Data = CreateArcGeometry(21.0, 21.0, 17.5, clamped);
-
-        // Compact Arc (Grid 28x28, Center 14, 14, Radius 11.0)
-        CompactBluetoothBatteryArc.Data = CreateArcGeometry(14.0, 14.0, 11.0, clamped);
-    }
-
-    private static Geometry CreateArcGeometry(double cx, double cy, double r, double clamped)
-    {
-        double startAngle = -90.0; // 12 o'clock
-        double sweepAngle = (clamped / 100.0) * 360.0;
-        if (sweepAngle >= 360.0) sweepAngle = 359.99;
-
-        double endAngleRad = (startAngle + sweepAngle) * Math.PI / 180.0;
-        double startX = cx;
-        double startY = cy - r;
-        double endX = cx + r * Math.Cos(endAngleRad);
-        double endY = cy + r * Math.Sin(endAngleRad);
-
-        bool isLargeArc = sweepAngle > 180.0;
-
-        var geometry = new PathGeometry();
-        var figure = new PathFigure
-        {
-            StartPoint = new Point(startX, startY),
-            IsClosed = false,
-            IsFilled = false
-        };
-        figure.Segments.Add(new ArcSegment
-        {
-            Point = new Point(endX, endY),
-            Size = new Size(r, r),
-            SweepDirection = SweepDirection.Clockwise,
-            IsLargeArc = isLargeArc
-        });
-        geometry.Figures.Add(figure);
-        return geometry;
+        CompactBluetoothBatteryPercentText.Foreground = fillBrush;
+        CompactBluetoothBatteryFill.Background = fillBrush;
+        CompactBluetoothBatteryFill.Width = Math.Max(2.0, (clamped / 100.0) * 18.0);
     }
 
     private void CompactBluetoothView_MouseDown(object sender, MouseButtonEventArgs e)
@@ -3246,8 +3203,12 @@ public partial class MainWindow : Window
         {
             if (isCameraInUse || isMicInUse)
             {
-                ShowDockSmooth();
-                WindowHelper.EnsureTopMost(this);
+                // In FullScreen mode, privacy indicator and dock must not appear
+                if (_appStateTracker.CurrentState != ForegroundAppState.FullScreen)
+                {
+                    ShowDockSmooth();
+                    WindowHelper.EnsureTopMost(this);
+                }
             }
             UpdatePrivacyIndicatorsUI(isCameraInUse, isMicInUse);
         });

@@ -1124,13 +1124,18 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Built-in Windows Device Icon + Connected Device Name -->
+                    <!-- Left: White Bluetooth Icon + Connected Device Name -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Image x:Name="CompactBluetoothDeviceIcon"
-                               Width="22" Height="22"
-                               Stretch="Uniform"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0" />
+                        <Viewbox Width="12" Height="16" VerticalAlignment="Center" Margin="0,0,7,0">
+                            <Canvas Width="22" Height="24">
+                                <Path Data="M 5.5,17.5 L 16.5,6.5 L 11,1 L 11,23 L 16.5,17.5 L 5.5,6.5"
+                                      Stroke="#FFFFFF"
+                                      StrokeThickness="2.2"
+                                      StrokeLineJoin="Round"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Viewbox>
                         <TextBlock x:Name="CompactBluetoothDeviceName"
                                    Text=""
                                    FontSize="13"
@@ -1142,21 +1147,37 @@
                     <!-- Center Gap -->
                     <Grid Grid.Column="1" />
 
-                    <!-- Right: Circular Battery Progress Ring with Battery Percentage inside -->
-                    <Grid Grid.Column="2" Width="28" Height="28" VerticalAlignment="Center">
-                        <!-- Dark Background Track -->
-                        <Ellipse Width="26" Height="26" Stroke="#16381C" StrokeThickness="2.6" Fill="Transparent" />
-                        <!-- Circular Battery Progress Arc (Green #30D158) -->
-                        <Path x:Name="CompactBluetoothBatteryArc" Stroke="#30D158" StrokeThickness="2.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                        <!-- Center Battery Percentage Text (e.g. "100%" or "85%") -->
+                    <!-- Right: Battery Cell Indicator (Percentage + Battery Cell Icon) -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,2,0">
                         <TextBlock x:Name="CompactBluetoothBatteryPercentText"
                                    Text="100%"
-                                   FontSize="8.5"
-                                   FontWeight="Bold"
+                                   FontSize="11.5"
+                                   FontWeight="SemiBold"
                                    Foreground="#30D158"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Grid>
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,5,0" />
+                        <!-- Battery Cell Shell -->
+                        <Border Width="22" Height="11.5"
+                                CornerRadius="3"
+                                BorderBrush="#7C7C80"
+                                BorderThickness="1.2"
+                                Background="Transparent"
+                                VerticalAlignment="Center">
+                            <Border x:Name="CompactBluetoothBatteryFill"
+                                    Height="7.5"
+                                    CornerRadius="1.5"
+                                    Background="#30D158"
+                                    HorizontalAlignment="Left"
+                                    Margin="1,0,0,0"
+                                    Width="18" />
+                        </Border>
+                        <!-- Positive Terminal Nub (+) -->
+                        <Border Width="1.5" Height="4"
+                                CornerRadius="0.8"
+                                Background="#7C7C80"
+                                VerticalAlignment="Center"
+                                Margin="0.8,0,0,0" />
+                    </StackPanel>
                 </Grid>
             </Grid>
 
@@ -1594,13 +1615,20 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Left: Built-in Windows Device Icon -->
-                        <Image x:Name="ExpandedBluetoothDeviceIcon"
-                               Grid.Column="0"
-                               Width="38" Height="38"
-                               Stretch="Uniform"
-                               VerticalAlignment="Center"
-                               Margin="0,0,16,0" />
+                        <!-- Left: White Bluetooth Icon -->
+                        <Viewbox Grid.Column="0"
+                                 Width="22" Height="28"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0,16,0">
+                            <Canvas Width="22" Height="24">
+                                <Path Data="M 5.5,17.5 L 16.5,6.5 L 11,1 L 11,23 L 16.5,17.5 L 5.5,6.5"
+                                      Stroke="#FFFFFF"
+                                      StrokeThickness="2.2"
+                                      StrokeLineJoin="Round"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Viewbox>
 
                         <!-- Middle: "Connected" + "[DeviceName] ready to use" -->
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -1616,21 +1644,37 @@
                                        Foreground="#FFFFFF" />
                         </StackPanel>
 
-                        <!-- Right: Circular Green Battery Gauge (Matches Photo 2) -->
-                        <Grid Grid.Column="2" Width="44" Height="44" VerticalAlignment="Center" Margin="10,0,4,0">
-                            <!-- Dark Green Background Track -->
-                            <Ellipse Width="42" Height="42" Stroke="#16381C" StrokeThickness="3.5" Fill="Transparent" />
-                            <!-- Green Progress Arc (85%) -->
-                            <Path x:Name="BluetoothBatteryArc" Stroke="#30D158" StrokeThickness="3.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                            <!-- Center Battery Percentage Text -->
+                        <!-- Right: Battery Cell Indicator (Percentage + Battery Cell Icon) -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,4,0">
                             <TextBlock x:Name="ExpandedBluetoothBatteryPercentText"
-                                       Text="85%"
-                                       FontSize="14.5"
-                                       FontWeight="Bold"
+                                       Text="100%"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
                                        Foreground="#30D158"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center" />
-                        </Grid>
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
+                            <!-- Battery Cell Shell -->
+                            <Border Width="28" Height="14"
+                                    CornerRadius="3.5"
+                                    BorderBrush="#8E8E93"
+                                    BorderThickness="1.5"
+                                    Background="Transparent"
+                                    VerticalAlignment="Center">
+                                <Border x:Name="ExpandedBluetoothBatteryFill"
+                                        Height="9"
+                                        CornerRadius="1.8"
+                                        Background="#30D158"
+                                        HorizontalAlignment="Left"
+                                        Margin="1.5,0,0,0"
+                                        Width="22" />
+                            </Border>
+                            <!-- Positive Terminal Nub (+) -->
+                            <Border Width="2" Height="5.5"
+                                    CornerRadius="1"
+                                    Background="#8E8E93"
+                                    VerticalAlignment="Center"
+                                    Margin="1,0,0,0" />
+                        </StackPanel>
                     </Grid>
 
                 </Grid>

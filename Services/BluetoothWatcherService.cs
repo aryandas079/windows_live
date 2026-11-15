@@ -168,17 +168,17 @@ public class BluetoothWatcherService
         string cleanName = CleanDeviceName(name);
         var kind = DetectDeviceKind(cleanName);
 
-        int battery = -1;
-        if (info.Properties.TryGetValue("{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2", out var bVal))
-        {
-            if (bVal is byte bByte) battery = bByte;
-            else if (bVal is int bInt) battery = bInt;
-            else if (bVal is short bShort) battery = bShort;
-        }
+        // Always query BtBatteryReader first for the most accurate, live battery percentage (e.g. from BTHLE or newest timestamp)
+        int battery = BtBatteryReader.GetBattery(cleanName);
 
         if (battery <= 0 || battery > 100)
         {
-            battery = BtBatteryReader.GetBattery(cleanName);
+            if (info.Properties.TryGetValue("{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2", out var bVal))
+            {
+                if (bVal is byte bByte) battery = bByte;
+                else if (bVal is int bInt) battery = bInt;
+                else if (bVal is short bShort) battery = bShort;
+            }
         }
 
         if (battery <= 0 || battery > 100)
@@ -383,13 +383,16 @@ internal static class BtBatteryReader
     private const uint SPDRP_FRIENDLYNAME = 0x0000000C;
 
     private static readonly PROPERTYKEY BatteryPropertyKey = new(new Guid("104EA319-6EE2-4701-BD47-8DDBF425BBE5"), 2);
+    private static readonly PROPERTYKEY BatteryTimestampKey = new(new Guid("104EA319-6EE2-4701-BD47-8DDBF425BBE5"), 7);
 
     public static int GetBattery(string searchPattern)
     {
         try
         {
-            string[] enumerators = { "BTHENUM", "BTHLE", "BTH" };
-            int lastFound = -1;
+            // Scan BTHLE first (Low Energy / modern smartphones and earbuds), then BTHENUM, then BTH
+            string[] enumerators = { "BTHLE", "BTHENUM", "BTH" };
+            int bestBattery = -1;
+            DateTime bestTime = DateTime.MinValue;
 
             foreach (var enumerator in enumerators)
             {
@@ -416,6 +419,11 @@ internal static class BtBatteryReader
                         string name = sbName.ToString();
                         string instId = sbId.ToString();
 
+                        if (!Matches(searchPattern, name, instId))
+                        {
+                            continue;
+                        }
+
                         uint propType, reqSize;
                         var key = BatteryPropertyKey;
                         SetupDiGetDeviceProperty(hDevInfo, ref devInfoData, ref key, out propType, IntPtr.Zero, 0, out reqSize, 0);
@@ -430,10 +438,38 @@ internal static class BtBatteryReader
                                     byte val = Marshal.ReadByte(buf);
                                     if (val > 0 && val <= 100)
                                     {
-                                        lastFound = val;
-                                        if (Matches(searchPattern, name, instId))
+                                        DateTime updateTime = DateTime.MinValue;
+
+                                        // Read timestamp (PID 7) if present
+                                        var timeKey = BatteryTimestampKey;
+                                        uint tPropType, tReqSize;
+                                        SetupDiGetDeviceProperty(hDevInfo, ref devInfoData, ref timeKey, out tPropType, IntPtr.Zero, 0, out tReqSize, 0);
+                                        if (tReqSize == 8)
                                         {
-                                            return val;
+                                            IntPtr tBuf = Marshal.AllocHGlobal(8);
+                                            try
+                                            {
+                                                uint tWritten;
+                                                if (SetupDiGetDeviceProperty(hDevInfo, ref devInfoData, ref timeKey, out tPropType, tBuf, 8, out tWritten, 0))
+                                                {
+                                                    long ft = Marshal.ReadInt64(tBuf);
+                                                    if (ft > 0)
+                                                    {
+                                                        updateTime = DateTime.FromFileTimeUtc(ft);
+                                                    }
+                                                }
+                                            }
+                                            finally
+                                            {
+                                                Marshal.FreeHGlobal(tBuf);
+                                            }
+                                        }
+
+                                        // Choose the freshest timestamp or initial valid value
+                                        if (updateTime > bestTime || bestBattery == -1)
+                                        {
+                                            bestBattery = val;
+                                            bestTime = updateTime;
                                         }
                                     }
                                 }
@@ -451,7 +487,7 @@ internal static class BtBatteryReader
                 }
             }
 
-            return lastFound;
+            return bestBattery;
         }
         catch (Exception ex)
         {
@@ -463,17 +499,22 @@ internal static class BtBatteryReader
     private static bool Matches(string searchPattern, string name, string instId)
     {
         if (string.IsNullOrWhiteSpace(searchPattern)) return true;
-        if (name.IndexOf(searchPattern, StringComparison.OrdinalIgnoreCase) >= 0 ||
-            instId.IndexOf(searchPattern, StringComparison.OrdinalIgnoreCase) >= 0)
+
+        string normSearch = searchPattern.Replace("’", "'").Trim();
+        string normName = name.Replace("’", "'").Trim();
+        string normId = instId.Replace("’", "'").Trim();
+
+        if (normName.IndexOf(normSearch, StringComparison.OrdinalIgnoreCase) >= 0 ||
+            normId.IndexOf(normSearch, StringComparison.OrdinalIgnoreCase) >= 0)
         {
             return true;
         }
 
-        var parts = searchPattern.Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
+        var parts = normSearch.Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (var p in parts)
         {
-            if (p.Length >= 3 && (name.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                  instId.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0))
+            if (p.Length >= 3 && (normName.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                  normId.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0))
             {
                 return true;
             }

@@ -65,6 +65,8 @@ public partial class MainWindow : Window
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
 
+    private bool _isExplicitExit = false;
+
     private bool _isChargingAlertActive = false;
     private bool _isNotificationAlertActive = false;
     private bool _isUnlockAlertActive = false;
@@ -526,8 +528,10 @@ public partial class MainWindow : Window
                 }
             };
 
-            // Listen for Windows device unlock events
+            // Listen for Windows device unlock, power mode (sleep/wake), and display settings change events
             Microsoft.Win32.SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
+            Microsoft.Win32.SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
+            Microsoft.Win32.SystemEvents.DisplaySettingsChanged += SystemEvents_DisplaySettingsChanged;
 
             // Aggressive Topmost Enforcement: keeps dock stubbornly above all other windows
             _topMostTimer = new DispatcherTimer
@@ -551,7 +555,19 @@ public partial class MainWindow : Window
                 WindowHelper.MakeToolWindow(this);
             };
             Loaded += OnLoaded;
-            Closing += (s, e) => App.Log($"MainWindow Closing: Cancel={e.Cancel}");
+            Closing += (s, e) =>
+            {
+                if (!_isExplicitExit)
+                {
+                    e.Cancel = true;
+                    CollapseDock();
+                    App.Log("MainWindow Closing prevented - dock continues running persistently in background");
+                }
+                else
+                {
+                    App.Log($"MainWindow Closing: Cancel={e.Cancel}");
+                }
+            };
             Closed += (s, e) => App.Log("MainWindow Closed");
             PositionWindow();
 
@@ -2155,9 +2171,38 @@ public partial class MainWindow : Window
         {
             Dispatcher.Invoke(() =>
             {
+                PositionWindow();
+                WindowHelper.EnsureTopMost(this);
                 TriggerUnlockAnimation();
             });
         }
+    }
+
+    private void SystemEvents_PowerModeChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+    {
+        App.Log($"SystemEvents_PowerModeChanged: Mode={e.Mode}");
+        if (e.Mode == Microsoft.Win32.PowerModes.Resume)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                App.Log("Waking from sleep / power resume: refreshing layout, window position and services");
+                PositionWindow();
+                WindowHelper.EnsureTopMost(this);
+                UpdateClock();
+                OnPowerStatusChanged();
+                UpdateCompactViewVisibility();
+            });
+        }
+    }
+
+    private void SystemEvents_DisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            App.Log("DisplaySettingsChanged: re-aligning dock to primary monitor");
+            PositionWindow();
+            WindowHelper.EnsureTopMost(this);
+        });
     }
 
     public void TriggerUnlockAnimation()

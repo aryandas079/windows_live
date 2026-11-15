@@ -91,6 +91,15 @@ public partial class App : Application
         {
             base.OnStartup(e);
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            // Ensure app autostarts on Windows boot, login, restart, and shutdown
+            Services.AutoStartService.EnsureAutoStartRegistered();
+
+            SessionEnding += (s, args) =>
+            {
+                Log($"App.SessionEnding: Reason={args.ReasonSessionEnding}");
+            };
+
             Log("Creating MainWindow...");
 
             var win = new MainWindow();

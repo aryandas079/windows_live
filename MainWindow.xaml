@@ -611,6 +611,68 @@
                                VerticalAlignment="Center"
                                Margin="0,0,4,0" />
                 </Grid>
+
+                <!-- 11. Screen Recording Mode: Matches media_1794687755340_89cff412.png -->
+                <Grid x:Name="CompactScreenRecordingView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="14,0,14,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Red Dot + Live Duration on Top Row, "Screen Recording" on Bottom Row -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <!-- Top Row: Red recording indicator dot + Live Duration (e.g. "🔴 0:01" in red) -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,1.5">
+                            <!-- Live Pulsing Red Dot -->
+                            <Ellipse x:Name="ScreenRecPulseDot"
+                                     Width="8" Height="8"
+                                     Fill="#FF453A"
+                                     Margin="0,0,6,0"
+                                     VerticalAlignment="Center" />
+                            <!-- Live Elapsed Duration Text in Red -->
+                            <TextBlock x:Name="CompactScreenRecDurationText"
+                                       Text="0:00"
+                                       FontSize="12.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="#FF453A"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <!-- Bottom Row: Clean White Text "Screen Recording" -->
+                        <TextBlock x:Name="CompactScreenRecTitleText"
+                                   Text="Screen Recording"
+                                   FontSize="13.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="#FFFFFF"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Center: Camera Notch Space -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Stop Recording Button (Red circle with square stop symbol) -->
+                    <Border Grid.Column="2"
+                            Width="30" Height="30"
+                            CornerRadius="15"
+                            Background="#22FF453A"
+                            BorderBrush="#55FF453A"
+                            BorderThickness="1.5"
+                            VerticalAlignment="Center"
+                            Cursor="Hand"
+                            ToolTip="Stop Screen Recording"
+                            MouseDown="ScreenRecordingStop_MouseDown">
+                        <!-- Red Square Stop Icon -->
+                        <Border Width="10" Height="10"
+                                CornerRadius="2.5"
+                                Background="#FF453A"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center" />
+                    </Border>
+                </Grid>
             </Grid>
 
             <!-- ============================================== -->
@@ -1088,6 +1150,45 @@
 
                         <Border Grid.Column="2" Background="#22FF453A" CornerRadius="12" Padding="10,4,10,4" VerticalAlignment="Center">
                             <TextBlock Text="RECORDING" FontSize="11" FontWeight="Bold" Foreground="#FF453A" />
+                        </Border>
+                    </Grid>
+
+                    <!-- ============================================== -->
+                    <!-- 11. SCREEN RECORDING EXPANDED MODE             -->
+                    <!-- ============================================== -->
+                    <Grid x:Name="ViewScreenRecording" Visibility="Collapsed" VerticalAlignment="Center" Margin="4,8,4,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Screen Recording Red Badge -->
+                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="22" Background="#22FF453A" BorderBrush="#44FF453A" BorderThickness="1.5" Margin="0,0,12,0">
+                            <ui:SymbolIcon Symbol="Video24" FontSize="20" Foreground="#FF453A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="ScreenRecAppNameText" Text="Screen Recording Active" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock x:Name="ScreenRecDurationSubtext" Text="0:00 recorded" FontSize="12" Foreground="#FF453A" Margin="0,3,0,0" />
+                        </StackPanel>
+
+                        <!-- Red Stop Button -->
+                        <Border Grid.Column="2"
+                                Width="36" Height="36"
+                                CornerRadius="18"
+                                Background="#22FF453A"
+                                BorderBrush="#55FF453A"
+                                BorderThickness="1.5"
+                                VerticalAlignment="Center"
+                                Cursor="Hand"
+                                ToolTip="Stop Screen Recording"
+                                MouseDown="ScreenRecordingStop_MouseDown">
+                            <Border Width="12" Height="12"
+                                    CornerRadius="3"
+                                    Background="#FF453A"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center" />
                         </Border>
                     </Grid>
 

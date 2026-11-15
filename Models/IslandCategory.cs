@@ -12,5 +12,6 @@ public enum IslandCategory
     LiveClipboard,
     WindowSnapping,
     TimerQuickSet,
-    VoiceRecording
+    VoiceRecording,
+    ScreenRecording
 }

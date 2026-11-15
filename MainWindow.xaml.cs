@@ -48,6 +48,8 @@ public partial class MainWindow : Window
     private const double CompactDndWidth = 240.0;
     private const double CompactTimerWidth = 240.0;
     private const double CompactRecordingWidth = 230.0;
+    private const double CompactScreenRecordingWidth = 240.0;
+    private const double CompactScreenRecordingHeight = 48.0;
     private const double CompactSplitLeadingWidth = 126.0;
     private const double DetachedBubbleWidth = 52.0;
     private const double DetachedBubbleGap = 12.0;
@@ -68,10 +70,12 @@ public partial class MainWindow : Window
     private readonly FocusAssistWatcherService _focusAssistService;
     private readonly WindowsClockWatcherService _windowsClockService;
     private readonly VoiceRecordingService _voiceRecordingService;
+    private readonly ScreenRecordingService _screenRecordingService;
     private bool _lastMuteState = false;
     private bool _muteStateInitialized = false;
 
     private bool IsVoiceRecordingActive => _voiceRecordingService?.IsRecording ?? false;
+    private bool IsScreenRecordingActive => _screenRecordingService?.IsRecording ?? false;
 
     private bool IsAnyTimerActive =>
         _focusService.IsRunning ||
@@ -95,6 +99,7 @@ public partial class MainWindow : Window
         !_isDndAlertActive &&
         !_isChargingAlertActive &&
         !_isNotificationAlertActive &&
+        !IsScreenRecordingActive &&
         !IsVoiceRecordingActive &&
         IsAnyTimerActive &&
         IsMusicActive;
@@ -103,11 +108,14 @@ public partial class MainWindow : Window
         _isUnlockAlertActive ||
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
+        IsScreenRecordingActive ||
         IsVoiceRecordingActive ||
         IsAnyTimerActive ||
         IsMusicActive ||
         _isChargingAlertActive ||
         _isNotificationAlertActive;
+
+    private double CurrentCompactHeight => IsScreenRecordingActive ? CompactScreenRecordingHeight : CompactHeight;
 
     private double CurrentCompactWidth
     {
@@ -118,6 +126,7 @@ public partial class MainWindow : Window
             if (_isDndAlertActive) return CompactDndWidth;
             if (_isChargingAlertActive) return CompactChargingWidth;
             if (_isNotificationAlertActive && _currentNotification != null) return CompactNotificationWidth;
+            if (IsScreenRecordingActive) return CompactScreenRecordingWidth;
             if (IsVoiceRecordingActive) return CompactRecordingWidth;
             if (IsAnyTimerActive && IsMusicActive) return CompactSplitLeadingWidth;
             if (IsAnyTimerActive) return CompactTimerWidth;
@@ -150,6 +159,7 @@ public partial class MainWindow : Window
             _focusAssistService = new FocusAssistWatcherService();
             _windowsClockService = new WindowsClockWatcherService();
             _voiceRecordingService = new VoiceRecordingService();
+            _screenRecordingService = new ScreenRecordingService();
 
             _mediaManager.TrackChanged += OnTrackChanged;
             _volumeManager.VolumeChanged += OnVolumeChanged;
@@ -166,6 +176,8 @@ public partial class MainWindow : Window
             _windowsClockService.Start();
             _voiceRecordingService.RecordingStateChanged += OnVoiceRecordingStateChanged;
             _voiceRecordingService.Start();
+            _screenRecordingService.RecordingStateChanged += OnScreenRecordingStateChanged;
+            _screenRecordingService.Start();
 
             _clockTimer = new DispatcherTimer
             {
@@ -498,8 +510,16 @@ public partial class MainWindow : Window
         UpdateClock();
         OnPowerStatusChanged();
         IslandContainer.Width = CurrentCompactWidth;
-        IslandContainer.Height = CompactHeight;
+        IslandContainer.Height = CurrentCompactHeight;
         _volumeManager.PollVolumeState(forceNotify: true);
+
+        // Breathing/pulsing red recording dot animation
+        var pulse = new DoubleAnimation(1.0, 0.25, TimeSpan.FromMilliseconds(700))
+        {
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+        ScreenRecPulseDot.BeginAnimation(OpacityProperty, pulse);
         OnTrackChanged(_mediaManager.CurrentTrack);
         _ = _notificationService.StartAsync();
 
@@ -605,9 +625,9 @@ public partial class MainWindow : Window
         IslandContainer.Cursor = HasActiveContent ? Cursors.Hand : Cursors.Arrow;
         if (!_isExpanded)
         {
-            // Only expand on hover if there is live content to interact with (voice recording, active timer or music active/paused)
+            // Only expand on hover if there is live content to interact with (screen recording, voice recording, active timer or music active/paused)
             // Notifications only show once on arrival and NEVER re-open on hover after disappearing
-            if (IsVoiceRecordingActive || IsAnyTimerActive || IsMusicActive)
+            if (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive || IsMusicActive)
             {
                 ExpandDock();
             }
@@ -654,6 +674,10 @@ public partial class MainWindow : Window
             // By default hovering the split island expands to the music player
             _activeCategory = IslandCategory.MediaPlayback;
         }
+        else if (IsScreenRecordingActive)
+        {
+            _activeCategory = IslandCategory.ScreenRecording;
+        }
         else if (IsVoiceRecordingActive)
         {
             _activeCategory = IslandCategory.VoiceRecording;
@@ -699,7 +723,7 @@ public partial class MainWindow : Window
         // Restore non-activating window mode when collapsing
         WindowHelper.SetActivationEnabled(this, false);
 
-        AnimateIsland(CurrentCompactWidth, CompactHeight);
+        AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
 
         // Restore shadow effect in case charging green pulse was active
         IslandShadowEffect.Color = _themeService.IsDarkTheme ? Colors.Black : Color.FromArgb(255, 60, 60, 70);
@@ -800,6 +824,7 @@ public partial class MainWindow : Window
         ViewWindowSnapping.Visibility = _activeCategory == IslandCategory.WindowSnapping ? Visibility.Visible : Visibility.Collapsed;
         ViewTimerQuickSet.Visibility = _activeCategory == IslandCategory.TimerQuickSet ? Visibility.Visible : Visibility.Collapsed;
         ViewVoiceRecording.Visibility = _activeCategory == IslandCategory.VoiceRecording ? Visibility.Visible : Visibility.Collapsed;
+        ViewScreenRecording.Visibility = _activeCategory == IslandCategory.ScreenRecording ? Visibility.Visible : Visibility.Collapsed;
 
         if (_isExpanded)
         {
@@ -1528,6 +1553,39 @@ public partial class MainWindow : Window
         });
     }
 
+    private void OnScreenRecordingStateChanged(ScreenRecordingInfo info)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (info.IsRecording)
+            {
+                int totalMins = (int)info.Duration.TotalMinutes;
+                int secs = info.Duration.Seconds;
+                string durStr = info.Duration.Hours > 0
+                    ? $"{info.Duration.Hours}:{info.Duration.Minutes:D2}:{secs:D2}"
+                    : $"{totalMins}:{secs:D2}";
+
+                CompactScreenRecDurationText.Text = durStr;
+                ScreenRecDurationSubtext.Text = $"{durStr} recorded";
+                ScreenRecAppNameText.Text = $"{info.AppName} Active";
+            }
+            else
+            {
+                if (_isExpanded && _activeCategory == IslandCategory.ScreenRecording)
+                {
+                    CollapseDock();
+                }
+            }
+            UpdateCompactViewVisibility();
+        });
+    }
+
+    private void ScreenRecordingStop_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _screenRecordingService.StopActiveRecording();
+    }
+
     private void OnClipboardTextChanged(string text)
     {
         Dispatcher.Invoke(() =>
@@ -1778,6 +1836,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             CompactUnlockView.Visibility = Visibility.Visible;
         }
         else if (_isSilentRingAlertActive)
@@ -1790,6 +1849,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Visible;
         }
         else if (_isDndAlertActive)
@@ -1802,6 +1862,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Visible;
         }
         else if (_isChargingAlertActive)
@@ -1814,6 +1875,7 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Visible;
         }
         else if (_isNotificationAlertActive && _currentNotification != null)
@@ -1826,7 +1888,22 @@ public partial class MainWindow : Window
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Visible;
+        }
+        else if (IsScreenRecordingActive)
+        {
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Visible;
         }
         else if (IsVoiceRecordingActive)
         {
@@ -1839,6 +1916,7 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Visible;
         }
         else if (IsSplitActive)
@@ -1855,6 +1933,7 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Visible;
         }
         else if (IsAnyTimerActive)
@@ -1868,6 +1947,7 @@ public partial class MainWindow : Window
             CompactMediaView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Visible;
         }
         else if (IsMusicActive)
@@ -1881,6 +1961,7 @@ public partial class MainWindow : Window
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Visible;
         }
         else
@@ -1896,11 +1977,12 @@ public partial class MainWindow : Window
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
         }
 
         if (!_isExpanded)
         {
-            AnimateIsland(CurrentCompactWidth, CompactHeight);
+            AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
         }
     }
 

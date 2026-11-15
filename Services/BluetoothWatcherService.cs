@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Media;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using Windows.Devices.Bluetooth;
@@ -9,10 +11,18 @@ using Windows.Devices.Enumeration;
 
 namespace WindowsLive.Services;
 
+public enum BluetoothDeviceKind
+{
+    AudioHeadset,
+    Smartphone,
+    Generic
+}
+
 public class BluetoothDeviceInfo
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = "Audio Device";
+    public BluetoothDeviceKind DeviceKind { get; set; } = BluetoothDeviceKind.AudioHeadset;
     public int BatteryPercent { get; set; } = 85;
     public bool IsConnected { get; set; } = true;
     public DateTime ConnectedTime { get; set; } = DateTime.Now;
@@ -132,6 +142,21 @@ public class BluetoothWatcherService
         }
     }
 
+    public static BluetoothDeviceKind DetectDeviceKind(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return BluetoothDeviceKind.AudioHeadset;
+        string lower = name.ToLowerInvariant();
+        if (lower.Contains("phone") || lower.Contains("iphone") || lower.Contains("galaxy") ||
+            lower.Contains("pixel") || lower.Contains("android") || lower.Contains("redmi") ||
+            lower.Contains("xiaomi") || lower.Contains("oneplus") || lower.Contains("oppo") ||
+            lower.Contains("vivo") || lower.Contains("realme") || lower.Contains("huawei") ||
+            lower.Contains("motorola") || lower.Contains("moto") || lower.Contains("samsung"))
+        {
+            return BluetoothDeviceKind.Smartphone;
+        }
+        return BluetoothDeviceKind.AudioHeadset;
+    }
+
     private void HandleDeviceConnected(DeviceInformation info)
     {
         string name = info.Name;
@@ -140,7 +165,10 @@ public class BluetoothWatcherService
             return;
         }
 
-        int battery = 85;
+        string cleanName = CleanDeviceName(name);
+        var kind = DetectDeviceKind(cleanName);
+
+        int battery = -1;
         if (info.Properties.TryGetValue("{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2", out var bVal))
         {
             if (bVal is byte bByte) battery = bByte;
@@ -148,16 +176,27 @@ public class BluetoothWatcherService
             else if (bVal is short bShort) battery = bShort;
         }
 
+        if (battery <= 0 || battery > 100)
+        {
+            battery = BtBatteryReader.GetBattery(cleanName);
+        }
+
+        if (battery <= 0 || battery > 100)
+        {
+            battery = 85;
+        }
+
         var dev = new BluetoothDeviceInfo
         {
             Id = info.Id,
-            Name = CleanDeviceName(name),
+            Name = cleanName,
+            DeviceKind = kind,
             BatteryPercent = Math.Clamp(battery, 1, 100),
             IsConnected = true,
             ConnectedTime = DateTime.Now
         };
 
-        App.Log($"Bluetooth device connected: Name='{dev.Name}', Battery={dev.BatteryPercent}%");
+        App.Log($"Bluetooth device connected: Name='{dev.Name}', Kind={dev.DeviceKind}, Battery={dev.BatteryPercent}%");
 
         _dispatcher.Invoke(() =>
         {
@@ -279,16 +318,167 @@ public class BluetoothWatcherService
     /// <summary>
     /// For instant testing / debugging: simulates a Bluetooth connection event.
     /// </summary>
-    public void SimulateConnection(string name = "AirPods", int battery = 85)
+    public void SimulateConnection(string name = "Buds T110", int? battery = null)
     {
+        int batteryLevel = battery ?? BtBatteryReader.GetBattery(name);
+        if (batteryLevel <= 0 || batteryLevel > 100) batteryLevel = 85;
+
         var dev = new BluetoothDeviceInfo
         {
             Id = "simulated_" + Guid.NewGuid().ToString("N"),
             Name = name,
-            BatteryPercent = battery,
+            DeviceKind = DetectDeviceKind(name),
+            BatteryPercent = batteryLevel,
             IsConnected = true,
             ConnectedTime = DateTime.Now
         };
+        App.Log($"SimulateConnection: Name='{dev.Name}', Kind={dev.DeviceKind}, Battery={dev.BatteryPercent}%");
         DeviceConnected?.Invoke(dev);
+    }
+}
+
+internal static class BtBatteryReader
+{
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PROPERTYKEY
+    {
+        public Guid fmtid;
+        public uint pid;
+        public PROPERTYKEY(Guid guid, uint id)
+        {
+            fmtid = guid;
+            pid = id;
+        }
+    }
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr SetupDiGetClassDevs(IntPtr classGuid, string? enumerator, IntPtr hwndParent, uint flags);
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool SetupDiEnumDeviceInfo(IntPtr deviceInfoSet, uint memberIndex, ref SP_DEVINFO_DATA deviceInfoData);
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool SetupDiGetDeviceProperty(IntPtr deviceInfoSet, ref SP_DEVINFO_DATA deviceInfoData, ref PROPERTYKEY propertyKey, out uint propertyType, IntPtr propertyBuffer, uint propertyBufferSize, out uint requiredSize, uint flags);
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool SetupDiGetDeviceRegistryProperty(IntPtr deviceInfoSet, ref SP_DEVINFO_DATA deviceInfoData, uint property, out uint propertyRegDataType, StringBuilder propertyBuffer, uint propertyBufferSize, out uint requiredSize);
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool SetupDiGetDeviceInstanceId(IntPtr deviceInfoSet, ref SP_DEVINFO_DATA deviceInfoData, StringBuilder deviceInstanceId, uint deviceInstanceIdSize, out uint requiredSize);
+
+    [DllImport("setupapi.dll", SetLastError = true)]
+    private static extern bool SetupDiDestroyDeviceInfoList(IntPtr deviceInfoSet);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SP_DEVINFO_DATA
+    {
+        public uint cbSize;
+        public Guid ClassGuid;
+        public uint DevInst;
+        public IntPtr Reserved;
+    }
+
+    private const uint DIGCF_PRESENT = 0x00000002;
+    private const uint DIGCF_ALLCLASSES = 0x00000004;
+    private const uint SPDRP_FRIENDLYNAME = 0x0000000C;
+
+    private static readonly PROPERTYKEY BatteryPropertyKey = new(new Guid("104EA319-6EE2-4701-BD47-8DDBF425BBE5"), 2);
+
+    public static int GetBattery(string searchPattern)
+    {
+        try
+        {
+            string[] enumerators = { "BTHENUM", "BTHLE", "BTH" };
+            int lastFound = -1;
+
+            foreach (var enumerator in enumerators)
+            {
+                IntPtr hDevInfo = SetupDiGetClassDevs(IntPtr.Zero, enumerator, IntPtr.Zero, DIGCF_PRESENT | DIGCF_ALLCLASSES);
+                if (hDevInfo == IntPtr.Zero || hDevInfo == (IntPtr)(-1)) continue;
+
+                try
+                {
+                    var devInfoData = new SP_DEVINFO_DATA();
+                    devInfoData.cbSize = (uint)Marshal.SizeOf(devInfoData);
+
+                    uint memberIndex = 0;
+                    while (SetupDiEnumDeviceInfo(hDevInfo, memberIndex, ref devInfoData))
+                    {
+                        memberIndex++;
+
+                        uint dummyType, dummySize;
+                        var sbName = new StringBuilder(256);
+                        SetupDiGetDeviceRegistryProperty(hDevInfo, ref devInfoData, SPDRP_FRIENDLYNAME, out dummyType, sbName, (uint)sbName.Capacity, out dummySize);
+
+                        var sbId = new StringBuilder(512);
+                        SetupDiGetDeviceInstanceId(hDevInfo, ref devInfoData, sbId, (uint)sbId.Capacity, out dummySize);
+
+                        string name = sbName.ToString();
+                        string instId = sbId.ToString();
+
+                        uint propType, reqSize;
+                        var key = BatteryPropertyKey;
+                        SetupDiGetDeviceProperty(hDevInfo, ref devInfoData, ref key, out propType, IntPtr.Zero, 0, out reqSize, 0);
+                        if (reqSize > 0)
+                        {
+                            IntPtr buf = Marshal.AllocHGlobal((int)reqSize);
+                            try
+                            {
+                                uint written;
+                                if (SetupDiGetDeviceProperty(hDevInfo, ref devInfoData, ref key, out propType, buf, reqSize, out written, 0))
+                                {
+                                    byte val = Marshal.ReadByte(buf);
+                                    if (val > 0 && val <= 100)
+                                    {
+                                        lastFound = val;
+                                        if (Matches(searchPattern, name, instId))
+                                        {
+                                            return val;
+                                        }
+                                    }
+                                }
+                            }
+                            finally
+                            {
+                                Marshal.FreeHGlobal(buf);
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    SetupDiDestroyDeviceInfoList(hDevInfo);
+                }
+            }
+
+            return lastFound;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"BtBatteryReader error: {ex.Message}");
+            return -1;
+        }
+    }
+
+    private static bool Matches(string searchPattern, string name, string instId)
+    {
+        if (string.IsNullOrWhiteSpace(searchPattern)) return true;
+        if (name.IndexOf(searchPattern, StringComparison.OrdinalIgnoreCase) >= 0 ||
+            instId.IndexOf(searchPattern, StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return true;
+        }
+
+        var parts = searchPattern.Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var p in parts)
+        {
+            if (p.Length >= 3 && (name.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                  instId.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

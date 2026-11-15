@@ -253,6 +253,7 @@ public partial class MainWindow : Window
             _bluetoothService.DeviceConnected += OnBluetoothDeviceConnected;
             _bluetoothService.DeviceDisconnected += OnBluetoothDeviceDisconnected;
             _bluetoothService.Start();
+            SetupBluetoothTestTriggerWatcher();
             _powerModeService = new PowerModeWatcherService();
             _powerModeService.PowerModeChanged += OnPowerModeChanged;
             _powerModeService.Start();
@@ -854,10 +855,40 @@ public partial class MainWindow : Window
 
     private void OnIslandMouseDown(object sender, MouseButtonEventArgs e)
     {
+        if (e.ChangedButton == MouseButton.Middle)
+        {
+            e.Handled = true;
+            _simBtToggle = !_simBtToggle;
+            if (_simBtToggle)
+            {
+                _bluetoothService.SimulateConnection("Buds T110");
+            }
+            else
+            {
+                _bluetoothService.SimulateConnection("Aryan's iPhone", 60);
+            }
+            return;
+        }
+
         if (e.ChangedButton == MouseButton.Right && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
         {
             e.Handled = true;
             _privacyService.CycleSimulation();
+            return;
+        }
+
+        if (e.ChangedButton == MouseButton.Right && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            e.Handled = true;
+            _simBtToggle = !_simBtToggle;
+            if (_simBtToggle)
+            {
+                _bluetoothService.SimulateConnection("Buds T110");
+            }
+            else
+            {
+                _bluetoothService.SimulateConnection("Aryan's iPhone", 60);
+            }
             return;
         }
 
@@ -1426,7 +1457,15 @@ public partial class MainWindow : Window
         if (e.ChangedButton == MouseButton.Middle)
         {
             e.Handled = true;
-            _bluetoothService.SimulateConnection("AirPods", 85);
+            _simBtToggle = !_simBtToggle;
+            if (_simBtToggle)
+            {
+                _bluetoothService.SimulateConnection("Buds T110");
+            }
+            else
+            {
+                _bluetoothService.SimulateConnection("Aryan's iPhone", 60);
+            }
         }
         else if (e.ChangedButton == MouseButton.Right)
         {
@@ -1437,7 +1476,15 @@ public partial class MainWindow : Window
             }
             else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             {
-                _bluetoothService.SimulateConnection("AirPods", 85);
+                _simBtToggle = !_simBtToggle;
+                if (_simBtToggle)
+                {
+                    _bluetoothService.SimulateConnection("Buds T110");
+                }
+                else
+                {
+                    _bluetoothService.SimulateConnection("Aryan's iPhone", 60);
+                }
             }
             else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
             {
@@ -1634,6 +1681,7 @@ public partial class MainWindow : Window
         }
     }
 
+    private bool _simBtToggle = false;
     private int _testPowerModeIndex = 0;
     private void CycleTestPowerMode()
     {
@@ -1734,10 +1782,92 @@ public partial class MainWindow : Window
         catch { }
     }
 
+    private FileSystemWatcher? _btTriggerWatcher;
+    private void SetupBluetoothTestTriggerWatcher()
+    {
+        try
+        {
+            string dir = AppDomain.CurrentDomain.BaseDirectory;
+            _btTriggerWatcher = new FileSystemWatcher(dir, "bt_trigger.txt")
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+                EnableRaisingEvents = true
+            };
+            _btTriggerWatcher.Changed += (s, e) => HandleTriggerFile(e.FullPath);
+            _btTriggerWatcher.Created += (s, e) => HandleTriggerFile(e.FullPath);
+        }
+        catch { }
+    }
+
+    private void HandleTriggerFile(string path)
+    {
+        try
+        {
+            System.Threading.Thread.Sleep(60);
+            if (!File.Exists(path)) return;
+            string text = File.ReadAllText(path).Trim();
+            App.Log($"HandleTriggerFile: received '{text}'");
+            if (string.IsNullOrWhiteSpace(text)) return;
+            try { File.Delete(path); } catch { }
+
+            string[] parts = text.Split(new[] { '|', ',' }, StringSplitOptions.RemoveEmptyEntries);
+            string name = parts[0].Trim();
+            int? battery = null;
+            if (parts.Length > 1 && int.TryParse(parts[1].Trim(), out int b))
+            {
+                battery = b;
+            }
+
+            Dispatcher.Invoke(() =>
+            {
+                _bluetoothService.SimulateConnection(name, battery);
+            });
+        }
+        catch (Exception ex)
+        {
+            App.Log($"HandleTriggerFile error: {ex.Message}");
+        }
+    }
+
+    private static BitmapImage? _cachedHeadsetIcon;
+    private static BitmapImage? _cachedPhoneIcon;
+
+    private static ImageSource? GetBluetoothDeviceIcon(BluetoothDeviceKind kind)
+    {
+        try
+        {
+            if (kind == BluetoothDeviceKind.Smartphone)
+            {
+                _cachedPhoneIcon ??= new BitmapImage(new Uri("pack://application:,,,/Resources/win_phone.png", UriKind.Absolute));
+                return _cachedPhoneIcon;
+            }
+            else
+            {
+                _cachedHeadsetIcon ??= new BitmapImage(new Uri("pack://application:,,,/Resources/win_headset.png", UriKind.Absolute));
+                return _cachedHeadsetIcon;
+            }
+        }
+        catch
+        {
+            try
+            {
+                string relPath = kind == BluetoothDeviceKind.Smartphone ? "Resources/win_phone.png" : "Resources/win_headset.png";
+                string fullPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relPath);
+                if (System.IO.File.Exists(fullPath))
+                {
+                    return new BitmapImage(new Uri(fullPath, UriKind.Absolute));
+                }
+            }
+            catch { }
+        }
+        return null;
+    }
+
     private void OnBluetoothDeviceConnected(BluetoothDeviceInfo dev)
     {
         Dispatcher.Invoke(() =>
         {
+            App.Log($"OnBluetoothDeviceConnected: Name='{dev.Name}', Kind={dev.DeviceKind}, Battery={dev.BatteryPercent}%");
             ShowDockSmooth();
             WindowHelper.EnsureTopMost(this);
 
@@ -1748,11 +1878,19 @@ public partial class MainWindow : Window
 
             ClearTemporaryAlerts();
 
-            // Populate compact glimpse UI (AirPods icon + device name)
+            // Set built-in Windows device icon (headset or smartphone)
+            var icon = GetBluetoothDeviceIcon(dev.DeviceKind);
+            if (icon != null)
+            {
+                CompactBluetoothDeviceIcon.Source = icon;
+                ExpandedBluetoothDeviceIcon.Source = icon;
+            }
+
+            // Populate compact glimpse UI (Windows device icon + device name)
             CompactBluetoothDeviceName.Text = dev.Name;
             CompactBluetoothDeviceName.Visibility = Visibility.Visible;
 
-            // Populate expanded UI (AirPods icon + "Connected" + "[Device] ready to use" + Battery Ring)
+            // Populate expanded UI (Windows device icon + "Connected" + "[Device] ready to use" + Battery Ring)
             ExpandedBluetoothTitleText.Text = $"{dev.Name} ready to use";
             UpdateBluetoothBatteryArc(dev.BatteryPercent);
 
@@ -1811,21 +1949,50 @@ public partial class MainWindow : Window
     private void UpdateBluetoothBatteryArc(int percent)
     {
         int clamped = Math.Clamp(percent, 0, 100);
-        ExpandedBluetoothBatteryPercentText.Text = $"{clamped}%";
+        string percentStr = $"{clamped}%";
+        ExpandedBluetoothBatteryPercentText.Text = percentStr;
+        CompactBluetoothBatteryPercentText.Text = percentStr;
 
-        // Center = (21, 21), Radius = 17.5. Start at 12 o'clock (21, 3.5)
-        double cx = 21.0;
-        double cy = 21.0;
-        double r = 17.5;
-        double startAngle = -90.0; // 12 o'clock
-        double sweepAngle = (clamped / 100.0) * 360.0;
-        if (sweepAngle >= 360.0) sweepAngle = 359.99;
+        // Dynamic battery colors: Red (<=10%), Amber (<=20%), Green (>20%)
+        SolidColorBrush strokeBrush;
+        if (clamped <= 10)
+        {
+            strokeBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x3A));
+        }
+        else if (clamped <= 20)
+        {
+            strokeBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x0A));
+        }
+        else
+        {
+            strokeBrush = new SolidColorBrush(Color.FromRgb(0x30, 0xD1, 0x58));
+        }
+
+        BluetoothBatteryArc.Stroke = strokeBrush;
+        ExpandedBluetoothBatteryPercentText.Foreground = strokeBrush;
+
+        CompactBluetoothBatteryArc.Stroke = strokeBrush;
+        CompactBluetoothBatteryPercentText.Foreground = strokeBrush;
 
         if (clamped <= 0)
         {
             BluetoothBatteryArc.Data = null;
+            CompactBluetoothBatteryArc.Data = null;
             return;
         }
+
+        // Expanded Arc (Grid 44x44, Center 21, 21, Radius 17.5)
+        BluetoothBatteryArc.Data = CreateArcGeometry(21.0, 21.0, 17.5, clamped);
+
+        // Compact Arc (Grid 28x28, Center 14, 14, Radius 11.0)
+        CompactBluetoothBatteryArc.Data = CreateArcGeometry(14.0, 14.0, 11.0, clamped);
+    }
+
+    private static Geometry CreateArcGeometry(double cx, double cy, double r, double clamped)
+    {
+        double startAngle = -90.0; // 12 o'clock
+        double sweepAngle = (clamped / 100.0) * 360.0;
+        if (sweepAngle >= 360.0) sweepAngle = 359.99;
 
         double endAngleRad = (startAngle + sweepAngle) * Math.PI / 180.0;
         double startX = cx;
@@ -1850,7 +2017,7 @@ public partial class MainWindow : Window
             IsLargeArc = isLargeArc
         });
         geometry.Figures.Add(figure);
-        BluetoothBatteryArc.Data = geometry;
+        return geometry;
     }
 
     private void CompactBluetoothView_MouseDown(object sender, MouseButtonEventArgs e)

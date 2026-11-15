@@ -14,4 +14,11 @@
     <PackageReference Include="System.Management" Version="9.0.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="Resources\*.png" />
+    <None Update="Resources\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

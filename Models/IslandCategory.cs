@@ -13,5 +13,6 @@ public enum IslandCategory
     WindowSnapping,
     TimerQuickSet,
     VoiceRecording,
-    ScreenRecording
+    ScreenRecording,
+    BluetoothDevice
 }

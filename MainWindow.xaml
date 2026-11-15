@@ -888,6 +888,61 @@
                         </Button>
                     </StackPanel>
                 </Grid>
+
+                <!-- 14. Bluetooth Device Connection Glimpse Mode (Matches media_1794688252060_17c6c32a.png) -->
+                <Grid x:Name="CompactBluetoothView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="10,0,12,0"
+                      Background="Transparent"
+                      Cursor="Hand"
+                      MouseDown="CompactBluetoothView_MouseDown">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Vector White AirPods / Earbuds Icon + Optional Name -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Viewbox Width="24" Height="24" VerticalAlignment="Center">
+                            <Canvas Width="28" Height="28">
+                                <!-- Left Earbud Head -->
+                                <Path Fill="White" Data="M 7,2 C 10.5,2 12,4.5 12,8 C 12,11.5 9.5,13.5 7,13.5 C 4,13.5 2,11 2,7.5 C 2,4 4,2 7,2 Z" />
+                                <Ellipse Canvas.Left="8.5" Canvas.Top="5" Width="2.5" Height="5" Fill="#1C1C1E" />
+                                <Ellipse Canvas.Left="4" Canvas.Top="4.5" Width="1.5" Height="1.5" Fill="#3A3A3C" />
+                                <Path Fill="White" Data="M 5,12 L 6.5,24 C 6.5,25 8,25 8,24 L 8.5,12 Z" />
+                                <Rectangle Canvas.Left="6.3" Canvas.Top="23" Width="2" Height="1.5" Fill="#C7C7CC" RadiusX="0.5" RadiusY="0.5" />
+
+                                <!-- Right Earbud Head -->
+                                <Path Fill="White" Data="M 21,2 C 17.5,2 16,4.5 16,8 C 16,11.5 18.5,13.5 21,13.5 C 24,13.5 26,11 26,7.5 C 26,4 24,2 21,2 Z" />
+                                <Ellipse Canvas.Left="17" Canvas.Top="5" Width="2.5" Height="5" Fill="#1C1C1E" />
+                                <Ellipse Canvas.Left="22.5" Canvas.Top="4.5" Width="1.5" Height="1.5" Fill="#3A3A3C" />
+                                <Path Fill="White" Data="M 23,12 L 21.5,24 C 21.5,25 20,25 20,24 L 19.5,12 Z" />
+                                <Rectangle Canvas.Left="19.7" Canvas.Top="23" Width="2" Height="1.5" Fill="#C7C7CC" RadiusX="0.5" RadiusY="0.5" />
+                            </Canvas>
+                        </Viewbox>
+                        <TextBlock x:Name="CompactBluetoothDeviceName"
+                                   Text=""
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="White"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0"
+                                   Visibility="Collapsed" />
+                    </StackPanel>
+
+                    <!-- Center Gap -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Circular Connection Indicator Ring (Matches Photo 1) -->
+                    <Grid Grid.Column="2" Width="24" Height="24" VerticalAlignment="Center">
+                        <!-- Dark Ring Track -->
+                        <Ellipse Width="22" Height="22" Stroke="#331818" StrokeThickness="2.8" Fill="Transparent" />
+                        <!-- Red Glowing Connection Indicator Dot at top -->
+                        <Ellipse Width="3.5" Height="3.5" Fill="#FF453A" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,1,0,0" />
+                    </Grid>
+                </Grid>
             </Grid>
 
             <!-- ============================================== -->
@@ -1311,6 +1366,67 @@
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center" />
                         </Border>
+                    </Grid>
+
+                    <!-- ============================================== -->
+                    <!-- 12. BLUETOOTH DEVICE ENLARGED (Matches Photo 2) -->
+                    <!-- ============================================== -->
+                    <Grid x:Name="ViewBluetoothDevice" Visibility="Collapsed" VerticalAlignment="Center" Margin="6,2,6,2"
+                          Background="Transparent" Cursor="Hand" MouseDown="ViewBluetoothDevice_MouseDown">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left: Large AirPods / Earbuds Icon -->
+                        <Viewbox Grid.Column="0" Width="36" Height="36" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <Canvas Width="28" Height="28">
+                                <!-- Left Earbud Head -->
+                                <Path Fill="White" Data="M 7,2 C 10.5,2 12,4.5 12,8 C 12,11.5 9.5,13.5 7,13.5 C 4,13.5 2,11 2,7.5 C 2,4 4,2 7,2 Z" />
+                                <Ellipse Canvas.Left="8.5" Canvas.Top="5" Width="2.5" Height="5" Fill="#1C1C1E" />
+                                <Ellipse Canvas.Left="4" Canvas.Top="4.5" Width="1.5" Height="1.5" Fill="#3A3A3C" />
+                                <Path Fill="White" Data="M 5,12 L 6.5,24 C 6.5,25 8,25 8,24 L 8.5,12 Z" />
+                                <Rectangle Canvas.Left="6.3" Canvas.Top="23" Width="2" Height="1.5" Fill="#C7C7CC" RadiusX="0.5" RadiusY="0.5" />
+
+                                <!-- Right Earbud Head -->
+                                <Path Fill="White" Data="M 21,2 C 17.5,2 16,4.5 16,8 C 16,11.5 18.5,13.5 21,13.5 C 24,13.5 26,11 26,7.5 C 26,4 24,2 21,2 Z" />
+                                <Ellipse Canvas.Left="17" Canvas.Top="5" Width="2.5" Height="5" Fill="#1C1C1E" />
+                                <Ellipse Canvas.Left="22.5" Canvas.Top="4.5" Width="1.5" Height="1.5" Fill="#3A3A3C" />
+                                <Path Fill="White" Data="M 23,12 L 21.5,24 C 21.5,25 20,25 20,24 L 19.5,12 Z" />
+                                <Rectangle Canvas.Left="19.7" Canvas.Top="23" Width="2" Height="1.5" Fill="#C7C7CC" RadiusX="0.5" RadiusY="0.5" />
+                            </Canvas>
+                        </Viewbox>
+
+                        <!-- Middle: "Connected" + "[DeviceName] ready to use" -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Connected"
+                                       FontSize="13"
+                                       FontWeight="Normal"
+                                       Foreground="#98989D"
+                                       Margin="0,0,0,2" />
+                            <TextBlock x:Name="ExpandedBluetoothTitleText"
+                                       Text="Audio device ready to use"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="#FFFFFF" />
+                        </StackPanel>
+
+                        <!-- Right: Circular Green Battery Gauge (Matches Photo 2) -->
+                        <Grid Grid.Column="2" Width="44" Height="44" VerticalAlignment="Center" Margin="10,0,4,0">
+                            <!-- Dark Green Background Track -->
+                            <Ellipse Width="42" Height="42" Stroke="#16381C" StrokeThickness="3.5" Fill="Transparent" />
+                            <!-- Green Progress Arc (85%) -->
+                            <Path x:Name="BluetoothBatteryArc" Stroke="#30D158" StrokeThickness="3.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <!-- Center Battery Percentage Text -->
+                            <TextBlock x:Name="ExpandedBluetoothBatteryPercentText"
+                                       Text="85%"
+                                       FontSize="14.5"
+                                       FontWeight="Bold"
+                                       Foreground="#30D158"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Grid>
                     </Grid>
 
                 </Grid>

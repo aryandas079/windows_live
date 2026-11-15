@@ -48,6 +48,9 @@ public partial class MainWindow : Window
     private const double CompactDndWidth = 240.0;
     private const double CompactNightModeWidth = 240.0;
     private const double CompactAlarmWidth = 250.0;
+    private const double CompactBluetoothWidth = 230.0;
+    private const double ExpandedBluetoothWidth = 450.0;
+    private const double ExpandedBluetoothHeight = 68.0;
     private const double CompactTimerWidth = 240.0;
     private const double CompactRecordingWidth = 230.0;
     private const double CompactScreenRecordingWidth = 240.0;
@@ -66,14 +69,19 @@ public partial class MainWindow : Window
     private bool _isDndAlertActive = false;
     private bool _isNightModeAlertActive = false;
     private bool _isAlarmActive = false;
+    private bool _isBluetoothAlertActive = false;
+    private BluetoothDeviceInfo? _activeBluetoothDevice = null;
     private IslandNotification? _currentNotification = null;
 
     private readonly DispatcherTimer _silentRingAlertTimer;
     private readonly DispatcherTimer _dndAlertTimer;
     private readonly DispatcherTimer _nightModeAlertTimer;
+    private readonly DispatcherTimer _bluetoothAlertTimer;
+    private readonly DispatcherTimer _bluetoothHoverCollapseTimer;
     private readonly FocusAssistWatcherService _focusAssistService;
     private readonly NightLightWatcherService _nightLightService;
     private readonly AlarmService _alarmService;
+    private readonly BluetoothWatcherService _bluetoothService;
     private readonly WindowsClockWatcherService _windowsClockService;
     private readonly VoiceRecordingService _voiceRecordingService;
     private readonly ScreenRecordingService _screenRecordingService;
@@ -101,6 +109,7 @@ public partial class MainWindow : Window
     private bool IsSplitActive =>
         !_isExpanded &&
         !_isAlarmActive &&
+        !_isBluetoothAlertActive &&
         !_isUnlockAlertActive &&
         !_isSilentRingAlertActive &&
         !_isDndAlertActive &&
@@ -114,6 +123,7 @@ public partial class MainWindow : Window
 
     private bool HasActiveContent =>
         _isAlarmActive ||
+        _isBluetoothAlertActive ||
         _isUnlockAlertActive ||
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
@@ -132,6 +142,7 @@ public partial class MainWindow : Window
         get
         {
             if (_isAlarmActive) return CompactAlarmWidth;
+            if (_isBluetoothAlertActive) return CompactBluetoothWidth;
             if (_isUnlockAlertActive) return CompactUnlockWidth;
             if (_isSilentRingAlertActive) return CompactSilentRingWidth;
             if (_isDndAlertActive) return CompactDndWidth;
@@ -171,6 +182,7 @@ public partial class MainWindow : Window
             _focusAssistService = new FocusAssistWatcherService();
             _nightLightService = new NightLightWatcherService();
             _alarmService = new AlarmService();
+            _bluetoothService = new BluetoothWatcherService();
             _windowsClockService = new WindowsClockWatcherService();
             _voiceRecordingService = new VoiceRecordingService();
             _screenRecordingService = new ScreenRecordingService();
@@ -190,6 +202,9 @@ public partial class MainWindow : Window
             _nightLightService.Start();
             _alarmService.AlarmStateChanged += OnAlarmStateChanged;
             _alarmService.SnoozeStarted += OnAlarmSnoozeStarted;
+            _bluetoothService.DeviceConnected += OnBluetoothDeviceConnected;
+            _bluetoothService.DeviceDisconnected += OnBluetoothDeviceDisconnected;
+            _bluetoothService.Start();
             _windowsClockService.TimerStateChanged += OnWindowsClockTimerChanged;
             _windowsClockService.Start();
             _voiceRecordingService.RecordingStateChanged += OnVoiceRecordingStateChanged;
@@ -360,6 +375,42 @@ public partial class MainWindow : Window
                         UpdateCompactViewVisibility();
                     };
                     CompactNightModeView.BeginAnimation(OpacityProperty, fadeOut);
+                }
+            };
+
+            _bluetoothAlertTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(5.0)
+            };
+            _bluetoothAlertTimer.Tick += (s, e) =>
+            {
+                _bluetoothAlertTimer.Stop();
+                if (_isBluetoothAlertActive && !_isExpanded)
+                {
+                    _isBluetoothAlertActive = false;
+                    _activeBluetoothDevice = null;
+                    var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
+                    fadeOut.Completed += (s2, e2) =>
+                    {
+                        CompactBluetoothView.Visibility = Visibility.Collapsed;
+                        UpdateCompactViewVisibility();
+                    };
+                    CompactBluetoothView.BeginAnimation(OpacityProperty, fadeOut);
+                }
+            };
+
+            _bluetoothHoverCollapseTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(2.5)
+            };
+            _bluetoothHoverCollapseTimer.Tick += (s, e) =>
+            {
+                _bluetoothHoverCollapseTimer.Stop();
+                if (_isBluetoothAlertActive && _isExpanded && _activeCategory == IslandCategory.BluetoothDevice)
+                {
+                    _isBluetoothAlertActive = false;
+                    _activeBluetoothDevice = null;
+                    CollapseDock();
                 }
             };
 
@@ -650,6 +701,14 @@ public partial class MainWindow : Window
         IslandContainer.Cursor = HasActiveContent ? Cursors.Hand : Cursors.Arrow;
         if (!_isExpanded)
         {
+            if (_isBluetoothAlertActive)
+            {
+                _bluetoothAlertTimer.Stop();
+                _bluetoothHoverCollapseTimer.Stop();
+                ExpandDock(IslandCategory.BluetoothDevice);
+                return;
+            }
+
             // Only expand on hover if there is live content to interact with (screen recording, voice recording, active timer or music active/paused)
             // Notifications only show once on arrival and NEVER re-open on hover after disappearing
             if (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive || IsMusicActive)
@@ -657,10 +716,21 @@ public partial class MainWindow : Window
                 ExpandDock();
             }
         }
+        else if (_isBluetoothAlertActive && _activeCategory == IslandCategory.BluetoothDevice)
+        {
+            _bluetoothHoverCollapseTimer.Stop();
+        }
     }
 
     private void OnIslandMouseLeave(object sender, MouseEventArgs e)
     {
+        if (_isExpanded && _activeCategory == IslandCategory.BluetoothDevice)
+        {
+            _bluetoothHoverCollapseTimer.Stop();
+            _bluetoothHoverCollapseTimer.Start();
+            return;
+        }
+
         if (_isExpanded && !_isPinned && !_isDraggingSlider)
         {
             _autoCollapseTimer.Stop();
@@ -689,6 +759,10 @@ public partial class MainWindow : Window
         if (preferredCategory.HasValue)
         {
             _activeCategory = preferredCategory.Value;
+        }
+        else if (_isBluetoothAlertActive)
+        {
+            _activeCategory = IslandCategory.BluetoothDevice;
         }
         else if (_isNotificationAlertActive && _currentNotification != null)
         {
@@ -724,9 +798,15 @@ public partial class MainWindow : Window
 
         double targetHeight = _activeCategory == IslandCategory.AppNotification
             ? 72.0
-            : ExpandedHeight;
+            : _activeCategory == IslandCategory.BluetoothDevice
+                ? ExpandedBluetoothHeight
+                : ExpandedHeight;
 
-        AnimateIsland(ExpandedWidth, targetHeight);
+        double targetWidth = _activeCategory == IslandCategory.BluetoothDevice
+            ? ExpandedBluetoothWidth
+            : ExpandedWidth;
+
+        AnimateIsland(targetWidth, targetHeight);
 
         var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(100));
         fadeOut.Completed += (s, e) =>
@@ -744,6 +824,12 @@ public partial class MainWindow : Window
     {
         if (!_isExpanded) return;
         _isExpanded = false;
+
+        if (_activeCategory == IslandCategory.BluetoothDevice)
+        {
+            _isBluetoothAlertActive = false;
+            _activeBluetoothDevice = null;
+        }
 
         // Restore non-activating window mode when collapsing
         WindowHelper.SetActivationEnabled(this, false);
@@ -850,13 +936,19 @@ public partial class MainWindow : Window
         ViewTimerQuickSet.Visibility = _activeCategory == IslandCategory.TimerQuickSet ? Visibility.Visible : Visibility.Collapsed;
         ViewVoiceRecording.Visibility = _activeCategory == IslandCategory.VoiceRecording ? Visibility.Visible : Visibility.Collapsed;
         ViewScreenRecording.Visibility = _activeCategory == IslandCategory.ScreenRecording ? Visibility.Visible : Visibility.Collapsed;
+        ViewBluetoothDevice.Visibility = _activeCategory == IslandCategory.BluetoothDevice ? Visibility.Visible : Visibility.Collapsed;
 
         if (_isExpanded)
         {
             double targetHeight = _activeCategory == IslandCategory.AppNotification
                 ? 72.0
-                : ExpandedHeight;
-            AnimateIsland(ExpandedWidth, targetHeight);
+                : _activeCategory == IslandCategory.BluetoothDevice
+                    ? ExpandedBluetoothHeight
+                    : ExpandedHeight;
+            double targetWidth = _activeCategory == IslandCategory.BluetoothDevice
+                ? ExpandedBluetoothWidth
+                : ExpandedWidth;
+            AnimateIsland(targetWidth, targetHeight);
         }
     }
 
@@ -1203,10 +1295,19 @@ public partial class MainWindow : Window
 
     private void CompactClockView_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton == MouseButton.Right)
+        if (e.ChangedButton == MouseButton.Middle)
         {
             e.Handled = true;
-            if (_isAlarmActive)
+            _bluetoothService.SimulateConnection("AirPods", 85);
+        }
+        else if (e.ChangedButton == MouseButton.Right)
+        {
+            e.Handled = true;
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                _bluetoothService.SimulateConnection("AirPods", 85);
+            }
+            else if (_isAlarmActive)
             {
                 _alarmService.Dismiss();
             }
@@ -1348,6 +1449,174 @@ public partial class MainWindow : Window
     {
         AlarmIconRotate.BeginAnimation(RotateTransform.AngleProperty, null);
         AlarmIconRotate.Angle = 0;
+    }
+
+    private void ClearTemporaryAlerts()
+    {
+        if (_isUnlockAlertActive)
+        {
+            _isUnlockAlertActive = false;
+            _unlockAlertTimer.Stop();
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+        }
+        if (_isSilentRingAlertActive)
+        {
+            _isSilentRingAlertActive = false;
+            _silentRingAlertTimer.Stop();
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+        }
+        if (_isDndAlertActive)
+        {
+            _isDndAlertActive = false;
+            _dndAlertTimer.Stop();
+            CompactDndView.Visibility = Visibility.Collapsed;
+        }
+        if (_isNightModeAlertActive)
+        {
+            _isNightModeAlertActive = false;
+            _nightModeAlertTimer.Stop();
+            CompactNightModeView.Visibility = Visibility.Collapsed;
+        }
+        if (_isChargingAlertActive)
+        {
+            _isChargingAlertActive = false;
+            _chargingAlertTimer.Stop();
+            CompactChargingView.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnBluetoothDeviceConnected(BluetoothDeviceInfo dev)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _activeBluetoothDevice = dev;
+            _isBluetoothAlertActive = true;
+            _bluetoothAlertTimer.Stop();
+            _bluetoothHoverCollapseTimer.Stop();
+
+            ClearTemporaryAlerts();
+
+            // Populate compact glimpse UI (AirPods icon + device name)
+            CompactBluetoothDeviceName.Text = dev.Name;
+            CompactBluetoothDeviceName.Visibility = Visibility.Visible;
+
+            // Populate expanded UI (AirPods icon + "Connected" + "[Device] ready to use" + Battery Ring)
+            ExpandedBluetoothTitleText.Text = $"{dev.Name} ready to use";
+            UpdateBluetoothBatteryArc(dev.BatteryPercent);
+
+            // Play the smooth 2-tone chime
+            BluetoothWatcherService.PlayConnectionChime();
+
+            // If dock is currently expanded into another category, collapse it back to compact view
+            if (_isExpanded && _activeCategory != IslandCategory.BluetoothDevice)
+            {
+                _isExpanded = false;
+                ExpandedContainer.Visibility = Visibility.Collapsed;
+                CompactView.Visibility = Visibility.Visible;
+                CompactView.Opacity = 1.0;
+            }
+
+            UpdateCompactViewVisibility();
+
+            CompactBluetoothView.Opacity = 0.0;
+            CompactBluetoothView.Visibility = Visibility.Visible;
+
+            double targetWidth = Math.Max(CompactBluetoothWidth, 190.0 + (dev.Name.Length * 7.0));
+            AnimateIsland(targetWidth, CompactHeight);
+
+            var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
+            CompactBluetoothView.BeginAnimation(OpacityProperty, fadeIn);
+
+            // Short glimpse stays for 5 seconds then collapses unless hovered
+            _bluetoothAlertTimer.Start();
+        });
+    }
+
+    private void OnBluetoothDeviceDisconnected(BluetoothDeviceInfo dev)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (_activeBluetoothDevice?.Id == dev.Id || string.Equals(_activeBluetoothDevice?.Name, dev.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                _bluetoothAlertTimer.Stop();
+                _bluetoothHoverCollapseTimer.Stop();
+                if (_isExpanded && _activeCategory == IslandCategory.BluetoothDevice)
+                {
+                    _isBluetoothAlertActive = false;
+                    _activeBluetoothDevice = null;
+                    CollapseDock();
+                }
+                else if (_isBluetoothAlertActive)
+                {
+                    _isBluetoothAlertActive = false;
+                    _activeBluetoothDevice = null;
+                    UpdateCompactViewVisibility();
+                }
+            }
+        });
+    }
+
+    private void UpdateBluetoothBatteryArc(int percent)
+    {
+        int clamped = Math.Clamp(percent, 0, 100);
+        ExpandedBluetoothBatteryPercentText.Text = $"{clamped}%";
+
+        // Center = (21, 21), Radius = 17.5. Start at 12 o'clock (21, 3.5)
+        double cx = 21.0;
+        double cy = 21.0;
+        double r = 17.5;
+        double startAngle = -90.0; // 12 o'clock
+        double sweepAngle = (clamped / 100.0) * 360.0;
+        if (sweepAngle >= 360.0) sweepAngle = 359.99;
+
+        if (clamped <= 0)
+        {
+            BluetoothBatteryArc.Data = null;
+            return;
+        }
+
+        double endAngleRad = (startAngle + sweepAngle) * Math.PI / 180.0;
+        double startX = cx;
+        double startY = cy - r;
+        double endX = cx + r * Math.Cos(endAngleRad);
+        double endY = cy + r * Math.Sin(endAngleRad);
+
+        bool isLargeArc = sweepAngle > 180.0;
+
+        var geometry = new PathGeometry();
+        var figure = new PathFigure
+        {
+            StartPoint = new Point(startX, startY),
+            IsClosed = false,
+            IsFilled = false
+        };
+        figure.Segments.Add(new ArcSegment
+        {
+            Point = new Point(endX, endY),
+            Size = new Size(r, r),
+            SweepDirection = SweepDirection.Clockwise,
+            IsLargeArc = isLargeArc
+        });
+        geometry.Figures.Add(figure);
+        BluetoothBatteryArc.Data = geometry;
+    }
+
+    private void CompactBluetoothView_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _bluetoothAlertTimer.Stop();
+        _bluetoothHoverCollapseTimer.Stop();
+        ExpandDock(IslandCategory.BluetoothDevice);
+    }
+
+    private void ViewBluetoothDevice_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true });
+        }
+        catch { }
     }
 
     private void OnChargingConnected()
@@ -2155,6 +2424,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2171,6 +2441,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2186,6 +2457,7 @@ public partial class MainWindow : Window
             CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2201,6 +2473,7 @@ public partial class MainWindow : Window
             CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2216,6 +2489,7 @@ public partial class MainWindow : Window
             CompactUnlockView.Visibility = Visibility.Collapsed;
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2231,10 +2505,28 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Visible;
+        }
+        else if (_isBluetoothAlertActive)
+        {
+            CompactAlarmView.Visibility = Visibility.Collapsed;
+            CompactClockView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
+            CompactChargingView.Visibility = Visibility.Collapsed;
+            CompactUnlockView.Visibility = Visibility.Collapsed;
+            CompactSilentRingView.Visibility = Visibility.Collapsed;
+            CompactDndView.Visibility = Visibility.Collapsed;
+            CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
+            CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
+            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
+            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Visible;
         }
         else if (_isNotificationAlertActive && _currentNotification != null)
         {
@@ -2246,6 +2538,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
@@ -2261,6 +2554,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
@@ -2277,6 +2571,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
@@ -2296,6 +2591,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
@@ -2312,6 +2608,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
@@ -2328,6 +2625,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
@@ -2344,6 +2642,7 @@ public partial class MainWindow : Window
             CompactSilentRingView.Visibility = Visibility.Collapsed;
             CompactDndView.Visibility = Visibility.Collapsed;
             CompactNightModeView.Visibility = Visibility.Collapsed;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactMediaView.Visibility = Visibility.Collapsed;

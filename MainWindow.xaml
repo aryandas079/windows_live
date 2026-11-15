@@ -13,10 +13,11 @@
         Topmost="True"
         ShowInTaskbar="False"
         ShowActivated="False"
+        AllowDrop="True"
         Width="700" Height="260"
         FontFamily="Segoe UI Variable Display, Segoe UI, Arial">
 
-    <Grid x:Name="RootGrid" Background="Transparent" VerticalAlignment="Top" HorizontalAlignment="Center">
+    <Grid x:Name="RootGrid" Background="Transparent" VerticalAlignment="Top" HorizontalAlignment="Center" AllowDrop="True">
         <!-- Top Edge Hover Zone for Maximized & Fullscreen Apps -->
         <Border x:Name="TopEdgeHotspot"
                 Height="12"
@@ -31,6 +32,11 @@
               Width="160" Height="36"
               VerticalAlignment="Top"
               HorizontalAlignment="Center"
+              AllowDrop="True"
+              PreviewDragEnter="IslandContainer_PreviewDragEnter"
+              PreviewDragOver="IslandContainer_PreviewDragOver"
+              DragLeave="IslandContainer_DragLeave"
+              PreviewDrop="IslandContainer_PreviewDrop"
               Cursor="Arrow">
 
             <!-- Ambient Glow / Drop Shadow Layer -->
@@ -1616,56 +1622,218 @@
                     </Ellipse.Effect>
                 </Ellipse>
             </StackPanel>
-        </Grid>
 
-        <!-- ========================================================================================= -->
-        <!-- DETACHED SATELLITE BUBBLE (Apple Dynamic Island Split Multi-Activity Presentation)       -->
-        <!-- Shown detached to the right of the main island when Timer + Music run concurrently      -->
-        <!-- 52px wide x 36px tall floating pill containing the live amber countdown & mini clock      -->
-        <!-- ========================================================================================= -->
-        <Grid x:Name="DetachedBubbleContainer"
-              Width="52" Height="36"
-              VerticalAlignment="Top"
-              HorizontalAlignment="Center"
-              Visibility="Collapsed"
-              Opacity="0.0"
-              Cursor="Hand"
-              MouseEnter="DetachedBubbleContainer_MouseEnter"
-              MouseLeave="DetachedBubbleContainer_MouseLeave"
-              MouseDown="DetachedBubbleContainer_MouseDown">
-            <!-- Detached Floating Bubble Shadow Layer -->
-            <controls:DynamicIslandNotch x:Name="DetachedBubbleShadow"
-                                         IsNotchMode="False"
-                                         CornerRadius="18"
-                                         Fill="#000000"
-                                         StrokeThickness="0">
-                <controls:DynamicIslandNotch.Effect>
-                    <DropShadowEffect x:Name="DetachedShadowEffect" Color="#000000" BlurRadius="18" Opacity="0.45" ShadowDepth="3" Direction="270" />
-                </controls:DynamicIslandNotch.Effect>
-            </controls:DynamicIslandNotch>
+            <!-- ========================================================================================= -->
+            <!-- DRAG & DROP OPEN CLIPBOARD OVERLAY                                                        -->
+            <!-- Blank enlarged dock during drag; Left edge = Copied (green tick), Right edge = Share UI   -->
+            <!-- ========================================================================================= -->
+            <Grid x:Name="DragDropFeedbackOverlay"
+                  Visibility="Collapsed"
+                  Opacity="0.0"
+                  IsHitTestVisible="False"
+                  VerticalAlignment="Stretch"
+                  HorizontalAlignment="Stretch">
 
-            <!-- Detached Floating Bubble Base Surface -->
-            <controls:DynamicIslandNotch x:Name="DetachedBubbleNotch"
-                                         IsNotchMode="False"
-                                         CornerRadius="18"
-                                         Fill="{DynamicResource SurfaceDarkBrush}"
-                                         Stroke="{DynamicResource SurfaceBorderBrush}"
-                                         StrokeThickness="1" />
+                <!-- Left Zone Preview: Clean Green Tick + "Copy" text -->
+                <StackPanel x:Name="DragCopyIndicator"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Margin="16,0,0,0"
+                            Visibility="Collapsed">
+                    <Viewbox Width="17" Height="17" Margin="0,0,8,0">
+                        <Canvas Width="24" Height="24">
+                            <Path Fill="#30D158"
+                                  Data="M 9,16.17 L 4.83,12 L 3.41,13.41 L 9,19 L 21,7 L 19.59,5.59 Z" />
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="Copy"
+                               FontSize="13.5"
+                               FontWeight="SemiBold"
+                               Foreground="#30D158"
+                               VerticalAlignment="Center" />
+                </StackPanel>
 
-            <!-- Content Inside Detached Bubble: Amber Mini Timer Icon & Live Countdown Digits -->
-            <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <!-- Subtle Mini Clock / Timer Symbol -->
-                    <ui:SymbolIcon Symbol="Timer24" FontSize="11" Foreground="#F59E0B" VerticalAlignment="Center" Margin="0,0,3,0" />
-                    <!-- Crisp Amber Countdown (e.g. "0:58" or "4:32") -->
-                    <TextBlock x:Name="DetachedTimerCountdownText"
-                               Text="0:58"
-                               FontSize="11.5"
-                               FontWeight="Bold"
-                               Foreground="#F59E0B"
+                <!-- Right Zone Preview: Share Icon + "Share" text -->
+                <StackPanel x:Name="DragShareIndicator"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,16,0"
+                            Visibility="Collapsed">
+                    <TextBlock Text="Share"
+                               FontSize="13.5"
+                               FontWeight="SemiBold"
+                               Foreground="#0A84FF"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0" />
+                    <Viewbox Width="16" Height="16">
+                        <Canvas Width="24" Height="24">
+                            <!-- Windows / Apple Share Tray Vector Icon -->
+                            <Path Fill="#0A84FF"
+                                  Data="M 12,2 L 7,7 L 8.41,8.41 L 11,5.83 L 11,15 L 13,15 L 13,5.83 L 15.59,8.41 L 17,7 L 12,2 Z M 5,10 C 3.9,10 3,10.9 3,12 L 3,19 C 3,20.1 3.9,21 5,21 L 19,21 C 20.1,21 21,20.1 21,19 L 21,12 C 21,10.9 20.1,10 19,10 L 15,10 L 15,12 L 19,12 L 19,19 L 5,19 L 5,12 L 9,12 L 9,10 L 5,10 Z" />
+                        </Canvas>
+                    </Viewbox>
+                </StackPanel>
+
+                <!-- Dropped Success Popout Feedback: Clean Green Tick + "Copied" -->
+                <StackPanel x:Name="DragCopiedSuccessIndicator"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed">
+                    <Viewbox Width="18" Height="18" Margin="0,0,8,0">
+                        <Canvas Width="24" Height="24">
+                            <Path Fill="#30D158"
+                                  Data="M 9,16.17 L 4.83,12 L 3.41,13.41 L 9,19 L 21,7 L 19.59,5.59 Z" />
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="Copied"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="#30D158"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Dropped Share Success Popout Feedback: Share Icon + "Sharing" -->
+                <StackPanel x:Name="DragShareSuccessIndicator"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed">
+                    <Viewbox Width="17" Height="17" Margin="0,0,8,0">
+                        <Canvas Width="24" Height="24">
+                            <Path Fill="#0A84FF"
+                                  Data="M 12,2 L 7,7 L 8.41,8.41 L 11,5.83 L 11,15 L 13,15 L 13,5.83 L 15.59,8.41 L 17,7 L 12,2 Z M 5,10 C 3.9,10 3,10.9 3,12 L 3,19 C 3,20.1 3.9,21 5,21 L 19,21 C 20.1,21 21,20.1 21,19 L 21,12 C 21,10.9 20.1,10 19,10 L 15,10 L 15,12 L 19,12 L 19,19 L 5,19 L 5,12 L 9,12 L 9,10 L 5,10 Z" />
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="Sharing..."
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="#0A84FF"
                                VerticalAlignment="Center" />
                 </StackPanel>
             </Grid>
         </Grid>
+
+        <!-- ========================================================================================= -->
+        <!-- DETACHED SATELLITE CAPSULES (Multi-Activity / Concurrent Tasks: 2 or 3 items)             -->
+        <!-- Satellite 1: Timer Capsule with amber clock icon + countdown timer (e.g., 14:52)            -->
+        <!-- Satellite 2: Secondary Activity Capsule (e.g., status/equalizer pill with cyan icon + text)-->
+        <!-- ========================================================================================= -->
+        <StackPanel x:Name="DetachedSatellitesRow"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Center"
+                    Visibility="Collapsed"
+                    Opacity="0.0">
+
+            <!-- Capsule 1: Timer Satellite Capsule (Matches Reference Image media_1794722524198_ddb74c27.png) -->
+            <Grid x:Name="DetachedBubbleContainer"
+                  Height="36"
+                  MinWidth="76"
+                  VerticalAlignment="Top"
+                  Cursor="Hand"
+                  Margin="0,0,8,0"
+                  MouseEnter="DetachedBubbleContainer_MouseEnter"
+                  MouseLeave="DetachedBubbleContainer_MouseLeave"
+                  MouseDown="DetachedBubbleContainer_MouseDown">
+                <!-- Shadow -->
+                <controls:DynamicIslandNotch x:Name="DetachedBubbleShadow"
+                                             IsNotchMode="False"
+                                             CornerRadius="18"
+                                             Fill="#000000"
+                                             StrokeThickness="0">
+                    <controls:DynamicIslandNotch.Effect>
+                        <DropShadowEffect x:Name="DetachedShadowEffect" Color="#000000" BlurRadius="18" Opacity="0.45" ShadowDepth="3" Direction="270" />
+                    </controls:DynamicIslandNotch.Effect>
+                </controls:DynamicIslandNotch>
+
+                <!-- Surface Base Pill -->
+                <controls:DynamicIslandNotch x:Name="DetachedBubbleNotch"
+                                             IsNotchMode="False"
+                                             CornerRadius="18"
+                                             Fill="{DynamicResource SurfaceDarkBrush}"
+                                             Stroke="{DynamicResource SurfaceBorderBrush}"
+                                             StrokeThickness="1" />
+
+                <!-- Content: Amber Clock / Timer Icon + Bold White Time Digits (e.g., 14:52) -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="10,0,12,0">
+                    <!-- Amber Timer Icon matching reference -->
+                    <Viewbox Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,5,0">
+                        <Canvas Width="20" Height="20">
+                            <!-- Circular Clock Face in Amber -->
+                            <Ellipse Width="18" Height="18" Canvas.Left="1" Canvas.Top="1"
+                                     Stroke="#FF9F0A" StrokeThickness="2.0" Fill="Transparent" />
+                            <!-- Clock Hands pointing to 10:10 / 2:50 -->
+                            <Path Stroke="#FF9F0A" StrokeThickness="2.0" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Data="M 10,10 L 10,5 M 10,10 L 13.5,10" />
+                        </Canvas>
+                    </Viewbox>
+
+                    <!-- Timer Countdown Digits (e.g., 14:52) -->
+                    <TextBlock x:Name="DetachedTimerCountdownText"
+                               Text="14:52"
+                               FontSize="13.5"
+                               FontWeight="SemiBold"
+                               Foreground="#FFFFFF"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Capsule 2: Activity / Task Satellite Capsule (e.g. Sliders / Equalizer Icon + Status Label) -->
+            <Grid x:Name="DetachedSecondaryContainer"
+                  Height="36"
+                  MinWidth="78"
+                  VerticalAlignment="Top"
+                  Cursor="Hand"
+                  Visibility="Collapsed"
+                  MouseEnter="DetachedSecondaryContainer_MouseEnter"
+                  MouseLeave="DetachedSecondaryContainer_MouseLeave"
+                  MouseDown="DetachedSecondaryContainer_MouseDown">
+                <!-- Shadow -->
+                <controls:DynamicIslandNotch IsNotchMode="False"
+                                             CornerRadius="18"
+                                             Fill="#000000"
+                                             StrokeThickness="0">
+                    <controls:DynamicIslandNotch.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="18" Opacity="0.45" ShadowDepth="3" Direction="270" />
+                    </controls:DynamicIslandNotch.Effect>
+                </controls:DynamicIslandNotch>
+
+                <!-- Surface Base Pill -->
+                <controls:DynamicIslandNotch IsNotchMode="False"
+                                             CornerRadius="18"
+                                             Fill="{DynamicResource SurfaceDarkBrush}"
+                                             Stroke="{DynamicResource SurfaceBorderBrush}"
+                                             StrokeThickness="1" />
+
+                <!-- Content: Cyan Sliders / Settings Icon + White Status Label (e.g. "build" or active task) -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="10,0,12,0">
+                    <!-- Cyan Slider / Equalizer Tuning Icon matching reference image -->
+                    <Viewbox Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,5,0">
+                        <Canvas Width="20" Height="20">
+                            <!-- Top Slider Bar -->
+                            <Line X1="2" Y1="5" X2="18" Y2="5" Stroke="#00C7BE" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Ellipse Width="4.5" Height="4.5" Canvas.Left="5" Canvas.Top="2.75" Fill="#00C7BE" />
+                            <!-- Middle Slider Bar -->
+                            <Line X1="2" Y1="10" X2="18" Y2="10" Stroke="#00C7BE" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Ellipse Width="4.5" Height="4.5" Canvas.Left="12" Canvas.Top="7.75" Fill="#00C7BE" />
+                            <!-- Bottom Slider Bar -->
+                            <Line X1="2" Y1="15" X2="18" Y2="15" Stroke="#00C7BE" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            <Ellipse Width="4.5" Height="4.5" Canvas.Left="7" Canvas.Top="12.75" Fill="#00C7BE" />
+                        </Canvas>
+                    </Viewbox>
+
+                    <!-- Activity Label -->
+                    <TextBlock x:Name="DetachedSecondaryText"
+                               Text="active"
+                               FontSize="13.5"
+                               FontWeight="SemiBold"
+                               Foreground="#FFFFFF"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </StackPanel>
     </Grid>
 </Window>

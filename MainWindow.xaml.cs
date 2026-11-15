@@ -58,9 +58,10 @@ public partial class MainWindow : Window
     private const double CompactRecordingWidth = 210.0;
     private const double CompactScreenRecordingWidth = 240.0;
     private const double CompactScreenRecordingHeight = 48.0;
-    private const double CompactSplitLeadingWidth = 126.0;
-    private const double DetachedBubbleWidth = 52.0;
-    private const double DetachedBubbleGap = 12.0;
+    private const double CompactSplitLeadingWidth = 140.0;
+    private const double DetachedBubbleWidth = 76.0;
+    private const double DetachedSecondaryWidth = 78.0;
+    private const double DetachedBubbleGap = 8.0;
     private const double CompactHeight = 36.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
@@ -86,6 +87,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _bluetoothAlertTimer;
     private readonly DispatcherTimer _bluetoothHoverCollapseTimer;
     private readonly DispatcherTimer _powerModeAlertTimer;
+    private readonly DispatcherTimer _dragDropFeedbackTimer;
+    private bool _isDragActive = false;
     private readonly FocusAssistWatcherService _focusAssistService;
     private readonly NightLightWatcherService _nightLightService;
     private readonly AlarmService _alarmService;
@@ -117,7 +120,7 @@ public partial class MainWindow : Window
     private bool IsMusicPlaying =>
         _mediaManager?.CurrentTrack?.IsPlaying ?? false;
 
-    private bool IsSplitActive =>
+        private bool IsSplitActive =>
         !_isExpanded &&
         !_isAlarmActive &&
         !_isBluetoothAlertActive &&
@@ -128,10 +131,20 @@ public partial class MainWindow : Window
         !_isNightModeAlertActive &&
         !_isChargingAlertActive &&
         !_isNotificationAlertActive &&
-        !IsScreenRecordingActive &&
-        !IsVoiceRecordingActive &&
-        IsAnyTimerActive &&
-        IsMusicActive;
+        ActiveRunningTasksCount >= 2;
+
+    private int ActiveRunningTasksCount
+    {
+        get
+        {
+            int count = 0;
+            if (IsMusicActive) count++;
+            if (IsAnyTimerActive) count++;
+            if (IsVoiceRecordingActive) count++;
+            if (IsScreenRecordingActive) count++;
+            return count;
+        }
+    }
 
     private bool HasActiveContent =>
         _isAlarmActive ||
@@ -198,9 +211,9 @@ public partial class MainWindow : Window
             else if (_isNightModeAlertActive) baseWidth = CompactNightModeWidth;
             else if (_isChargingAlertActive) baseWidth = CompactChargingWidth;
             else if (_isNotificationAlertActive && _currentNotification != null) baseWidth = CompactNotificationWidth;
+            else if (IsSplitActive) baseWidth = CompactSplitLeadingWidth;
             else if (IsScreenRecordingActive) baseWidth = CompactScreenRecordingWidth;
             else if (IsVoiceRecordingActive) baseWidth = CompactRecordingWidth;
-            else if (IsAnyTimerActive && IsMusicActive) baseWidth = CompactSplitLeadingWidth;
             else if (IsAnyTimerActive) baseWidth = CompactTimerWidth;
             else if (IsMusicActive) baseWidth = CompactMediaWidth;
             else if (_isPrivacyIndicatorActive) baseWidth = CompactDefaultWidth + 10.0;
@@ -528,6 +541,16 @@ public partial class MainWindow : Window
                 }
             };
 
+            _dragDropFeedbackTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(2.0)
+            };
+            _dragDropFeedbackTimer.Tick += (s, e) =>
+            {
+                _dragDropFeedbackTimer.Stop();
+                ResetDragDropState();
+            };
+
             // Listen for Windows device unlock, power mode (sleep/wake), and display settings change events
             Microsoft.Win32.SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
             Microsoft.Win32.SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
@@ -782,10 +805,13 @@ public partial class MainWindow : Window
 
             Point windowPoint = PointFromScreen(new Point(x, y));
 
-            if (IslandContainer.Visibility == Visibility.Visible && IslandContainer.Opacity > 0.1)
+            if (_isDragActive || (IslandContainer.Visibility == Visibility.Visible && IslandContainer.Opacity > 0.1))
             {
                 Point islandPoint = IslandContainer.TranslatePoint(new Point(0, 0), this);
-                Rect islandRect = new Rect(islandPoint.X, islandPoint.Y, IslandContainer.ActualWidth, IslandContainer.ActualHeight);
+                // Expand hit-test boundary slightly during drag for responsive target capture
+                double hitWidth = Math.Max(IslandContainer.ActualWidth, DragHoverWidth);
+                double hitHeight = Math.Max(IslandContainer.ActualHeight, DragHoverHeight);
+                Rect islandRect = new Rect(islandPoint.X - (hitWidth - IslandContainer.ActualWidth) / 2.0, islandPoint.Y, hitWidth, hitHeight);
 
                 if (islandRect.Contains(windowPoint))
                 {
@@ -1066,38 +1092,60 @@ public partial class MainWindow : Window
     {
         if (IsSplitActive)
         {
-            // Position detached bubble adjacent to the right edge of the main island
-            // Offset from center = (mainIslandWidth / 2) + gap + (bubbleWidth / 2)
-            double bubbleCenterX = (mainIslandTargetWidth / 2.0) + DetachedBubbleGap + (DetachedBubbleWidth / 2.0);
-            DetachedBubbleContainer.Margin = new Thickness(bubbleCenterX * 2.0, 0, 0, 0);
+            // Position detached satellite capsules row adjacent to the right edge of the main island
+            // Offset from center = (mainIslandWidth / 2) + gap
+            double startX = (mainIslandTargetWidth / 2.0) + DetachedBubbleGap;
+            DetachedSatellitesRow.Margin = new Thickness(startX * 2.0, 0, 0, 0);
 
-            if (DetachedBubbleContainer.Visibility != Visibility.Visible || DetachedBubbleContainer.Opacity < 0.1)
+            // Configure secondary capsule if 3 or more concurrent tasks are running
+            if (ActiveRunningTasksCount >= 3)
             {
-                DetachedBubbleContainer.Visibility = Visibility.Visible;
+                DetachedSecondaryContainer.Visibility = Visibility.Visible;
+                if (IsVoiceRecordingActive)
+                {
+                    DetachedSecondaryText.Text = "call";
+                }
+                else if (IsScreenRecordingActive)
+                {
+                    DetachedSecondaryText.Text = "rec";
+                }
+                else
+                {
+                    DetachedSecondaryText.Text = "task";
+                }
+            }
+            else
+            {
+                DetachedSecondaryContainer.Visibility = Visibility.Collapsed;
+            }
+
+            if (DetachedSatellitesRow.Visibility != Visibility.Visible || DetachedSatellitesRow.Opacity < 0.1)
+            {
+                DetachedSatellitesRow.Visibility = Visibility.Visible;
                 var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(220))
                 {
                     EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseOut }
                 };
-                DetachedBubbleContainer.BeginAnimation(OpacityProperty, fadeIn);
+                DetachedSatellitesRow.BeginAnimation(OpacityProperty, fadeIn);
             }
         }
         else
         {
-            if (DetachedBubbleContainer.Visibility == Visibility.Visible && DetachedBubbleContainer.Opacity > 0.0)
+            if (DetachedSatellitesRow.Visibility == Visibility.Visible && DetachedSatellitesRow.Opacity > 0.0)
             {
-                var fadeOut = new DoubleAnimation(DetachedBubbleContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
+                var fadeOut = new DoubleAnimation(DetachedSatellitesRow.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
                 {
                     EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseIn }
                 };
                 fadeOut.Completed += (s, e) =>
                 {
-                    DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+                    DetachedSatellitesRow.Visibility = Visibility.Collapsed;
                 };
-                DetachedBubbleContainer.BeginAnimation(OpacityProperty, fadeOut);
+                DetachedSatellitesRow.BeginAnimation(OpacityProperty, fadeOut);
             }
             else
             {
-                DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+                DetachedSatellitesRow.Visibility = Visibility.Collapsed;
             }
         }
     }
@@ -2904,6 +2952,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Fix mismatch/clash: Filter out Windows system power & energy saver toast notifications
+        // because PowerModeWatcherService handles power mode transitions in its dedicated compact pill
+        if (notif.AppName.Contains("Power & Battery", StringComparison.OrdinalIgnoreCase) ||
+            notif.AppName.Contains("Energy saver", StringComparison.OrdinalIgnoreCase) ||
+            notif.Title.Contains("Energy saver", StringComparison.OrdinalIgnoreCase) ||
+            notif.Title.Contains("Battery saver", StringComparison.OrdinalIgnoreCase) ||
+            notif.Message.Contains("Energy saver is on", StringComparison.OrdinalIgnoreCase) ||
+            notif.Message.Contains("Energy saver is off", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         App.Log($"Processing notification in MainWindow: App={notif.AppName}, Title={notif.Title}, Message={notif.Message}");
 
         Dispatcher.Invoke(() =>
@@ -3312,6 +3372,25 @@ public partial class MainWindow : Window
         // User explicit requirement: timer stays in notch / bubble without expanding
     }
 
+    private void DetachedSecondaryContainer_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _autoCollapseTimer.Stop();
+    }
+
+    private void DetachedSecondaryContainer_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (_isExpanded && !_isPinned && !_isDraggingSlider)
+        {
+            _autoCollapseTimer.Stop();
+            _autoCollapseTimer.Start();
+        }
+    }
+
+    private void DetachedSecondaryContainer_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        // User explicit requirement: secondary satellite remains docked / compact
+    }
+
     private void OnPrivacyStateChanged(bool isCameraInUse, bool isMicInUse)
     {
         Dispatcher.Invoke(() =>
@@ -3425,4 +3504,240 @@ public partial class MainWindow : Window
             }
         }
     }
+
+    #region Open Clipboard Drag-and-Drop Interaction
+
+    private const double DragHoverWidth = 300.0;
+    private const double DragHoverHeight = 44.0;
+
+    private void IslandContainer_PreviewDragEnter(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        _isDragActive = true;
+        _dragDropFeedbackTimer.Stop();
+
+        // Enlarge dock smoothly to provide a blank landing target
+        AnimateIsland(DragHoverWidth, DragHoverHeight);
+        CompactView.Visibility = Visibility.Collapsed;
+        DragDropFeedbackOverlay.Visibility = Visibility.Visible;
+        DragDropFeedbackOverlay.Opacity = 1.0;
+        DragCopiedSuccessIndicator.Visibility = Visibility.Collapsed;
+        DragShareSuccessIndicator.Visibility = Visibility.Collapsed;
+
+        UpdateDragHoverIndicators(e.GetPosition(IslandContainer));
+        e.Effects = DragDropEffects.Copy;
+    }
+
+    private void IslandContainer_PreviewDragOver(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        _isDragActive = true;
+        UpdateDragHoverIndicators(e.GetPosition(IslandContainer));
+        e.Effects = DragDropEffects.Copy;
+    }
+
+    private void UpdateDragHoverIndicators(Point pos)
+    {
+        double width = IslandContainer.ActualWidth > 0 ? IslandContainer.ActualWidth : DragHoverWidth;
+        double ratio = Math.Clamp(pos.X / width, 0.0, 1.0);
+
+        if (ratio < 0.35)
+        {
+            // Hovering on Left Edge -> Show Green Tick + Copy
+            DragCopyIndicator.Visibility = Visibility.Visible;
+            DragShareIndicator.Visibility = Visibility.Collapsed;
+        }
+        else if (ratio > 0.65)
+        {
+            // Hovering on Right Edge -> Show Share Icon + Share
+            DragCopyIndicator.Visibility = Visibility.Collapsed;
+            DragShareIndicator.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            // Middle zone -> Dock is enlarged and blank as requested
+            DragCopyIndicator.Visibility = Visibility.Collapsed;
+            DragShareIndicator.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void IslandContainer_DragLeave(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        // Check if cursor actually left the island container boundaries
+        Point pos = e.GetPosition(IslandContainer);
+        if (pos.X < 0 || pos.Y < 0 || pos.X > IslandContainer.ActualWidth || pos.Y > IslandContainer.ActualHeight)
+        {
+            ResetDragDropState();
+        }
+    }
+
+    private void IslandContainer_PreviewDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        Point dropPos = e.GetPosition(IslandContainer);
+        double width = IslandContainer.ActualWidth > 0 ? IslandContainer.ActualWidth : DragHoverWidth;
+        double ratio = Math.Clamp(dropPos.X / width, 0.0, 1.0);
+
+        DragCopyIndicator.Visibility = Visibility.Collapsed;
+        DragShareIndicator.Visibility = Visibility.Collapsed;
+
+        if (ratio < 0.35)
+        {
+            // Left Edge Drop -> Copy to Windows Clipboard
+            ExecuteCopyDrop(e.Data);
+        }
+        else if (ratio > 0.65)
+        {
+            // Right Edge Drop -> Open Windows Share Menu
+            ExecuteShareDrop(e.Data);
+        }
+        else
+        {
+            // Dropped in neutral center -> collapse back
+            ResetDragDropState();
+        }
+    }
+
+    private void ExecuteCopyDrop(IDataObject data)
+    {
+        try
+        {
+            if (data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var files = (string[]?)data.GetData(DataFormats.FileDrop);
+                if (files != null && files.Length > 0)
+                {
+                    var fileCollection = new System.Collections.Specialized.StringCollection();
+                    fileCollection.AddRange(files);
+                    Clipboard.SetFileDropList(fileCollection);
+                }
+            }
+            else if (data.GetDataPresent(DataFormats.UnicodeText))
+            {
+                string? text = data.GetData(DataFormats.UnicodeText) as string;
+                if (!string.IsNullOrEmpty(text))
+                {
+                    Clipboard.SetText(text);
+                }
+            }
+            else if (data.GetDataPresent(DataFormats.Text))
+            {
+                string? text = data.GetData(DataFormats.Text) as string;
+                if (!string.IsNullOrEmpty(text))
+                {
+                    Clipboard.SetText(text);
+                }
+            }
+            else if (data.GetDataPresent(DataFormats.Bitmap))
+            {
+                var bmp = data.GetData(DataFormats.Bitmap) as BitmapSource;
+                if (bmp != null)
+                {
+                    Clipboard.SetImage(bmp);
+                }
+            }
+
+            // Pop out confirmed "Copied" with green tick as requested
+            DragCopiedSuccessIndicator.Visibility = Visibility.Visible;
+            DragShareSuccessIndicator.Visibility = Visibility.Collapsed;
+            _dragDropFeedbackTimer.Stop();
+            _dragDropFeedbackTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            App.Log($"Error executing copy drop: {ex.Message}");
+            ResetDragDropState();
+        }
+    }
+
+    private void ExecuteShareDrop(IDataObject data)
+    {
+        try
+        {
+            DragShareSuccessIndicator.Visibility = Visibility.Visible;
+            DragCopiedSuccessIndicator.Visibility = Visibility.Collapsed;
+            _dragDropFeedbackTimer.Stop();
+            _dragDropFeedbackTimer.Start();
+
+            // Extract file or text to share
+            string? firstFile = null;
+            string? textContent = null;
+
+            if (data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var files = (string[]?)data.GetData(DataFormats.FileDrop);
+                if (files != null && files.Length > 0)
+                {
+                    firstFile = files[0];
+                }
+            }
+            else if (data.GetDataPresent(DataFormats.UnicodeText))
+            {
+                textContent = data.GetData(DataFormats.UnicodeText) as string;
+            }
+            else if (data.GetDataPresent(DataFormats.Text))
+            {
+                textContent = data.GetData(DataFormats.Text) as string;
+            }
+
+            // Launch Windows Share Contract UI or native Share flyout
+            OpenWindowsShareDialog(firstFile, textContent);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"Error executing share drop: {ex.Message}");
+            ResetDragDropState();
+        }
+    }
+
+    private void OpenWindowsShareDialog(string? filePath, string? textContent)
+    {
+        try
+        {
+            // If it's a file, launch the shell open/share verb or Windows 11 context share
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+            {
+                // In Windows 10/11, launching explorer with file selection or shell share command
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-WindowStyle Hidden -Command \"try {{ [Windows.ApplicationModel.DataTransfer.DataTransferManager, Windows.ApplicationModel.DataTransfer, ContentType = WindowsRuntime] | Out-Null; }} catch {{}}; Start-Process -FilePath '{filePath.Replace("'", "''")}' -Verb share -ErrorAction SilentlyContinue\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                Process.Start(psi);
+            }
+            else if (!string.IsNullOrEmpty(textContent))
+            {
+                Clipboard.SetText(textContent);
+                // Also trigger modern Windows share flyout via ms-actioncenter or protocol
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "ms-settings:workplace",
+                    UseShellExecute = true
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"Share invocation: {ex.Message}");
+        }
+    }
+
+    private void ResetDragDropState()
+    {
+        _isDragActive = false;
+        DragDropFeedbackOverlay.Visibility = Visibility.Collapsed;
+        DragCopyIndicator.Visibility = Visibility.Collapsed;
+        DragShareIndicator.Visibility = Visibility.Collapsed;
+        DragCopiedSuccessIndicator.Visibility = Visibility.Collapsed;
+        DragShareSuccessIndicator.Visibility = Visibility.Collapsed;
+
+        CompactView.Visibility = Visibility.Visible;
+        UpdateCompactViewVisibility();
+        AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
+    }
+
+    #endregion
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -105,6 +105,7 @@ public partial class MainWindow : Window
 
     private const double CompactDefaultWidth = 160.0;
     private const double CompactMediaWidth = 240.0;
+    private const double CompactWifiWidth = 250.0;
     private const double CompactChargingWidth = 260.0;
     private const double CompactNotificationWidth = 220.0;
     private const double CompactUnlockWidth = 210.0;
@@ -125,6 +126,8 @@ public partial class MainWindow : Window
     private const double DetachedBubbleWidth = 78.0;
     private const double DetachedBubbleGap = 16.0;
     private const double ActivityIndicatorBlinkIntervalMs = 1000.0;
+    private double _lastDetachedRightTargetX = double.NaN;
+    private double _lastDetachedLeftTargetX = double.NaN;
     private const double CompactHeight = 36.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
@@ -139,6 +142,9 @@ public partial class MainWindow : Window
     private bool _isNightModeAlertActive = false;
     private bool _isAlarmActive = false;
     private bool _isBluetoothAlertActive = false;
+    private bool _isWifiConnected = false;
+    private bool _isHotspotActive = false;
+    private bool _isWifiAnimationActive = false;
     private BluetoothDeviceInfo? _activeBluetoothDevice = null;
     private bool _isPowerModeAlertActive = false;
     private WindowsPowerMode _activePowerMode = WindowsPowerMode.Balanced;
@@ -150,7 +156,9 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _bluetoothAlertTimer;
     private readonly DispatcherTimer _bluetoothHoverCollapseTimer;
     private readonly DispatcherTimer _powerModeAlertTimer;
+    private readonly DispatcherTimer _wifiAlertTimer;
     private readonly DispatcherTimer _dragDropFeedbackTimer;
+    private bool _isWifiAlertActive = false;
     private bool _isDragActive = false;
     private bool _isDropFeedbackActive = false;
     private bool IsFeedbackSurfaceActive => _isDragActive || _isDropFeedbackActive;
@@ -158,6 +166,7 @@ public partial class MainWindow : Window
     private readonly NightLightWatcherService _nightLightService;
     private readonly AlarmService _alarmService;
     private readonly BluetoothWatcherService _bluetoothService;
+    private readonly WifiActivityService _wifiService;
     private readonly PowerModeWatcherService _powerModeService;
     private readonly PrivacyIndicatorService _privacyService;
     private readonly WindowsClockWatcherService _windowsClockService;
@@ -170,10 +179,14 @@ public partial class MainWindow : Window
     private bool IsVoiceRecordingActive => _voiceRecordingService?.IsRecording ?? false;
     private bool IsScreenRecordingActive => _screenRecordingService?.IsRecording ?? false;
     private bool IsRecordingActivityActive => IsVoiceRecordingActive || IsScreenRecordingActive;
+    private bool IsWifiActivityActive => _isWifiAlertActive && (_isWifiConnected || _isHotspotActive);
 
     private bool IsAnyTimerActive =>
         _focusService.IsRunning ||
         _windowsClockService.HasActiveTimer;
+
+    private bool ShowRecordingDotWithMedia =>
+        IsMusicActive && IsRecordingActivityActive && !(_voiceRecordingService?.IsCallActive ?? false);
 
     // A song stays active in the dock while playing OR paused until the media app or browser tab is closed
     private bool IsMusicActive =>
@@ -224,11 +237,13 @@ public partial class MainWindow : Window
         IsVoiceRecordingActive ||
         IsAnyTimerActive ||
         IsMusicActive ||
+        IsWifiActivityActive ||
         _isChargingAlertActive ||
         _isNotificationAlertActive ||
         (_isPrivacyIndicatorActive && _appStateTracker?.CurrentState != ForegroundAppState.FullScreen);
 
     private bool HasActiveAlert =>
+        _isWifiAlertActive ||
         _isPowerModeAlertActive ||
         _isNotificationAlertActive ||
         _isBluetoothAlertActive ||
@@ -282,6 +297,7 @@ public partial class MainWindow : Window
             else if (IsVoiceRecordingActive && !IsMusicActive) baseWidth = CompactRecordingWidth;
             else if (IsAnyTimerActive) baseWidth = CompactTimerWidth;
             else if (IsMusicActive) baseWidth = CompactMediaWidth;
+            else if (IsWifiActivityActive) baseWidth = CompactWifiWidth;
             else if (_isPrivacyIndicatorActive) baseWidth = CompactDefaultWidth + 10.0;
             else baseWidth = CompactDefaultWidth;
 
@@ -297,13 +313,16 @@ public partial class MainWindow : Window
             InitializeComponent();
             App.Log("MainWindow InitializeComponent finished");
 
+            App.Log("Initializing ThemeService...");
             _themeService = new ThemeService();
             _themeService.ThemeChanged += OnThemeChanged;
             ApplyThemeResources();
 
+            App.Log("Initializing AppStateTracker...");
             _appStateTracker = new AppStateTracker();
             _appStateTracker.StateChanged += OnForegroundAppStateChanged;
 
+            App.Log("Initializing MediaManager & VolumeManager...");
             _mediaManager = new MediaManager(Dispatcher);
             _volumeManager = new VolumeManager();
             _powerService = new PowerManagerService();
@@ -314,10 +333,12 @@ public partial class MainWindow : Window
             _nightLightService = new NightLightWatcherService();
             _alarmService = new AlarmService();
             _bluetoothService = new BluetoothWatcherService();
+            _wifiService = new WifiActivityService();
             _windowsClockService = new WindowsClockWatcherService();
             _voiceRecordingService = new VoiceRecordingService();
             _screenRecordingService = new ScreenRecordingService();
 
+            App.Log("Hooking service events...");
             _mediaManager.TrackChanged += OnTrackChanged;
             _volumeManager.VolumeChanged += OnVolumeChanged;
             _powerService.PowerStatusChanged += OnPowerStatusChanged;
@@ -336,6 +357,7 @@ public partial class MainWindow : Window
             _bluetoothService.DeviceConnected += OnBluetoothDeviceConnected;
             _bluetoothService.DeviceDisconnected += OnBluetoothDeviceDisconnected;
             _bluetoothService.Start();
+            _wifiService.StateChanged += OnWifiActivityStateChanged;
             SetupBluetoothTestTriggerWatcher();
             _powerModeService = new PowerModeWatcherService();
             _powerModeService.PowerModeChanged += OnPowerModeChanged;
@@ -350,6 +372,7 @@ public partial class MainWindow : Window
             _voiceRecordingService.Start();
             _screenRecordingService.RecordingStateChanged += OnScreenRecordingStateChanged;
             _screenRecordingService.Start();
+            App.Log("All services started in constructor.");
 
             _clockTimer = new DispatcherTimer
             {
@@ -617,6 +640,33 @@ public partial class MainWindow : Window
                 ResetDragDropState();
             };
 
+            _wifiAlertTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(5.0)
+            };
+            _wifiAlertTimer.Tick += (s, e) =>
+            {
+                _wifiAlertTimer.Stop();
+                if (_isWifiAlertActive)
+                {
+                    _isWifiAlertActive = false;
+                    App.Log("Wi-Fi alert timed out after 5s - collapsing to blank notch.");
+                    var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
+                    fadeOut.Completed += (s2, e2) =>
+                    {
+                        CompactWifiView.Visibility = Visibility.Collapsed;
+                        CompactWifiView.BeginAnimation(OpacityProperty, null);
+                        CompactWifiView.Opacity = 1.0;
+                        UpdateCompactViewVisibility();
+                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
+                        {
+                            HideDockSmooth();
+                        }
+                    };
+                    CompactWifiView.BeginAnimation(OpacityProperty, fadeOut);
+                }
+            };
+
             // Listen for Windows device unlock, power mode (sleep/wake), and display settings change events
             Microsoft.Win32.SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
             Microsoft.Win32.SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
@@ -823,6 +873,7 @@ public partial class MainWindow : Window
         OnPowerStatusChanged();
         UpdateNightModePillVisibility();
         UpdateCompactViewVisibility();
+        _wifiService.Start();
         IslandContainer.Width = CurrentCompactWidth;
         IslandContainer.Height = CurrentCompactHeight;
         _volumeManager.PollVolumeState(forceNotify: true);
@@ -939,7 +990,7 @@ public partial class MainWindow : Window
 
         // User explicit requirement: "no need to expand for sound recording, timer, screen recording... it should just show in the notch..."
         // If music is active in the notch, allow expanding music player
-        if (!IsMusicActive && (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive))
+        if (!IsMusicActive && (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive || IsWifiActivityActive))
         {
             IslandContainer.Cursor = Cursors.Arrow;
             return;
@@ -1030,7 +1081,7 @@ public partial class MainWindow : Window
         if (e.LeftButton == MouseButtonState.Pressed && !_isExpanded)
         {
             // User explicit requirement: "no need to expand for sound recording, timer, screen recording... it should just show in the notch..."
-            if (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive)
+            if (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive || IsWifiActivityActive)
             {
                 return;
             }
@@ -1210,8 +1261,12 @@ public partial class MainWindow : Window
             {
                 double rightPillW = DetachedBubbleContainer.ActualWidth > 0 ? DetachedBubbleContainer.ActualWidth : DetachedBubbleWidth;
                 double rightX = (mainIslandTargetWidth / 2.0) + DetachedBubbleGap + (rightPillW / 2.0);
-                var rightAnim = new DoubleAnimation { To = rightX, Duration = dur, EasingFunction = ease };
-                DetachedRightTranslate.BeginAnimation(TranslateTransform.XProperty, rightAnim);
+                if (double.IsNaN(_lastDetachedRightTargetX) || Math.Abs(_lastDetachedRightTargetX - rightX) > 0.5)
+                {
+                    var rightAnim = new DoubleAnimation { To = rightX, Duration = dur, EasingFunction = ease };
+                    DetachedRightTranslate.BeginAnimation(TranslateTransform.XProperty, rightAnim);
+                    _lastDetachedRightTargetX = rightX;
+                }
 
                 if (DetachedBubbleContainer.Visibility != Visibility.Visible || DetachedBubbleContainer.Opacity < 0.1)
                 {
@@ -1227,13 +1282,17 @@ public partial class MainWindow : Window
                 double leftPillW = DetachedLeftContainer.ActualWidth > 0 ? DetachedLeftContainer.ActualWidth : DetachedBubbleWidth;
                 double leftX = -((mainIslandTargetWidth / 2.0) + DetachedBubbleGap + (leftPillW / 2.0));
 
-                var leftAnim = new DoubleAnimation
+                if (double.IsNaN(_lastDetachedLeftTargetX) || Math.Abs(_lastDetachedLeftTargetX - leftX) > 0.5)
                 {
-                    To = leftX,
-                    Duration = dur,
-                    EasingFunction = ease
-                };
-                DetachedLeftTranslate.BeginAnimation(TranslateTransform.XProperty, leftAnim);
+                    var leftAnim = new DoubleAnimation
+                    {
+                        To = leftX,
+                        Duration = dur,
+                        EasingFunction = ease
+                    };
+                    DetachedLeftTranslate.BeginAnimation(TranslateTransform.XProperty, leftAnim);
+                    _lastDetachedLeftTargetX = leftX;
+                }
 
                 UpdateDetachedLeftContent();
 
@@ -1265,6 +1324,7 @@ public partial class MainWindow : Window
 
             if (!showTimerOnRight)
             {
+                _lastDetachedRightTargetX = double.NaN;
                 if (DetachedBubbleContainer.Visibility == Visibility.Visible)
                 {
                     var fadeOut = new DoubleAnimation(DetachedBubbleContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150));
@@ -1279,6 +1339,8 @@ public partial class MainWindow : Window
         }
         else
         {
+            _lastDetachedRightTargetX = double.NaN;
+            _lastDetachedLeftTargetX = double.NaN;
             if (DetachedBubbleContainer.Visibility == Visibility.Visible && DetachedBubbleContainer.Opacity > 0.0)
             {
                 var fadeOut = new DoubleAnimation(DetachedBubbleContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
@@ -2118,6 +2180,143 @@ public partial class MainWindow : Window
         return null;
     }
 
+    private void OnWifiActivityStateChanged(WifiActivityState state)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            bool wasActive = _isWifiConnected || _isHotspotActive;
+            bool nowActive = state.IsWifiConnected || state.IsHotspotActive;
+
+            _isWifiConnected = state.IsWifiConnected;
+            _isHotspotActive = state.IsHotspotActive;
+
+            CompactWifiIcon.Visibility = state.IsHotspotActive ? Visibility.Collapsed : Visibility.Visible;
+            CompactHotspotIcon.Visibility = state.IsHotspotActive ? Visibility.Visible : Visibility.Collapsed;
+
+            string networkTooltip = state.IsHotspotActive
+                ? state.HotspotClientCount > 0
+                    ? $"Hotspot device: {state.HotspotClientName ?? "Device connected"}" +
+                      (string.IsNullOrWhiteSpace(state.WifiNetworkName) ? string.Empty : $"\nWi-Fi: {state.WifiNetworkName}")
+                    : "Windows mobile hotspot is active"
+                : state.IsWifiConnected && !string.IsNullOrWhiteSpace(state.WifiNetworkName)
+                    ? $"Connected to {state.WifiNetworkName}"
+                    : "Connected to Wi-Fi";
+
+            if (state.IsHotspotActive && state.HotspotClientCount > 0)
+            {
+                string connectedName = string.IsNullOrWhiteSpace(state.HotspotClientName)
+                    ? "Device connected"
+                    : state.HotspotClientName;
+                int additionalDevices = state.HotspotClientCount - 1;
+                CompactWifiStatusText.Text = additionalDevices > 0
+                    ? $"{connectedName} +{additionalDevices}"
+                    : connectedName;
+            }
+            else if (state.IsWifiConnected && !string.IsNullOrWhiteSpace(state.WifiNetworkName))
+            {
+                CompactWifiStatusText.Text = state.WifiNetworkName;
+            }
+            else
+            {
+                CompactWifiStatusText.Text = state.IsHotspotActive ? "Hotspot On" : "Wi-Fi connected";
+            }
+
+            CompactWifiView.ToolTip = networkTooltip;
+
+            // When Wi-Fi connects or Hotspot turns on, show in notch for 5 seconds then disappear
+            if (nowActive)
+            {
+                _isWifiAlertActive = true;
+                CompactWifiView.Opacity = 1.0;
+                CompactWifiView.Visibility = Visibility.Visible;
+                _wifiAlertTimer.Stop();
+                _wifiAlertTimer.Start();
+                ShowDockSmooth();
+            }
+            else
+            {
+                _isWifiAlertActive = false;
+                _wifiAlertTimer.Stop();
+                CompactWifiView.Visibility = Visibility.Collapsed;
+            }
+
+            foreach (WifiNetworkGlyph glyph in new[]
+                     { MediaWifiStatusGlyph, TimerWifiStatusGlyph, VoiceWifiStatusGlyph, ScreenRecordingWifiStatusGlyph })
+            {
+                glyph.IsHotspot = state.IsHotspotActive;
+                glyph.ToolTip = networkTooltip;
+                glyph.Visibility = IsWifiActivityActive ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            UpdateCompactViewVisibility();
+        });
+    }
+
+    private void SetWifiActivityAnimation(bool active)
+    {
+        if (_isWifiAnimationActive == active) return;
+        _isWifiAnimationActive = active;
+
+        UIElement[] signalParts =
+        {
+            CompactWifiOuterArc,
+            CompactWifiMiddleArc,
+            CompactWifiInnerArc,
+            CompactWifiDot,
+            CompactHotspotOuterArcs,
+            CompactHotspotAntenna,
+            CompactHotspotCenter,
+            MediaWifiStatusGlyph,
+            TimerWifiStatusGlyph,
+            VoiceWifiStatusGlyph,
+            ScreenRecordingWifiStatusGlyph
+        };
+
+        if (!active)
+        {
+            foreach (UIElement part in signalParts)
+            {
+                if (part == null) continue;
+                try
+                {
+                    part.BeginAnimation(OpacityProperty, null);
+                    part.Opacity = 1.0;
+                }
+                catch { }
+            }
+            return;
+        }
+
+        TimeSpan[] offsets =
+        {
+            TimeSpan.Zero,
+            TimeSpan.FromMilliseconds(140),
+            TimeSpan.FromMilliseconds(280),
+            TimeSpan.FromMilliseconds(420)
+        };
+
+        for (int i = 0; i < signalParts.Length; i++)
+        {
+            var part = signalParts[i];
+            if (part == null) continue;
+
+            try
+            {
+                part.BeginAnimation(OpacityProperty, new DoubleAnimation(1.0, 0.35,
+                    TimeSpan.FromMilliseconds(520))
+                {
+                    BeginTime = offsets[i % offsets.Length],
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever
+                });
+            }
+            catch (Exception ex)
+            {
+                App.Log($"SetWifiActivityAnimation error on index {i}: {ex.Message}");
+            }
+        }
+    }
+
     private void OnBluetoothDeviceConnected(BluetoothDeviceInfo dev)
     {
         Dispatcher.Invoke(() =>
@@ -2679,13 +2878,9 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            FocusCountdownText.Text = $"{_focusService.FormattedTime} remaining";
+            FocusCountdownText.Text = $"{FormatRemainingTime(_focusService.Remaining)} remaining";
             FocusToggleButton.Content = _focusService.IsRunning ? "Pause" : "Resume";
-
-            // Format "M:SS" or "MM:SS" matching reference (e.g. "0:58", "4:32")
-            string formattedTimer = $"{_focusService.Remaining.Minutes}:{_focusService.Remaining.Seconds:D2}";
-            CompactLiveTimerCountdownText.Text = formattedTimer;
-            DetachedTimerCountdownText.Text = formattedTimer;
+            UpdateTimerPillCountdown();
 
             // Update pause/play icon state in the compact pill
             if (_focusService.IsRunning)
@@ -2753,14 +2948,7 @@ public partial class MainWindow : Window
         {
             if (info != null && (info.IsRunning || info.RemainingTime.TotalSeconds > 0))
             {
-                int totalMins = (int)info.RemainingTime.TotalMinutes;
-                int secs = info.RemainingTime.Seconds;
-                string formattedTimer = info.RemainingTime.Hours > 0
-                    ? $"{info.RemainingTime.Hours}:{info.RemainingTime.Minutes:D2}:{secs:D2}"
-                    : $"{totalMins}:{secs:D2}";
-
-                CompactLiveTimerCountdownText.Text = formattedTimer;
-                DetachedTimerCountdownText.Text = formattedTimer;
+                string formattedTimer = FormatRemainingTime(info.RemainingTime);
                 FocusCountdownText.Text = $"{formattedTimer} remaining";
                 FocusTimerTitleText.Text = string.IsNullOrWhiteSpace(info.Name) ? "Timer Active" : $"{info.Name} Active";
 
@@ -2780,8 +2968,42 @@ public partial class MainWindow : Window
                 }
             }
 
+            UpdateTimerPillCountdown();
             UpdateCompactViewVisibility();
         });
+    }
+
+    private static string FormatRemainingTime(TimeSpan remaining)
+    {
+        int totalSeconds = Math.Max(0, (int)Math.Ceiling(remaining.TotalSeconds));
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds % 3600) / 60;
+        int seconds = totalSeconds % 60;
+
+        return hours > 0
+            ? $"{hours}:{minutes:D2}:{seconds:D2}"
+            : $"{totalSeconds / 60}:{seconds:D2}";
+    }
+
+    private void UpdateTimerPillCountdown()
+    {
+        TimeSpan? remaining = null;
+        var clockTimer = _windowsClockService.ActiveTimer;
+        if (_windowsClockService.HasActiveTimer && clockTimer != null)
+        {
+            remaining = clockTimer.RemainingTime;
+        }
+        else if (_focusService.IsRunning && _focusService.Remaining > TimeSpan.Zero)
+        {
+            remaining = _focusService.Remaining;
+        }
+
+        if (remaining.HasValue)
+        {
+            string formatted = FormatRemainingTime(remaining.Value);
+            CompactLiveTimerCountdownText.Text = formatted;
+            DetachedTimerCountdownText.Text = formatted;
+        }
     }
 
     private static readonly double[] BaseWaveProfile = { 4.5, 7.5, 13.0, 11.0, 6.0, 13.5, 17.0, 13.0, 7.5, 4.5, 8.0, 12.0, 4.5 };
@@ -3255,6 +3477,7 @@ public partial class MainWindow : Window
     {
         if (_isExpanded)
         {
+            SetWifiActivityAnimation(false);
             CompactView.Visibility = Visibility.Collapsed;
             DetachedBubbleContainer.Visibility = Visibility.Collapsed;
             DetachedLeftContainer.Visibility = Visibility.Collapsed;
@@ -3263,6 +3486,7 @@ public partial class MainWindow : Window
 
         if (_isDragActive || _isDropFeedbackActive || _dragDropFeedbackTimer.IsEnabled)
         {
+            SetWifiActivityAnimation(false);
             CompactView.Visibility = Visibility.Collapsed;
             ExpandedContainer.Visibility = Visibility.Collapsed;
             DetachedBubbleContainer.Visibility = Visibility.Collapsed;
@@ -3279,8 +3503,12 @@ public partial class MainWindow : Window
         {
             ShowDockSmooth();
         }
+        CompactWifiView.Visibility = Visibility.Collapsed;
 
-        bool showRecordingDotWithMedia = IsMusicActive && IsRecordingActivityActive && !(_voiceRecordingService?.IsCallActive ?? false);
+        bool showRecordingDotWithMedia = ShowRecordingDotWithMedia;
+        MediaPrivacyPanel.Visibility = _isPrivacyIndicatorActive || showRecordingDotWithMedia
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         if (showRecordingDotWithMedia)
         {
             CompactRecordingActivityDot.Visibility = Visibility.Visible;
@@ -3636,8 +3864,13 @@ public partial class MainWindow : Window
 
             CompactNightModePill.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
+            if (IsWifiActivityActive)
+            {
+                CompactWifiView.Visibility = Visibility.Visible;
+            }
         }
 
+        SetWifiActivityAnimation(IsWifiActivityActive);
         UpdateNightModePillVisibility();
         UpdatePrivacyIndicatorsUI(_isCameraActive, _isMicrophoneActive);
 
@@ -3750,7 +3983,9 @@ public partial class MainWindow : Window
         Visibility anyVis = anyActive ? Visibility.Visible : Visibility.Collapsed;
 
         // 1. Media View: Equalizer shifts to the left, privacy dots sit on the right
-        MediaPrivacyPanel.Visibility = anyVis;
+        MediaPrivacyPanel.Visibility = anyActive || ShowRecordingDotWithMedia
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         MediaCameraDot.Visibility = camVis;
         MediaMicDot.Visibility = micVis;
 

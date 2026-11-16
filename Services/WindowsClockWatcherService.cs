@@ -59,7 +59,9 @@ public class WindowsClockWatcherService
 
         _pollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(200)
+            // Keep a responsive local countdown without polling the Clock UI
+            // and publishing timer updates several times per second.
+            Interval = TimeSpan.FromMilliseconds(500)
         };
         _pollTimer.Tick += (s, e) => PollTimers();
     }
@@ -78,6 +80,7 @@ public class WindowsClockWatcherService
             // If we have an active running timer, decrement remaining time smoothly
             if (_activeTimer != null && _activeTimer.IsRunning)
             {
+                int previousDisplayedSecond = GetDisplayedSecond(_activeTimer.RemainingTime);
                 var remaining = _activeTimer.EndTime - DateTime.Now;
                 if (remaining.TotalSeconds <= 0)
                 {
@@ -90,7 +93,10 @@ public class WindowsClockWatcherService
                 else
                 {
                     _activeTimer.RemainingTime = remaining;
-                    TimerStateChanged?.Invoke(_activeTimer);
+                    if (GetDisplayedSecond(remaining) != previousDisplayedSecond)
+                    {
+                        TimerStateChanged?.Invoke(_activeTimer);
+                    }
                 }
             }
 
@@ -233,7 +239,7 @@ public class WindowsClockWatcherService
                                _activeTimer.IsRunning != resolved.IsRunning ||
                                Math.Abs((_activeTimer.RemainingTime - resolved.RemainingTime).TotalSeconds) > 1.5;
 
-                if (changed || (_activeTimer != null && !_activeTimer.IsRunning))
+                if (changed)
                 {
                     _activeTimer = resolved;
                     App.Log($"Windows Clock timer detected: {resolved.Name}, remaining={resolved.RemainingTime:c}, running={resolved.IsRunning}");
@@ -450,7 +456,7 @@ public class WindowsClockWatcherService
                                _activeTimer.IsRunning != resolvedTimer.IsRunning ||
                                Math.Abs((_activeTimer.RemainingTime - resolvedTimer.RemainingTime).TotalSeconds) > 1.5;
 
-                if (changed || (_activeTimer != null && !_activeTimer.IsRunning))
+                if (changed)
                 {
                     _activeTimer = resolvedTimer;
                     TimerStateChanged?.Invoke(_activeTimer);
@@ -467,6 +473,9 @@ public class WindowsClockWatcherService
             App.Log($"WindowsClockWatcherService ReadClockSettings error: {ex.Message}");
         }
     }
+
+    private static int GetDisplayedSecond(TimeSpan remaining) =>
+        Math.Max(0, (int)Math.Ceiling(remaining.TotalSeconds));
 
     public void PauseActiveTimer()
     {

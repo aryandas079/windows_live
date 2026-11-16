@@ -20,7 +20,7 @@ The app is built with WPF and .NET 10 for Windows. It uses Windows media control
 | Desktop UI | WPF, XAML | Dock, compact and expanded activity views, animation, and controls. |
 | UI components | WPF-UI 4.3.0 | Fluent-styled icons and interface components. |
 | Media | Windows Runtime `GlobalSystemMediaTransportControlsSessionManager` | Discover media sessions and read track, artwork, playback, and timeline state. |
-| Windows integrations | Windows Runtime APIs | Battery and power status, Bluetooth discovery, notifications, clipboard, and native Share UI. |
+| Windows integrations | Windows Runtime APIs and .NET networking APIs | Battery and power status, Bluetooth discovery, Wi-Fi connection and hotspot adapter status, notifications, clipboard, and native Share UI. |
 | Native Windows interop | Win32 P/Invoke and COM | Window positioning and hit testing, topmost behavior, Core Audio endpoint volume, and selected system signals. |
 | Brightness | `System.Management` 9.0.2 and WMI | Read and change monitor brightness where supported by the display and driver. |
 | Clock timers | Windows UI Automation and Windows Clock app settings | Read active timer state and remaining time. |
@@ -41,7 +41,7 @@ The project targets `net10.0-windows10.0.22621.0` and uses the .NET SDK's defaul
 - **Adaptive presentation:** use a top-attached notch or floating pill, with compact and expanded layouts, system theme and accent colors, and foreground-window behavior.
 - **Startup support:** register the app to launch at sign-in. The installer and the app's startup service manage the startup entries.
 
-Windows and application versions expose different information. Media artwork, notification access, Clock timer details, and some recording or privacy signals depend on the source app and Windows permissions/APIs.
+Windows and application versions expose different information. Media artwork, notification access, Clock timer details, and some recording or privacy signals depend on the source app and Windows permissions/APIs. Wi-Fi status reflects this computer's network adapters; the app does not scan the local network or enumerate devices connected to the same router.
 
 ## Requirements
 

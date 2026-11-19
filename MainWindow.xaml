@@ -421,18 +421,18 @@
                 <Grid x:Name="CompactSilentRingView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="6,0,16,0">
+                      Margin="4,0,10,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" MinWidth="16" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <!-- Left: Coral/Red Capsule for Silent OR White Bell for Ring -->
                     <Border x:Name="CompactSilentBadge"
                             Grid.Column="0"
-                            Width="54" Height="28"
-                            CornerRadius="14"
+                            Width="46" Height="26"
+                            CornerRadius="13"
                             Background="#FF453A"
                             VerticalAlignment="Center">
                         <!-- Muted Bell Icon with Diagonal Strike Line -->
@@ -451,7 +451,7 @@
                     <!-- Alternate Ring Icon (White unmuted bell) -->
                     <Border x:Name="CompactRingBadge"
                             Grid.Column="0"
-                            Width="28" Height="28"
+                            Width="26" Height="26"
                             VerticalAlignment="Center"
                             Visibility="Collapsed">
                         <Canvas Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -468,29 +468,29 @@
                     <TextBlock x:Name="CompactSilentRingText"
                                Grid.Column="2"
                                Text="Silent"
-                               FontSize="16"
+                               FontSize="14.5"
                                FontWeight="SemiBold"
                                Foreground="#FF453A"
                                VerticalAlignment="Center"
-                               Margin="0,0,4,0" />
+                               Margin="0,0,2,0" />
                 </Grid>
 
                 <!-- 7. Focus / Do Not Disturb (DND) Alert Mode -->
                 <Grid x:Name="CompactDndView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="8,0,16,0">
+                      Margin="4,0,10,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" MinWidth="16" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <!-- Left: Purple Moon / DND Capsule Badge -->
                     <Border x:Name="CompactDndBadge"
                             Grid.Column="0"
-                            Width="54" Height="28"
-                            CornerRadius="14"
+                            Width="46" Height="26"
+                            CornerRadius="13"
                             Background="#AF52DE"
                             VerticalAlignment="Center">
                         <!-- Crescent Moon Icon -->
@@ -507,11 +507,11 @@
                     <TextBlock x:Name="CompactDndText"
                                Grid.Column="2"
                                Text="Do Not Disturb"
-                               FontSize="15"
+                               FontSize="14"
                                FontWeight="SemiBold"
                                Foreground="#AF52DE"
                                VerticalAlignment="Center"
-                               Margin="0,0,4,0" />
+                               Margin="0,0,2,0" />
                 </Grid>
 
                 <!-- 8. Live Active Timer Pill (Matches User Uploaded Reference Exactly) -->

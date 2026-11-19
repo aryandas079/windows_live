@@ -109,8 +109,8 @@ public partial class MainWindow : Window
     private const double CompactChargingWidth = 260.0;
     private const double CompactNotificationWidth = 220.0;
     private const double CompactUnlockWidth = 210.0;
-    private const double CompactSilentRingWidth = 200.0;
-    private const double CompactDndWidth = 240.0;
+    private const double CompactSilentRingWidth = 240.0;
+    private const double CompactDndWidth = 260.0;
     private const double CompactNightModeWidth = 240.0;
     private const double CompactAlarmWidth = 130.0;
     private const double CompactBluetoothWidth = 230.0;
@@ -3697,8 +3697,11 @@ public partial class MainWindow : Window
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactNotificationView.Visibility = Visibility.Visible;
         }
-        else if (IsMusicActive && IsRecordingActivityActive && IsAnyTimerActive)
+        else if (IsSplitActive)
         {
+            // Apple Dynamic Island Split Multi-Activity Presentation:
+            // Main notch displays compact music (album artwork on left, pulsing waveform on right)
+            // Detached satellite bubble displays amber live countdown on the right
             CompactAlarmView.Visibility = Visibility.Collapsed;
             CompactClockView.Visibility = Visibility.Collapsed;
             CompactChargingView.Visibility = Visibility.Collapsed;
@@ -3710,46 +3713,10 @@ public partial class MainWindow : Window
             CompactBluetoothView.Visibility = Visibility.Collapsed;
             CompactPowerModeView.Visibility = Visibility.Collapsed;
             CompactLiveTimerView.Visibility = Visibility.Collapsed;
+            CompactMediaView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
-            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
-            CompactMediaView.Visibility = Visibility.Visible;
-        }
-        else if (IsMusicActive && IsRecordingActivityActive)
-        {
-            CompactAlarmView.Visibility = Visibility.Collapsed;
-            CompactClockView.Visibility = Visibility.Collapsed;
-            CompactChargingView.Visibility = Visibility.Collapsed;
-            CompactNotificationView.Visibility = Visibility.Collapsed;
-            CompactUnlockView.Visibility = Visibility.Collapsed;
-            CompactSilentRingView.Visibility = Visibility.Collapsed;
-            CompactDndView.Visibility = Visibility.Collapsed;
-            CompactNightModeView.Visibility = Visibility.Collapsed;
-            CompactBluetoothView.Visibility = Visibility.Collapsed;
-            CompactPowerModeView.Visibility = Visibility.Collapsed;
-            CompactLiveTimerView.Visibility = Visibility.Collapsed;
-            CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
-            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
-            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
-            CompactMediaView.Visibility = Visibility.Visible;
-        }
-        else if (IsMusicActive && IsAnyTimerActive)
-        {
-            CompactAlarmView.Visibility = Visibility.Collapsed;
-            CompactClockView.Visibility = Visibility.Collapsed;
-            CompactChargingView.Visibility = Visibility.Collapsed;
-            CompactNotificationView.Visibility = Visibility.Collapsed;
-            CompactUnlockView.Visibility = Visibility.Collapsed;
-            CompactSilentRingView.Visibility = Visibility.Collapsed;
-            CompactDndView.Visibility = Visibility.Collapsed;
-            CompactNightModeView.Visibility = Visibility.Collapsed;
-            CompactBluetoothView.Visibility = Visibility.Collapsed;
-            CompactPowerModeView.Visibility = Visibility.Collapsed;
-            CompactLiveTimerView.Visibility = Visibility.Collapsed;
-            CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
-            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
-            SplitLeadingMediaView.Visibility = Visibility.Collapsed;
-            CompactMediaView.Visibility = Visibility.Visible;
+            SplitLeadingMediaView.Visibility = Visibility.Visible;
         }
         else if (IsScreenRecordingActive)
         {
@@ -3786,27 +3753,6 @@ public partial class MainWindow : Window
             SplitLeadingMediaView.Visibility = Visibility.Collapsed;
             CompactScreenRecordingView.Visibility = Visibility.Collapsed;
             CompactVoiceRecordingView.Visibility = Visibility.Visible;
-        }
-        else if (IsSplitActive)
-        {
-            // Apple Dynamic Island Split Multi-Activity Presentation:
-            // Main notch displays compact music (album artwork on left, pulsing waveform on right)
-            // Detached satellite bubble displays amber live countdown on the right
-            CompactAlarmView.Visibility = Visibility.Collapsed;
-            CompactClockView.Visibility = Visibility.Collapsed;
-            CompactChargingView.Visibility = Visibility.Collapsed;
-            CompactNotificationView.Visibility = Visibility.Collapsed;
-            CompactUnlockView.Visibility = Visibility.Collapsed;
-            CompactSilentRingView.Visibility = Visibility.Collapsed;
-            CompactDndView.Visibility = Visibility.Collapsed;
-            CompactNightModeView.Visibility = Visibility.Collapsed;
-            CompactBluetoothView.Visibility = Visibility.Collapsed;
-            CompactPowerModeView.Visibility = Visibility.Collapsed;
-            CompactLiveTimerView.Visibility = Visibility.Collapsed;
-            CompactMediaView.Visibility = Visibility.Collapsed;
-            CompactVoiceRecordingView.Visibility = Visibility.Collapsed;
-            CompactScreenRecordingView.Visibility = Visibility.Collapsed;
-            SplitLeadingMediaView.Visibility = Visibility.Visible;
         }
         else if (IsAnyTimerActive)
         {

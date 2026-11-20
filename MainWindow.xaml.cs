@@ -468,17 +468,19 @@ public partial class MainWindow : Window
                 _chargingAlertTimer.Stop();
                 if (_isChargingAlertActive)
                 {
-                    _isChargingAlertActive = false;
-
-                    // Restore shadow effect from charging glow
-                    IslandShadowEffect.Color = _themeService.IsDarkTheme ? Colors.Black : Color.FromArgb(255, 60, 60, 70);
-                    IslandShadowEffect.Opacity = _themeService.IsDarkTheme ? 0.55 : 0.25;
-                    IslandShadowEffect.BlurRadius = _themeService.IsDarkTheme ? 22 : 18;
-
                     var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
                     fadeOut.Completed += (s2, e2) =>
                     {
+                        _isChargingAlertActive = false;
+                        CompactChargingView.BeginAnimation(OpacityProperty, null);
+                        CompactChargingView.Opacity = 1.0;
                         CompactChargingView.Visibility = Visibility.Collapsed;
+
+                        // Restore shadow effect from charging glow
+                        IslandShadowEffect.Color = _themeService.IsDarkTheme ? Colors.Black : Color.FromArgb(255, 60, 60, 70);
+                        IslandShadowEffect.Opacity = _themeService.IsDarkTheme ? 0.55 : 0.25;
+                        IslandShadowEffect.BlurRadius = _themeService.IsDarkTheme ? 22 : 18;
+
                         UpdateCompactViewVisibility();
                         if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
                         {
@@ -498,10 +500,12 @@ public partial class MainWindow : Window
                 _unlockAlertTimer.Stop();
                 if (_isUnlockAlertActive)
                 {
-                    _isUnlockAlertActive = false;
                     var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(180));
                     fadeOut.Completed += (s2, e2) =>
                     {
+                        _isUnlockAlertActive = false;
+                        CompactUnlockView.BeginAnimation(OpacityProperty, null);
+                        CompactUnlockView.Opacity = 1.0;
                         CompactUnlockView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
                         if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
@@ -522,10 +526,12 @@ public partial class MainWindow : Window
                 _silentRingAlertTimer.Stop();
                 if (_isSilentRingAlertActive)
                 {
-                    _isSilentRingAlertActive = false;
                     var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
                     fadeOut.Completed += (s2, e2) =>
                     {
+                        _isSilentRingAlertActive = false;
+                        CompactSilentRingView.BeginAnimation(OpacityProperty, null);
+                        CompactSilentRingView.Opacity = 1.0;
                         CompactSilentRingView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
                         if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
@@ -546,10 +552,12 @@ public partial class MainWindow : Window
                 _dndAlertTimer.Stop();
                 if (_isDndAlertActive)
                 {
-                    _isDndAlertActive = false;
                     var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
                     fadeOut.Completed += (s2, e2) =>
                     {
+                        _isDndAlertActive = false;
+                        CompactDndView.BeginAnimation(OpacityProperty, null);
+                        CompactDndView.Opacity = 1.0;
                         CompactDndView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
                         if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
@@ -570,10 +578,12 @@ public partial class MainWindow : Window
                 _nightModeAlertTimer.Stop();
                 if (_isNightModeAlertActive)
                 {
-                    _isNightModeAlertActive = false;
                     var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
                     fadeOut.Completed += (s2, e2) =>
                     {
+                        _isNightModeAlertActive = false;
+                        CompactNightModeView.BeginAnimation(OpacityProperty, null);
+                        CompactNightModeView.Opacity = 1.0;
                         CompactNightModeView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
                         if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
@@ -594,11 +604,13 @@ public partial class MainWindow : Window
                 _bluetoothAlertTimer.Stop();
                 if (_isBluetoothAlertActive && !_isExpanded)
                 {
-                    _isBluetoothAlertActive = false;
-                    _activeBluetoothDevice = null;
                     var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
                     fadeOut.Completed += (s2, e2) =>
                     {
+                        _isBluetoothAlertActive = false;
+                        _activeBluetoothDevice = null;
+                        CompactBluetoothView.BeginAnimation(OpacityProperty, null);
+                        CompactBluetoothView.Opacity = 1.0;
                         CompactBluetoothView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
                         if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
@@ -634,17 +646,18 @@ public partial class MainWindow : Window
                 _powerModeAlertTimer.Stop();
                 if (_isPowerModeAlertActive)
                 {
-                    _isPowerModeAlertActive = false;
                     var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
                     fadeOut.Completed += (s2, e2) =>
                     {
+                        _isPowerModeAlertActive = false;
+                        CompactPowerModeView.BeginAnimation(OpacityProperty, null);
+                        CompactPowerModeView.Opacity = 1.0;
                         CompactPowerModeView.Visibility = Visibility.Collapsed;
                         // Restore island shadow
                         IslandShadowEffect.Color = _themeService.IsDarkTheme ? Colors.Black : Color.FromArgb(255, 60, 60, 70);
                         IslandShadowEffect.Opacity = _themeService.IsDarkTheme ? 0.55 : 0.25;
                         IslandShadowEffect.BlurRadius = _themeService.IsDarkTheme ? 22 : 18;
                         UpdateCompactViewVisibility();
-                        AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
                     };
                     CompactPowerModeView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -1870,45 +1883,74 @@ public partial class MainWindow : Window
         {
             _isUnlockAlertActive = false;
             _unlockAlertTimer.Stop();
+            CompactUnlockView.BeginAnimation(OpacityProperty, null);
+            CompactUnlockView.Opacity = 1.0;
             CompactUnlockView.Visibility = Visibility.Collapsed;
         }
         if (_isSilentRingAlertActive)
         {
             _isSilentRingAlertActive = false;
             _silentRingAlertTimer.Stop();
+            CompactSilentRingView.BeginAnimation(OpacityProperty, null);
+            CompactSilentRingView.Opacity = 1.0;
             CompactSilentRingView.Visibility = Visibility.Collapsed;
         }
         if (_isDndAlertActive)
         {
             _isDndAlertActive = false;
             _dndAlertTimer.Stop();
+            CompactDndView.BeginAnimation(OpacityProperty, null);
+            CompactDndView.Opacity = 1.0;
             CompactDndView.Visibility = Visibility.Collapsed;
         }
         if (_isNightModeAlertActive)
         {
             _isNightModeAlertActive = false;
             _nightModeAlertTimer.Stop();
+            CompactNightModeView.BeginAnimation(OpacityProperty, null);
+            CompactNightModeView.Opacity = 1.0;
             CompactNightModeView.Visibility = Visibility.Collapsed;
         }
         if (_isChargingAlertActive)
         {
             _isChargingAlertActive = false;
             _chargingAlertTimer.Stop();
+            CompactChargingView.BeginAnimation(OpacityProperty, null);
+            CompactChargingView.Opacity = 1.0;
             CompactChargingView.Visibility = Visibility.Collapsed;
+        }
+        if (_isBluetoothAlertActive)
+        {
+            _isBluetoothAlertActive = false;
+            _bluetoothAlertTimer.Stop();
+            _activeBluetoothDevice = null;
+            CompactBluetoothView.BeginAnimation(OpacityProperty, null);
+            CompactBluetoothView.Opacity = 1.0;
+            CompactBluetoothView.Visibility = Visibility.Collapsed;
+        }
+        if (_isNotificationAlertActive)
+        {
+            _isNotificationAlertActive = false;
+            _notificationAlertTimer.Stop();
+            CompactNotificationView.BeginAnimation(OpacityProperty, null);
+            CompactNotificationView.Opacity = 1.0;
+            CompactNotificationView.Visibility = Visibility.Collapsed;
         }
         if (!keepPowerMode && _isPowerModeAlertActive)
         {
             _isPowerModeAlertActive = false;
             _powerModeAlertTimer.Stop();
+            CompactPowerModeView.BeginAnimation(OpacityProperty, null);
+            CompactPowerModeView.Opacity = 1.0;
             CompactPowerModeView.Visibility = Visibility.Collapsed;
         }
-        if (!keepWifi)
+        if (!keepWifi && _isWifiAlertActive)
         {
             _isWifiAlertActive = false;
             _wifiAlertTimer.Stop();
             CompactWifiView.BeginAnimation(OpacityProperty, null);
-            CompactWifiView.Visibility = Visibility.Collapsed;
             CompactWifiView.Opacity = 1.0;
+            CompactWifiView.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -1950,11 +1992,11 @@ public partial class MainWindow : Window
         if (!_isWifiAlertActive && CompactWifiView.Visibility == Visibility.Collapsed) return;
 
         App.Log("DismissWifiAlert: 5s alert elapsed; fading out Wi-Fi notch view.");
-        _isWifiAlertActive = false;
 
         var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
         fadeOut.Completed += (s, e) =>
         {
+            _isWifiAlertActive = false;
             CompactWifiView.BeginAnimation(OpacityProperty, null);
             CompactWifiView.Opacity = 1.0;
             CompactWifiView.Visibility = Visibility.Collapsed;
@@ -2070,6 +2112,7 @@ public partial class MainWindow : Window
     }
 
     private FileSystemWatcher? _btTriggerWatcher;
+    private FileSystemWatcher? _testTriggerWatcher;
     private void SetupBluetoothTestTriggerWatcher()
     {
         try
@@ -2082,6 +2125,14 @@ public partial class MainWindow : Window
             };
             _btTriggerWatcher.Changed += (s, e) => HandleTriggerFile(e.FullPath);
             _btTriggerWatcher.Created += (s, e) => HandleTriggerFile(e.FullPath);
+
+            _testTriggerWatcher = new FileSystemWatcher(dir, "test_trigger.txt")
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+                EnableRaisingEvents = true
+            };
+            _testTriggerWatcher.Changed += (s, e) => HandleTriggerFile(e.FullPath);
+            _testTriggerWatcher.Created += (s, e) => HandleTriggerFile(e.FullPath);
         }
         catch { }
     }
@@ -2099,6 +2150,30 @@ public partial class MainWindow : Window
 
             string[] parts = text.Split(new[] { '|', ',' }, StringSplitOptions.RemoveEmptyEntries);
             string name = parts[0].Trim();
+
+            if (name.Equals("dnd", StringComparison.OrdinalIgnoreCase) || name.Equals("dnd_on", StringComparison.OrdinalIgnoreCase))
+            {
+                Dispatcher.Invoke(() => ShowDndAnimation(FocusAssistState.PriorityOnly));
+                return;
+            }
+            if (name.Equals("dnd_off", StringComparison.OrdinalIgnoreCase))
+            {
+                Dispatcher.Invoke(() => ShowDndAnimation(FocusAssistState.Off));
+                return;
+            }
+            if (name.Equals("wifi", StringComparison.OrdinalIgnoreCase))
+            {
+                string net = parts.Length > 1 ? parts[1].Trim() : "Jio_5";
+                Dispatcher.Invoke(() => TriggerWifiConnectedAlert(net, false));
+                return;
+            }
+            if (name.Equals("hotspot", StringComparison.OrdinalIgnoreCase))
+            {
+                string net = parts.Length > 1 ? parts[1].Trim() : "iPhone Hotspot";
+                Dispatcher.Invoke(() => TriggerWifiConnectedAlert(net, true));
+                return;
+            }
+
             int? battery = null;
             if (parts.Length > 1 && int.TryParse(parts[1].Trim(), out int b))
             {
@@ -3539,7 +3614,7 @@ public partial class MainWindow : Window
             CompactRecordingActivityDot.Visibility = Visibility.Collapsed;
         }
 
-        if (HasActiveAlert)
+        if (!IsSplitActive || HasActiveAlert)
         {
             DetachedBubbleContainer.Visibility = Visibility.Collapsed;
             DetachedLeftContainer.Visibility = Visibility.Collapsed;
@@ -3905,7 +3980,7 @@ public partial class MainWindow : Window
         bool isBlankNotch = !IsMusicActive && !IsVoiceRecordingActive && !IsScreenRecordingActive && !IsAnyTimerActive &&
                             !_isAlarmActive && !_isBluetoothAlertActive && !_isPowerModeAlertActive &&
                             !_isChargingAlertActive && !_isNotificationAlertActive && !_isIncomingCallActive && !_isUnlockAlertActive &&
-                            !_isSilentRingAlertActive && !_isDndAlertActive && !_isNightModeAlertActive &&
+                            !_isSilentRingAlertActive && !_isDndAlertActive && !_isNightModeAlertActive && !_isWifiAlertActive &&
                             CompactClockView.Visibility != Visibility.Visible;
 
         PrivacyIndicatorPanel.Visibility = (anyActive && isBlankNotch) ? Visibility.Visible : Visibility.Collapsed;

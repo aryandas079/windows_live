@@ -14,5 +14,6 @@ public enum IslandCategory
     TimerQuickSet,
     VoiceRecording,
     ScreenRecording,
-    BluetoothDevice
+    BluetoothDevice,
+    IncomingCall
 }

@@ -66,7 +66,8 @@
                   Height="36"
                   VerticalAlignment="Top"
                   Margin="12,0,12,0"
-                  Opacity="1.0">
+                  Opacity="1.0"
+                  ClipToBounds="True">
 
                 <!-- 1. Default Mode: Clock & Date (Hidden by default for empty blank notch) -->
                 <Grid x:Name="CompactClockView"
@@ -843,6 +844,74 @@
                     </StackPanel>
                 </Grid>
 
+                <!-- 10.5. Incoming Call Compact View: Apple Dynamic Island Ringing State -->
+                <Grid x:Name="CompactIncomingCallView"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      Margin="10,0,10,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Pulsing Green Phone Handset + Caller Name -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Viewbox x:Name="CompactIncomingPhoneIcon" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <Canvas Width="24" Height="24">
+                                <Path Fill="#30D158"
+                                      Data="M 6.62,10.79 C 8.06,13.62 10.38,15.94 13.21,17.38 L 15.41,15.18 C 15.69,14.9 16.08,14.82 16.43,14.93 C 17.55,15.3 18.75,15.5 20,15.5 C 20.55,15.5 21,15.95 21,16.5 L 21,20 C 21,20.55 20.55,21 20,21 C 10.61,21 3,13.39 3,4 C 3,3.45 3.45,3 4,3 L 7.5,3 C 8.05,3 8.5,3.45 8.5,4 C 8.5,5.25 8.7,6.45 9.07,7.57 C 9.18,7.92 9.1,8.31 8.82,8.59 L 6.62,10.79 Z" />
+                            </Canvas>
+                        </Viewbox>
+                        <TextBlock x:Name="CompactIncomingCallerText"
+                                   Text="Incoming Call"
+                                   FontSize="14.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="#30D158"
+                                   MaxWidth="120"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Center: Notch Spacer -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Quick Accept / Decline Action Buttons -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Mini Decline Button (Red) -->
+                        <Border x:Name="CompactDeclineBtn"
+                                Width="26" Height="26"
+                                CornerRadius="13"
+                                Background="#FF453A"
+                                Cursor="Hand"
+                                Margin="0,0,8,0"
+                                MouseDown="DeclineCall_Click">
+                            <Viewbox Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Canvas Width="24" Height="24">
+                                    <!-- End call / Downward handset -->
+                                    <Path Fill="White"
+                                          Data="M 12,9 C 8.7,9 5.7,10.1 3.3,12 L 1.2,9.9 C 4.1,7.4 7.9,6 12,6 C 16.1,6 19.9,7.4 22.8,9.9 L 20.7,12 C 18.3,10.1 15.3,9 12,9 Z M 5.1,16.5 C 5.5,16.1 6,15.9 6.6,15.9 C 7.2,15.9 7.7,16.1 8.1,16.5 L 9.9,18.3 C 10.3,18.7 10.5,19.2 10.5,19.8 L 10.5,21.5 C 10.5,22.3 9.8,23 9,23 L 4.5,23 C 3.7,23 3,22.3 3,21.5 L 3,18.8 C 3,18 3.3,17.2 3.9,16.6 L 5.1,16.5 Z M 18.9,16.5 C 19.5,17.1 19.8,17.9 19.8,18.8 L 19.8,21.5 C 19.8,22.3 19.1,23 18.3,23 L 13.8,23 C 13,23 12.3,22.3 12.3,21.5 L 12.3,19.8 C 12.3,19.2 12.5,18.7 12.9,18.3 L 14.7,16.5 C 15.1,16.1 15.6,15.9 16.2,15.9 C 16.8,15.9 17.3,16.1 17.7,16.5 L 18.9,16.5 Z" />
+                                </Canvas>
+                            </Viewbox>
+                        </Border>
+
+                        <!-- Mini Accept Button (Green) -->
+                        <Border x:Name="CompactAcceptBtn"
+                                Width="26" Height="26"
+                                CornerRadius="13"
+                                Background="#30D158"
+                                Cursor="Hand"
+                                MouseDown="AcceptCall_Click">
+                            <Viewbox Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Canvas Width="24" Height="24">
+                                    <Path Fill="White"
+                                          Data="M 6.62,10.79 C 8.06,13.62 10.38,15.94 13.21,17.38 L 15.41,15.18 C 15.69,14.9 16.08,14.82 16.43,14.93 C 17.55,15.3 18.75,15.5 20,15.5 C 20.55,15.5 21,15.95 21,16.5 L 21,20 C 21,20.55 20.55,21 20,21 C 10.61,21 3,13.39 3,4 C 3,3.45 3.45,3 4,3 L 7.5,3 C 8.05,3 8.5,3.45 8.5,4 C 8.5,5.25 8.7,6.45 9.07,7.57 C 9.18,7.92 9.1,8.31 8.82,8.59 L 6.62,10.79 Z" />
+                                </Canvas>
+                            </Viewbox>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
                 <!-- 11. Screen Recording Mode: Matches media_1794687755340_89cff412.png -->
                 <Grid x:Name="CompactScreenRecordingView"
                       Visibility="Collapsed"
@@ -1109,6 +1178,7 @@
                   Opacity="0.0"
                   Visibility="Collapsed"
                   Margin="22,12,22,14"
+                  ClipToBounds="True"
                   VerticalAlignment="Center">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
@@ -1475,6 +1545,138 @@
                         <Border Grid.Column="2" Background="#22FF453A" CornerRadius="12" Padding="10,4,10,4" VerticalAlignment="Center">
                             <TextBlock Text="RECORDING" FontSize="11" FontWeight="Bold" Foreground="#FF453A" />
                         </Border>
+                    </Grid>
+
+                    <!-- ============================================== -->
+                    <!-- 10.5. INCOMING CALL EXPANDED BANNER (Apple Dynamic Island) -->
+                    <!-- ============================================== -->
+                    <Grid x:Name="ViewIncomingCall" Visibility="Collapsed" VerticalAlignment="Center" Margin="2,4,2,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Caller Profile Avatar or App Squircle (52x52) -->
+                        <Grid Grid.Column="0" Width="52" Height="52" Margin="0,0,14,0" VerticalAlignment="Center">
+                            <!-- Circular Avatar Background / Fallback -->
+                            <Border x:Name="IncomingCallerAvatarBorder"
+                                    Width="52" Height="52"
+                                    CornerRadius="26"
+                                    Background="#2C2C2E"
+                                    ClipToBounds="True">
+                                <Image x:Name="IncomingCallerAvatarImage"
+                                       Stretch="UniformToFill"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                            </Border>
+
+                            <!-- Fallback Initials / App Icon -->
+                            <controls:AppIconControl x:Name="IncomingCallAppIcon"
+                                                     Width="52" Height="52"
+                                                     CornerRadius="26"
+                                                     IconPadding="12"
+                                                     Visibility="Collapsed" />
+
+                            <!-- Mini Phone Badge on Avatar bottom-right -->
+                            <Border Width="18" Height="18" CornerRadius="9"
+                                    Background="#30D158"
+                                    BorderBrush="#000000" BorderThickness="1.5"
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    Margin="0,0,-2,-2">
+                                <Viewbox Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Canvas Width="24" Height="24">
+                                        <Path Fill="White"
+                                              Data="M 6.62,10.79 C 8.06,13.62 10.38,15.94 13.21,17.38 L 15.41,15.18 C 15.69,14.9 16.08,14.82 16.43,14.93 C 17.55,15.3 18.75,15.5 20,15.5 C 20.55,15.5 21,15.95 21,16.5 L 21,20 C 21,20.55 20.55,21 20,21 C 10.61,21 3,13.39 3,4 C 3,3.45 3.45,3 4,3 L 7.5,3 C 8.05,3 8.5,3.45 8.5,4 C 8.5,5.25 8.7,6.45 9.07,7.57 C 9.18,7.92 9.1,8.31 8.82,8.59 L 6.62,10.79 Z" />
+                                    </Canvas>
+                                </Viewbox>
+                            </Border>
+                        </Grid>
+
+                        <!-- Caller Information (Title & App / Subtext) -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="IncomingCallSubtext"
+                                       Text="INCOMING CALL"
+                                       FontSize="11"
+                                       FontWeight="Bold"
+                                       Foreground="#8E8E93"
+                                       TextTrimming="CharacterEllipsis"
+                                       TextWrapping="NoWrap" />
+                            <TextBlock x:Name="IncomingCallerNameText"
+                                       Text="John Appleseed"
+                                       FontSize="17.5"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       TextWrapping="NoWrap"
+                                       Margin="0,2,0,0" />
+                            <TextBlock x:Name="IncomingCallAppNameText"
+                                       Text="WhatsApp Audio"
+                                       FontSize="12"
+                                       Foreground="#30D158"
+                                       FontWeight="Medium"
+                                       TextTrimming="CharacterEllipsis"
+                                       TextWrapping="NoWrap"
+                                       Margin="0,2,0,0" />
+                        </StackPanel>
+
+                        <!-- Action Buttons: Decline (Red circular #FF453A) and Accept (Green circular #30D158) -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,2,0">
+                            <!-- Decline Button -->
+                            <Button x:Name="ExpandedDeclineCallButton"
+                                    Width="46" Height="46"
+                                    Margin="0,0,12,0"
+                                    Cursor="Hand"
+                                    Click="DeclineCall_Click">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="btnBorder"
+                                                Width="46" Height="46"
+                                                CornerRadius="23"
+                                                Background="#FF453A">
+                                            <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <Canvas Width="24" Height="24">
+                                                    <Path Fill="White"
+                                                          Data="M 12,9 C 8.7,9 5.7,10.1 3.3,12 L 1.2,9.9 C 4.1,7.4 7.9,6 12,6 C 16.1,6 19.9,7.4 22.8,9.9 L 20.7,12 C 18.3,10.1 15.3,9 12,9 Z M 5.1,16.5 C 5.5,16.1 6,15.9 6.6,15.9 C 7.2,15.9 7.7,16.1 8.1,16.5 L 9.9,18.3 C 10.3,18.7 10.5,19.2 10.5,19.8 L 10.5,21.5 C 10.5,22.3 9.8,23 9,23 L 4.5,23 C 3.7,23 3,22.3 3,21.5 L 3,18.8 C 3,18 3.3,17.2 3.9,16.6 L 5.1,16.5 Z M 18.9,16.5 C 19.5,17.1 19.8,17.9 19.8,18.8 L 19.8,21.5 C 19.8,22.3 19.1,23 18.3,23 L 13.8,23 C 13,23 12.3,22.3 12.3,21.5 L 12.3,19.8 C 12.3,19.2 12.5,18.7 12.9,18.3 L 14.7,16.5 C 15.1,16.1 15.6,15.9 16.2,15.9 C 16.8,15.9 17.3,16.1 17.7,16.5 L 18.9,16.5 Z" />
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="btnBorder" Property="Background" Value="#D9362C" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+
+                            <!-- Accept Button -->
+                            <Button x:Name="ExpandedAcceptCallButton"
+                                    Width="46" Height="46"
+                                    Cursor="Hand"
+                                    Click="AcceptCall_Click">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="btnBorder"
+                                                Width="46" Height="46"
+                                                CornerRadius="23"
+                                                Background="#30D158">
+                                            <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <Canvas Width="24" Height="24">
+                                                    <Path Fill="White"
+                                                          Data="M 6.62,10.79 C 8.06,13.62 10.38,15.94 13.21,17.38 L 15.41,15.18 C 15.69,14.9 16.08,14.82 16.43,14.93 C 17.55,15.3 18.75,15.5 20,15.5 C 20.55,15.5 21,15.95 21,16.5 L 21,20 C 21,20.55 20.55,21 20,21 C 10.61,21 3,13.39 3,4 C 3,3.45 3.45,3 4,3 L 7.5,3 C 8.05,3 8.5,3.45 8.5,4 C 8.5,5.25 8.7,6.45 9.07,7.57 C 9.18,7.92 9.1,8.31 8.82,8.59 L 6.62,10.79 Z" />
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="btnBorder" Property="Background" Value="#28B84B" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </StackPanel>
                     </Grid>
 
                     <!-- ============================================== -->

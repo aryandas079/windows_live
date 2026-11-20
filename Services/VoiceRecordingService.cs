@@ -144,11 +144,13 @@ public class VoiceRecordingService
         if (_isSimulated)
         {
             _isRecording = true;
+            _isDetectedCall = false;
             _recordingStartTime = DateTime.Now;
             _activeAppName = "Voice Recorder";
             RecordingStateChanged?.Invoke(new VoiceRecordingInfo
             {
                 IsRecording = true,
+                IsCall = false,
                 Duration = TimeSpan.Zero,
                 PeakLevel = 0.5f,
                 AppName = _activeAppName
@@ -157,14 +159,34 @@ public class VoiceRecordingService
         else
         {
             _isRecording = false;
+            _isDetectedCall = false;
             RecordingStateChanged?.Invoke(new VoiceRecordingInfo
             {
                 IsRecording = false,
+                IsCall = false,
                 Duration = TimeSpan.Zero,
                 PeakLevel = 0f,
                 AppName = _activeAppName
             });
         }
+    }
+
+    public void SimulateCall(string callerName, string appName)
+    {
+        _isSimulated = true;
+        _isRecording = true;
+        _isDetectedCall = true;
+        _recordingStartTime = DateTime.Now;
+        _activeAppName = string.IsNullOrWhiteSpace(appName) ? "Phone" : appName;
+
+        RecordingStateChanged?.Invoke(new VoiceRecordingInfo
+        {
+            IsRecording = true,
+            IsCall = true,
+            Duration = TimeSpan.Zero,
+            PeakLevel = 0.5f,
+            AppName = _activeAppName
+        });
     }
 
     public float GetCurrentPeak()
@@ -251,6 +273,7 @@ public class VoiceRecordingService
             RecordingStateChanged?.Invoke(new VoiceRecordingInfo
             {
                 IsRecording = true,
+                IsCall = _isDetectedCall,
                 Duration = simDur,
                 PeakLevel = GetCurrentPeak(),
                 AppName = _activeAppName

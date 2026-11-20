@@ -50,6 +50,34 @@ public class IslandNotification
         AppName.Contains("Messages", StringComparison.OrdinalIgnoreCase) ||
         AppName.Contains("Chat", StringComparison.OrdinalIgnoreCase);
 
+    public bool IsIncomingCall
+    {
+        get
+        {
+            string combined = $"{AppName} {AppId} {Title} {Message}".ToLowerInvariant();
+            if (combined.Contains("incoming call") ||
+                combined.Contains("calling...") ||
+                combined.Contains("calling you") ||
+                combined.Contains("call from") ||
+                combined.Contains("incoming voice call") ||
+                combined.Contains("incoming video call") ||
+                combined.Contains("ringing...") ||
+                combined.Contains("is calling"))
+            {
+                return true;
+            }
+
+            // Phone Link call notification
+            if (combined.Contains("phonelink") || combined.Contains("your phone") || combined.Contains("phone link"))
+            {
+                if (combined.Contains("call") || combined.Contains("incoming"))
+                    return true;
+            }
+
+            return false;
+        }
+    }
+
     public string DisplayTitle
     {
         get

@@ -15,5 +15,6 @@ public enum IslandCategory
     VoiceRecording,
     ScreenRecording,
     BluetoothDevice,
-    IncomingCall
+    IncomingCall,
+    LiveLyrics
 }

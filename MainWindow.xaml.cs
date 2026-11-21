@@ -96,6 +96,10 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _notificationAlertTimer;
     private readonly DispatcherTimer _unlockAlertTimer;
     private readonly DispatcherTimer _topMostTimer;
+    private readonly LyricsService _lyricsService;
+    private readonly DispatcherTimer _lyricsSatelliteHoverTimer;
+    private const double ExpandedLyricsWidth = 400.0;
+    private const double ExpandedLyricsHeight = 86.0;
 
     private IslandCategory _activeCategory = IslandCategory.MediaPlayback;
     private bool _isExpanded = false;
@@ -382,6 +386,36 @@ public partial class MainWindow : Window
             _voiceRecordingService.Start();
             _screenRecordingService.RecordingStateChanged += OnScreenRecordingStateChanged;
             _screenRecordingService.Start();
+
+            App.Log("Initializing LyricsService...");
+            _lyricsService = new LyricsService(Dispatcher);
+            _lyricsService.ActiveLineChanged += OnLyricsActiveLineChanged;
+            _lyricsService.SetPlaybackProviders(
+                () => _mediaManager?.CurrentTrack?.Position ?? TimeSpan.Zero,
+                () => _mediaManager?.CurrentTrack?.IsPlaying ?? false
+            );
+
+            _lyricsSatelliteHoverTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(300)
+            };
+            _lyricsSatelliteHoverTimer.Tick += (s, e) =>
+            {
+                _lyricsSatelliteHoverTimer.Stop();
+                if (!IslandContainer.IsMouseOver && !LyricsSatelliteButton.IsMouseOver && _activeCategory != IslandCategory.LiveLyrics)
+                {
+                    var fadeOut = new DoubleAnimation(LyricsSatelliteButton.Opacity, 0.0, TimeSpan.FromMilliseconds(160));
+                    fadeOut.Completed += (s2, e2) =>
+                    {
+                        if (!IslandContainer.IsMouseOver && !LyricsSatelliteButton.IsMouseOver && _activeCategory != IslandCategory.LiveLyrics)
+                        {
+                            LyricsSatelliteButton.Visibility = Visibility.Collapsed;
+                        }
+                    };
+                    LyricsSatelliteButton.BeginAnimation(OpacityProperty, fadeOut);
+                }
+            };
+
             App.Log("All services started in constructor.");
 
             _clockTimer = new DispatcherTimer
@@ -980,6 +1014,18 @@ public partial class MainWindow : Window
                 }
             }
 
+            if (LyricsSatelliteButton.Visibility == Visibility.Visible && LyricsSatelliteButton.Opacity > 0.1)
+            {
+                Point lyricsBtnPoint = LyricsSatelliteButton.TranslatePoint(new Point(0, 0), this);
+                Rect lyricsBtnRect = new Rect(lyricsBtnPoint.X, lyricsBtnPoint.Y, LyricsSatelliteButton.ActualWidth, LyricsSatelliteButton.ActualHeight);
+
+                if (lyricsBtnRect.Contains(windowPoint))
+                {
+                    handled = true;
+                    return (IntPtr)WindowHelper.HTCLIENT;
+                }
+            }
+
             if (TopEdgeHotspot.Visibility == Visibility.Visible)
             {
                 Point hotspotPoint = TopEdgeHotspot.TranslatePoint(new Point(0, 0), this);
@@ -1002,6 +1048,17 @@ public partial class MainWindow : Window
     private void OnIslandMouseEnter(object sender, MouseEventArgs e)
     {
         _autoCollapseTimer.Stop();
+
+        if (_activeCategory == IslandCategory.LiveLyrics)
+        {
+            UpdateLyricsSatelliteVisibility(true);
+            return;
+        }
+
+        if (IsMusicActive)
+        {
+            UpdateLyricsSatelliteVisibility(true);
+        }
 
         // User explicit requirement: "no need to expand for sound recording, timer, screen recording... it should just show in the notch..."
         // If music is active in the notch, allow expanding music player
@@ -1036,6 +1093,14 @@ public partial class MainWindow : Window
 
     private void OnIslandMouseLeave(object sender, MouseEventArgs e)
     {
+        if (_activeCategory == IslandCategory.LiveLyrics)
+        {
+            // Keep showing live lyrics, do not auto collapse
+            return;
+        }
+
+        UpdateLyricsSatelliteVisibility(false);
+
         if (_isExpanded && _activeCategory == IslandCategory.BluetoothDevice)
         {
             _bluetoothHoverCollapseTimer.Stop();
@@ -1167,13 +1232,17 @@ public partial class MainWindow : Window
                 ? 82.0
                 : _activeCategory == IslandCategory.BluetoothDevice
                     ? ExpandedBluetoothHeight
-                    : ExpandedHeight;
+                    : _activeCategory == IslandCategory.LiveLyrics
+                        ? ExpandedLyricsHeight
+                        : ExpandedHeight;
 
         double targetWidth = _activeCategory == IslandCategory.BluetoothDevice
             ? ExpandedBluetoothWidth
             : _activeCategory == IslandCategory.IncomingCall
                 ? 440.0
-                : ExpandedWidth;
+                : _activeCategory == IslandCategory.LiveLyrics
+                    ? ExpandedLyricsWidth
+                    : ExpandedWidth;
 
         DetachedBubbleContainer.Visibility = Visibility.Collapsed;
         DetachedLeftContainer.Visibility = Visibility.Collapsed;
@@ -1200,6 +1269,11 @@ public partial class MainWindow : Window
         {
             _isBluetoothAlertActive = false;
             _activeBluetoothDevice = null;
+        }
+        else if (_activeCategory == IslandCategory.LiveLyrics)
+        {
+            _activeCategory = IslandCategory.MediaPlayback;
+            UpdateLyricsSatelliteIconState();
         }
 
         // Restore non-activating window mode when collapsing
@@ -1252,6 +1326,7 @@ public partial class MainWindow : Window
         IslandContainer.BeginAnimation(HeightProperty, heightAnim);
 
         UpdateSplitBubbleAnimation(targetWidth);
+        UpdateLyricsSatellitePosition(targetWidth);
     }
 
     private void UpdateSplitBubbleAnimation(double mainIslandTargetWidth)
@@ -1430,6 +1505,7 @@ public partial class MainWindow : Window
         ViewVoiceRecording.Visibility = _activeCategory == IslandCategory.VoiceRecording ? Visibility.Visible : Visibility.Collapsed;
         ViewBluetoothDevice.Visibility = _activeCategory == IslandCategory.BluetoothDevice ? Visibility.Visible : Visibility.Collapsed;
         ViewIncomingCall.Visibility = _activeCategory == IslandCategory.IncomingCall ? Visibility.Visible : Visibility.Collapsed;
+        ViewLiveLyrics.Visibility = _activeCategory == IslandCategory.LiveLyrics ? Visibility.Visible : Visibility.Collapsed;
 
         if (_isExpanded)
         {
@@ -1439,16 +1515,20 @@ public partial class MainWindow : Window
                     ? 82.0
                     : _activeCategory == IslandCategory.BluetoothDevice
                         ? ExpandedBluetoothHeight
-                        : ExpandedHeight;
+                        : _activeCategory == IslandCategory.LiveLyrics
+                            ? ExpandedLyricsHeight
+                            : ExpandedHeight;
             double targetWidth = _activeCategory == IslandCategory.BluetoothDevice
                 ? ExpandedBluetoothWidth
                 : _activeCategory == IslandCategory.IncomingCall
                     ? 440.0
-                    : ExpandedWidth;
+                    : _activeCategory == IslandCategory.LiveLyrics
+                        ? ExpandedLyricsWidth
+                        : ExpandedWidth;
             DetachedBubbleContainer.Visibility = Visibility.Collapsed;
-        DetachedLeftContainer.Visibility = Visibility.Collapsed;
+            DetachedLeftContainer.Visibility = Visibility.Collapsed;
 
-        AnimateIsland(targetWidth, targetHeight);
+            AnimateIsland(targetWidth, targetHeight);
         }
     }
 
@@ -1458,10 +1538,12 @@ public partial class MainWindow : Window
         {
             if (track.HasMedia)
             {
-                if (!_isNotificationAlertActive && _activeCategory != IslandCategory.AppNotification)
+                if (!_isNotificationAlertActive && _activeCategory != IslandCategory.AppNotification && _activeCategory != IslandCategory.LiveLyrics)
                 {
                     _activeCategory = IslandCategory.MediaPlayback;
                 }
+
+                _lyricsService.LoadTrack(track.Artist, track.Title, track.Duration, track.IsPlaying);
 
                 CompactEqualizer.IsPlaying = track.IsPlaying;
 
@@ -1510,10 +1592,13 @@ public partial class MainWindow : Window
             }
             else
             {
-                if (_isExpanded && _activeCategory == IslandCategory.MediaPlayback)
+                if (_isExpanded && (_activeCategory == IslandCategory.MediaPlayback || _activeCategory == IslandCategory.LiveLyrics))
                 {
                     CollapseDock();
                 }
+
+                _lyricsService.LoadTrack(string.Empty, string.Empty, TimeSpan.Zero, false);
+                UpdateLyricsSatelliteVisibility(false);
 
                 ExpandedTitleText.Text = "No Media Playing";
                 ExpandedArtistText.Text = "Play music or video on your system";
@@ -2193,6 +2278,30 @@ public partial class MainWindow : Window
             if (name.Equals("power_perf", StringComparison.OrdinalIgnoreCase) || name.Equals("power_performance", StringComparison.OrdinalIgnoreCase))
             {
                 Dispatcher.Invoke(() => ShowPowerModeAlert(WindowsPowerMode.BestPerformance));
+                return;
+            }
+            if (name.Equals("lyrics", StringComparison.OrdinalIgnoreCase) || name.Equals("music", StringComparison.OrdinalIgnoreCase))
+            {
+                string artist = parts.Length > 1 ? parts[1].Trim() : "Alec Benjamin";
+                string title = parts.Length > 2 ? parts[2].Trim() : "Let Me Down Slowly";
+                int posSec = parts.Length > 3 && int.TryParse(parts[3].Trim(), out int p) ? p : 45;
+
+                Dispatcher.Invoke(() =>
+                {
+                    _mediaManager.SimulateTrack(artist, title, TimeSpan.FromSeconds(posSec));
+                    if (name.Equals("lyrics", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (_activeCategory != IslandCategory.LiveLyrics)
+                        {
+                            ToggleLiveLyrics();
+                        }
+                    }
+                });
+                return;
+            }
+            if (name.Equals("lyrics_toggle", StringComparison.OrdinalIgnoreCase))
+            {
+                Dispatcher.Invoke(ToggleLiveLyrics);
                 return;
             }
 
@@ -3952,6 +4061,182 @@ public partial class MainWindow : Window
     {
         // User explicit requirement: secondary satellite remains docked / compact
     }
+
+    #region Live Lyrics / Captions
+
+    private void UpdateLyricsSatellitePosition(double islandTargetWidth)
+    {
+        if (LyricsSatelliteButton == null || LyricsSatelliteTranslate == null) return;
+
+        bool rightOccupied = DetachedBubbleContainer.Visibility == Visibility.Visible && DetachedBubbleContainer.Opacity > 0.1;
+        double satelliteTargetX = rightOccupied
+            ? -((islandTargetWidth / 2.0) + 14.0 + 18.0)
+            : ((islandTargetWidth / 2.0) + 14.0 + 18.0);
+
+        var ease = new QuinticEase { EasingMode = EasingMode.EaseOut };
+        var anim = new DoubleAnimation
+        {
+            To = satelliteTargetX,
+            Duration = TimeSpan.FromMilliseconds(200),
+            EasingFunction = ease
+        };
+        LyricsSatelliteTranslate.BeginAnimation(TranslateTransform.XProperty, anim);
+    }
+
+    private void UpdateLyricsSatelliteVisibility(bool show)
+    {
+        if (LyricsSatelliteButton == null) return;
+
+        if (!IsMusicActive && _activeCategory != IslandCategory.LiveLyrics)
+        {
+            show = false;
+        }
+
+        if (show)
+        {
+            _lyricsSatelliteHoverTimer.Stop();
+            double currentIslandWidth = IslandContainer.ActualWidth > 0 ? IslandContainer.ActualWidth : (_isExpanded ? ExpandedWidth : CurrentCompactWidth);
+            UpdateLyricsSatellitePosition(currentIslandWidth);
+
+            if (LyricsSatelliteButton.Visibility != Visibility.Visible || LyricsSatelliteButton.Opacity < 0.1)
+            {
+                LyricsSatelliteButton.Visibility = Visibility.Visible;
+                var fadeIn = new DoubleAnimation(LyricsSatelliteButton.Opacity, 1.0, TimeSpan.FromMilliseconds(180))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                LyricsSatelliteButton.BeginAnimation(OpacityProperty, fadeIn);
+            }
+        }
+        else
+        {
+            if (_activeCategory == IslandCategory.LiveLyrics)
+            {
+                // In LiveLyrics mode, keep satellite button visible
+                return;
+            }
+
+            if (LyricsSatelliteButton.IsMouseOver || IslandContainer.IsMouseOver)
+            {
+                return;
+            }
+
+            _lyricsSatelliteHoverTimer.Stop();
+            _lyricsSatelliteHoverTimer.Interval = TimeSpan.FromMilliseconds(300);
+            _lyricsSatelliteHoverTimer.Start();
+        }
+    }
+
+    private void UpdateLyricsSatelliteIconState()
+    {
+        bool isLyrics = _activeCategory == IslandCategory.LiveLyrics;
+        var peachBrush = new SolidColorBrush(Color.FromRgb(0xC9, 0x8F, 0x71));
+        if (LyricsSatelliteIconPath != null)
+        {
+            LyricsSatelliteIconPath.Fill = isLyrics ? peachBrush : Brushes.White;
+        }
+        if (ExpandedLyricsIconPath != null)
+        {
+            ExpandedLyricsIconPath.Fill = isLyrics ? peachBrush : (Brush)FindResource("TextSecondaryBrush");
+        }
+    }
+
+    private void ToggleLiveLyrics()
+    {
+        if (!IsMusicActive) return;
+
+        if (_activeCategory == IslandCategory.LiveLyrics)
+        {
+            // Toggle back to media player if mouse is over, or collapse
+            if (IslandContainer.IsMouseOver)
+            {
+                _activeCategory = IslandCategory.MediaPlayback;
+                ShowActiveCategoryView();
+                AnimateIsland(ExpandedWidth, ExpandedHeight);
+            }
+            else
+            {
+                CollapseDock();
+            }
+            UpdateLyricsSatelliteIconState();
+        }
+        else
+        {
+            _activeCategory = IslandCategory.LiveLyrics;
+            _isExpanded = true;
+            _autoCollapseTimer.Stop();
+
+            _lyricsService.StartTracking();
+            _lyricsService.UpdateCurrentLines();
+
+            CompactView.BeginAnimation(OpacityProperty, null);
+            CompactView.Opacity = 0.0;
+            CompactView.Visibility = Visibility.Collapsed;
+
+            ExpandedContainer.Visibility = Visibility.Visible;
+            ShowActiveCategoryView();
+            var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(150));
+            ExpandedContainer.BeginAnimation(OpacityProperty, fadeIn);
+
+            UpdateLyricsSatelliteVisibility(true);
+            UpdateLyricsSatelliteIconState();
+        }
+    }
+
+    private void OnLyricsActiveLineChanged(string prev, string curr, string next)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            LyricsLinePrevious.Text = prev;
+            LyricsLineCurrent.Text = string.IsNullOrWhiteSpace(curr) ? "♪ Music ♪" : curr;
+            LyricsLineNext.Text = next;
+
+            if (_activeCategory == IslandCategory.LiveLyrics && ViewLiveLyrics.Visibility == Visibility.Visible)
+            {
+                var anim = new DoubleAnimation(0.5, 1.0, TimeSpan.FromMilliseconds(160))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                LyricsLineCurrent.BeginAnimation(OpacityProperty, anim);
+            }
+        });
+    }
+
+    private void LyricsSatelliteButton_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _lyricsSatelliteHoverTimer.Stop();
+        UpdateLyricsSatelliteVisibility(true);
+    }
+
+    private void LyricsSatelliteButton_MouseLeave(object sender, MouseEventArgs e)
+    {
+        UpdateLyricsSatelliteVisibility(false);
+    }
+
+    private void LyricsSatelliteButton_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed)
+        {
+            e.Handled = true;
+            ToggleLiveLyrics();
+        }
+    }
+
+    private void ExpandedLyricsButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleLiveLyrics();
+    }
+
+    private void ViewLiveLyrics_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed)
+        {
+            e.Handled = true;
+            ToggleLiveLyrics();
+        }
+    }
+
+    #endregion
 
     private void OnPrivacyStateChanged(bool isCameraInUse, bool isMicInUse)
     {

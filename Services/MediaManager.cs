@@ -59,16 +59,21 @@ public class MediaManager
 
     public void EnableDemoMode()
     {
+        SimulateTrack("Windows Live Studio", "Starry Horizon", TimeSpan.FromSeconds(45), TimeSpan.FromMinutes(3) + TimeSpan.FromSeconds(24));
+    }
+
+    public void SimulateTrack(string artist, string title, TimeSpan? position = null, TimeSpan? duration = null)
+    {
         _isDemoMode = true;
         _currentTrack = new MediaTrackInfo
         {
-            Title = "Starry Horizon",
-            Artist = "Windows Live Studio",
-            AlbumTitle = "Fluent Vibes",
-            SourceApp = "Windows Live",
+            Title = title,
+            Artist = artist,
+            AlbumTitle = "Album",
+            SourceApp = "Media Player",
             IsPlaying = true,
-            Position = TimeSpan.FromSeconds(45),
-            Duration = TimeSpan.FromMinutes(3) + TimeSpan.FromSeconds(24),
+            Position = position ?? TimeSpan.FromSeconds(25),
+            Duration = duration ?? TimeSpan.FromMinutes(3) + TimeSpan.FromSeconds(20),
             HasMedia = true
         };
         _dispatcher.Invoke(() => TrackChanged?.Invoke(_currentTrack));

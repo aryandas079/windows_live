@@ -1777,19 +1777,23 @@
                         <StackPanel Orientation="Vertical"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
-                                    Margin="12,2,12,2">
+                                    Margin="14,1,14,1">
                             <!-- Previous Lyric Line (Muted Gray #8D8D8D) -->
                             <TextBlock x:Name="LyricsLinePrevious"
                                        Text=""
-                                       FontSize="13.5"
+                                       FontSize="13"
                                        FontWeight="Medium"
                                        Foreground="#8D8D8D"
                                        TextAlignment="Center"
                                        TextTrimming="CharacterEllipsis"
                                        TextWrapping="NoWrap"
                                        HorizontalAlignment="Center"
-                                       Opacity="0.85"
-                                       Margin="0,0,0,3" />
+                                       Opacity="0.75"
+                                       Margin="0,0,0,2">
+                                <TextBlock.RenderTransform>
+                                    <TranslateTransform x:Name="LyricsPrevTranslate" Y="0" />
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
 
                             <!-- Current / Active Lyric Line (Bold, Windows Accent Color) -->
                             <TextBlock x:Name="LyricsLineCurrent"
@@ -1801,19 +1805,31 @@
                                        TextTrimming="CharacterEllipsis"
                                        TextWrapping="NoWrap"
                                        HorizontalAlignment="Center"
-                                       Margin="0,0,0,3" />
+                                       Margin="0,0,0,2"
+                                       RenderTransformOrigin="0.5,0.5">
+                                <TextBlock.RenderTransform>
+                                    <TransformGroup>
+                                        <TranslateTransform x:Name="LyricsCurrentTranslate" Y="0" />
+                                        <ScaleTransform x:Name="LyricsCurrentScale" ScaleX="1.0" ScaleY="1.0" />
+                                    </TransformGroup>
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
 
                             <!-- Next Lyric Line (Muted Gray #8D8D8D) -->
                             <TextBlock x:Name="LyricsLineNext"
                                        Text=""
-                                       FontSize="13.5"
+                                       FontSize="13"
                                        FontWeight="Medium"
                                        Foreground="#8D8D8D"
                                        TextAlignment="Center"
                                        TextTrimming="CharacterEllipsis"
                                        TextWrapping="NoWrap"
                                        HorizontalAlignment="Center"
-                                       Opacity="0.85" />
+                                       Opacity="0.75">
+                                <TextBlock.RenderTransform>
+                                    <TranslateTransform x:Name="LyricsNextTranslate" Y="0" />
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
                         </StackPanel>
                     </Grid>
 

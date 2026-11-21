@@ -97,8 +97,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _unlockAlertTimer;
     private readonly DispatcherTimer _topMostTimer;
     private readonly LyricsService _lyricsService;
-    private const double ExpandedLyricsWidth = 400.0;
-    private const double ExpandedLyricsHeight = 86.0;
+    private const double ExpandedLyricsWidth = 430.0;
+    private const double ExpandedLyricsHeight = 90.0;
 
     private IslandCategory _activeCategory = IslandCategory.MediaPlayback;
     private bool _isExpanded = false;
@@ -405,7 +405,7 @@ public partial class MainWindow : Window
             _lyricsService.ActiveLineChanged += OnLyricsActiveLineChanged;
             _lyricsService.LyricsAvailabilityChanged += OnLyricsAvailabilityChanged;
             _lyricsService.SetPlaybackProviders(
-                () => _mediaManager?.CurrentTrack?.Position ?? TimeSpan.Zero,
+                () => _mediaManager?.GetLivePosition() ?? TimeSpan.Zero,
                 () => _mediaManager?.CurrentTrack?.IsPlaying ?? false
             );
 
@@ -4173,11 +4173,30 @@ public partial class MainWindow : Window
 
             if (_activeCategory == IslandCategory.LiveLyrics && ViewLiveLyrics.Visibility == Visibility.Visible)
             {
-                var anim = new DoubleAnimation(0.5, 1.0, TimeSpan.FromMilliseconds(160))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                };
-                LyricsLineCurrent.BeginAnimation(OpacityProperty, anim);
+                var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+                var dur = TimeSpan.FromMilliseconds(220);
+
+                // 1. Current Active Line: Smooth upward glide, subtle scale bloom (0.95 -> 1.0), and crisp fade
+                var currentSlide = new DoubleAnimation(6.0, 0.0, dur) { EasingFunction = ease };
+                var currentFade = new DoubleAnimation(0.35, 1.0, dur) { EasingFunction = ease };
+                var currentScale = new DoubleAnimation(0.96, 1.0, dur) { EasingFunction = ease };
+
+                LyricsCurrentTranslate?.BeginAnimation(TranslateTransform.YProperty, currentSlide);
+                LyricsLineCurrent.BeginAnimation(OpacityProperty, currentFade);
+                LyricsCurrentScale?.BeginAnimation(ScaleTransform.ScaleXProperty, currentScale);
+                LyricsCurrentScale?.BeginAnimation(ScaleTransform.ScaleYProperty, currentScale);
+
+                // 2. Previous Line: Smooth glide into upper position and subtle fade
+                var prevSlide = new DoubleAnimation(4.0, 0.0, dur) { EasingFunction = ease };
+                var prevFade = new DoubleAnimation(0.30, 0.75, dur) { EasingFunction = ease };
+                LyricsPrevTranslate?.BeginAnimation(TranslateTransform.YProperty, prevSlide);
+                LyricsLinePrevious.BeginAnimation(OpacityProperty, prevFade);
+
+                // 3. Next Line: Smooth entrance glide from below
+                var nextSlide = new DoubleAnimation(5.0, 0.0, dur) { EasingFunction = ease };
+                var nextFade = new DoubleAnimation(0.20, 0.75, dur) { EasingFunction = ease };
+                LyricsNextTranslate?.BeginAnimation(TranslateTransform.YProperty, nextSlide);
+                LyricsLineNext.BeginAnimation(OpacityProperty, nextFade);
             }
         });
     }

@@ -20,6 +20,9 @@ public class MediaManager
 
     private MediaTrackInfo _currentTrack = new();
     private bool _isDemoMode = false;
+    private readonly System.Diagnostics.Stopwatch _positionStopwatch = new();
+    private TimeSpan _lastReportedPosition = TimeSpan.Zero;
+    private DateTimeOffset _lastUpdatedTime = DateTimeOffset.MinValue;
 
     public MediaTrackInfo CurrentTrack => _currentTrack;
 
@@ -29,7 +32,7 @@ public class MediaManager
 
         _timelineTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(500)
+            Interval = TimeSpan.FromMilliseconds(50)
         };
         _timelineTimer.Tick += OnTimelineTick;
 
@@ -215,6 +218,13 @@ public class MediaManager
             bool isPlaying = playbackInfo?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
             bool hasTitle = !string.IsNullOrWhiteSpace(props?.Title);
 
+            SynchronizeTimeline(
+                timeline?.Position ?? TimeSpan.Zero,
+                timeline?.LastUpdatedTime ?? DateTimeOffset.UtcNow,
+                (timeline?.EndTime ?? TimeSpan.Zero) == TimeSpan.Zero ? TimeSpan.FromMinutes(3) : timeline!.EndTime,
+                isPlaying
+            );
+
             _currentTrack = new MediaTrackInfo
             {
                 Title = hasTitle ? props!.Title : (isPlaying ? "Now Playing" : string.Empty),
@@ -224,7 +234,7 @@ public class MediaManager
                 IsBrowser = isBrowser,
                 Thumbnail = thumbnailImage,
                 IsPlaying = isPlaying,
-                Position = timeline?.Position ?? TimeSpan.Zero,
+                Position = GetLivePosition(),
                 Duration = (timeline?.EndTime ?? TimeSpan.Zero) == TimeSpan.Zero ? TimeSpan.FromMinutes(3) : timeline!.EndTime,
                 HasMedia = hasTitle || isPlaying
             };
@@ -237,6 +247,66 @@ public class MediaManager
         }
     }
 
+    private void SynchronizeTimeline(TimeSpan reportedPosition, DateTimeOffset lastUpdatedTime, TimeSpan duration, bool isPlaying)
+    {
+        _lastReportedPosition = reportedPosition;
+        _lastUpdatedTime = lastUpdatedTime;
+        _positionStopwatch.Restart();
+
+        TimeSpan livePos = reportedPosition;
+        if (isPlaying && lastUpdatedTime > DateTimeOffset.MinValue)
+        {
+            var elapsed = DateTimeOffset.UtcNow - lastUpdatedTime;
+            if (elapsed > TimeSpan.Zero && elapsed < TimeSpan.FromHours(1))
+            {
+                livePos += elapsed;
+            }
+        }
+
+        _currentTrack.Position = livePos;
+        if (duration > TimeSpan.Zero)
+        {
+            _currentTrack.Duration = duration;
+        }
+    }
+
+    public TimeSpan GetLivePosition()
+    {
+        if (_isDemoMode)
+        {
+            return _currentTrack.Position;
+        }
+
+        if (!_currentTrack.IsPlaying)
+        {
+            return _currentTrack.Position;
+        }
+
+        TimeSpan live = _currentTrack.Position;
+        if (_lastUpdatedTime > DateTimeOffset.MinValue)
+        {
+            var elapsed = DateTimeOffset.UtcNow - _lastUpdatedTime;
+            if (elapsed > TimeSpan.Zero && elapsed < TimeSpan.FromHours(1))
+            {
+                live = _lastReportedPosition + elapsed;
+            }
+            else
+            {
+                live = _lastReportedPosition + _positionStopwatch.Elapsed;
+            }
+        }
+        else
+        {
+            live = _lastReportedPosition + _positionStopwatch.Elapsed;
+        }
+
+        if (live > _currentTrack.Duration && _currentTrack.Duration > TimeSpan.Zero)
+        {
+            live = _currentTrack.Duration;
+        }
+        return live;
+    }
+
     private void UpdateTimeline()
     {
         if (_currentSession == null) return;
@@ -244,13 +314,12 @@ public class MediaManager
         try
         {
             var timeline = _currentSession.GetTimelineProperties();
+            var playbackInfo = _currentSession.GetPlaybackInfo();
+            bool isPlaying = playbackInfo?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+
             if (timeline != null)
             {
-                _currentTrack.Position = timeline.Position;
-                if (timeline.EndTime > TimeSpan.Zero)
-                {
-                    _currentTrack.Duration = timeline.EndTime;
-                }
+                SynchronizeTimeline(timeline.Position, timeline.LastUpdatedTime, timeline.EndTime, isPlaying);
                 TrackChanged?.Invoke(_currentTrack);
             }
         }
@@ -288,7 +357,7 @@ public class MediaManager
     {
         if (_isDemoMode && _currentTrack.IsPlaying)
         {
-            var newPos = _currentTrack.Position + TimeSpan.FromMilliseconds(500);
+            var newPos = _currentTrack.Position + TimeSpan.FromMilliseconds(50);
             if (newPos > _currentTrack.Duration)
             {
                 newPos = TimeSpan.Zero;
@@ -298,11 +367,7 @@ public class MediaManager
         }
         else if (_currentSession != null && _currentTrack.IsPlaying)
         {
-            _currentTrack.Position += TimeSpan.FromMilliseconds(500);
-            if (_currentTrack.Position > _currentTrack.Duration)
-            {
-                _currentTrack.Position = _currentTrack.Duration;
-            }
+            _currentTrack.Position = GetLivePosition();
             TrackChanged?.Invoke(_currentTrack);
         }
     }

@@ -114,7 +114,7 @@ public class LyricsService
 
         _syncTimer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher)
         {
-            Interval = TimeSpan.FromMilliseconds(100)
+            Interval = TimeSpan.FromMilliseconds(30)
         };
         _syncTimer.Tick += OnSyncTimerTick;
     }
@@ -265,7 +265,11 @@ public class LyricsService
         if (_currentLyrics == null) return;
 
         TimeSpan pos = _positionProvider?.Invoke() ?? TimeSpan.Zero;
-        var (prev, curr, next, idx) = _currentLyrics.GetLinesAt(pos);
+        
+        // Add a 220ms lead time to account for Windows audio rendering buffer latency
+        // so the line highlights at the exact onset of the singer's vocals
+        TimeSpan syncPos = pos + TimeSpan.FromMilliseconds(220);
+        var (prev, curr, next, idx) = _currentLyrics.GetLinesAt(syncPos);
 
         if (idx != _lastActiveIndex || !string.Equals(curr, _lastCurrentLine, StringComparison.Ordinal))
         {

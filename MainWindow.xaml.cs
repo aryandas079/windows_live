@@ -459,7 +459,7 @@ public partial class MainWindow : Window
                 }
             };
 
-            _chargingAlertTimer = new DispatcherTimer
+            _chargingAlertTimer = new DispatcherTimer(DispatcherPriority.Normal)
             {
                 Interval = TimeSpan.FromSeconds(5.0)
             };
@@ -491,7 +491,7 @@ public partial class MainWindow : Window
                 }
             };
 
-            _unlockAlertTimer = new DispatcherTimer
+            _unlockAlertTimer = new DispatcherTimer(DispatcherPriority.Normal)
             {
                 Interval = TimeSpan.FromSeconds(3.0)
             };
@@ -517,7 +517,7 @@ public partial class MainWindow : Window
                 }
             };
 
-            _silentRingAlertTimer = new DispatcherTimer
+            _silentRingAlertTimer = new DispatcherTimer(DispatcherPriority.Normal)
             {
                 Interval = TimeSpan.FromSeconds(3.0)
             };
@@ -543,7 +543,7 @@ public partial class MainWindow : Window
                 }
             };
 
-            _dndAlertTimer = new DispatcherTimer
+            _dndAlertTimer = new DispatcherTimer(DispatcherPriority.Normal)
             {
                 Interval = TimeSpan.FromSeconds(3.0)
             };
@@ -569,7 +569,7 @@ public partial class MainWindow : Window
                 }
             };
 
-            _nightModeAlertTimer = new DispatcherTimer
+            _nightModeAlertTimer = new DispatcherTimer(DispatcherPriority.Normal)
             {
                 Interval = TimeSpan.FromSeconds(4.0)
             };
@@ -595,7 +595,7 @@ public partial class MainWindow : Window
                 }
             };
 
-            _bluetoothAlertTimer = new DispatcherTimer
+            _bluetoothAlertTimer = new DispatcherTimer(DispatcherPriority.Normal)
             {
                 Interval = TimeSpan.FromSeconds(5.0)
             };
@@ -637,7 +637,7 @@ public partial class MainWindow : Window
                 }
             };
 
-            _powerModeAlertTimer = new DispatcherTimer
+            _powerModeAlertTimer = new DispatcherTimer(DispatcherPriority.Normal)
             {
                 Interval = TimeSpan.FromSeconds(3.0)
             };
@@ -673,7 +673,7 @@ public partial class MainWindow : Window
                 ResetDragDropState();
             };
 
-            _wifiAlertTimer = new DispatcherTimer
+            _wifiAlertTimer = new DispatcherTimer(DispatcherPriority.Normal)
             {
                 Interval = TimeSpan.FromSeconds(5.0)
             };
@@ -1936,7 +1936,7 @@ public partial class MainWindow : Window
             CompactNotificationView.Opacity = 1.0;
             CompactNotificationView.Visibility = Visibility.Collapsed;
         }
-        if (!keepPowerMode && _isPowerModeAlertActive)
+        if (!keepPowerMode)
         {
             _isPowerModeAlertActive = false;
             _powerModeAlertTimer.Stop();
@@ -1944,7 +1944,7 @@ public partial class MainWindow : Window
             CompactPowerModeView.Opacity = 1.0;
             CompactPowerModeView.Visibility = Visibility.Collapsed;
         }
-        if (!keepWifi && _isWifiAlertActive)
+        if (!keepWifi)
         {
             _isWifiAlertActive = false;
             _wifiAlertTimer.Stop();
@@ -1961,6 +1961,10 @@ public partial class MainWindow : Window
         // Clear other alerts but keep this Wi-Fi alert active
         ClearTemporaryAlerts(keepWifi: true);
         _isWifiAlertActive = true;
+
+        CompactWifiStatusText.Text = networkName;
+        CompactWifiIcon.Visibility = isHotspot ? Visibility.Collapsed : Visibility.Visible;
+        CompactHotspotIcon.Visibility = isHotspot ? Visibility.Visible : Visibility.Collapsed;
 
         if (_isExpanded)
         {
@@ -1992,11 +1996,11 @@ public partial class MainWindow : Window
         if (!_isWifiAlertActive && CompactWifiView.Visibility == Visibility.Collapsed) return;
 
         App.Log("DismissWifiAlert: 5s alert elapsed; fading out Wi-Fi notch view.");
+        _isWifiAlertActive = false;
 
         var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(160));
         fadeOut.Completed += (s, e) =>
         {
-            _isWifiAlertActive = false;
             CompactWifiView.BeginAnimation(OpacityProperty, null);
             CompactWifiView.Opacity = 1.0;
             CompactWifiView.Visibility = Visibility.Collapsed;
@@ -2070,6 +2074,7 @@ public partial class MainWindow : Window
 
         CompactPowerModeBadge.Background = badgeBrush;
         PowerModeBadgeGlow.Color = accentColor;
+        CompactPowerModeLeafIcon.Visibility = (mode == WindowsPowerMode.BestPowerEfficiency) ? Visibility.Visible : Visibility.Collapsed;
         CompactPowerModeText.Text = title;
         CompactPowerModeText.Foreground = new SolidColorBrush(accentColor);
 
@@ -2173,6 +2178,23 @@ public partial class MainWindow : Window
                 Dispatcher.Invoke(() => TriggerWifiConnectedAlert(net, true));
                 return;
             }
+            if (name.Equals("power_save", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("low_power", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("power_efficiency", StringComparison.OrdinalIgnoreCase))
+            {
+                Dispatcher.Invoke(() => ShowPowerModeAlert(WindowsPowerMode.BestPowerEfficiency));
+                return;
+            }
+            if (name.Equals("power_balanced", StringComparison.OrdinalIgnoreCase) || name.Equals("balanced", StringComparison.OrdinalIgnoreCase))
+            {
+                Dispatcher.Invoke(() => ShowPowerModeAlert(WindowsPowerMode.Balanced));
+                return;
+            }
+            if (name.Equals("power_perf", StringComparison.OrdinalIgnoreCase) || name.Equals("power_performance", StringComparison.OrdinalIgnoreCase))
+            {
+                Dispatcher.Invoke(() => ShowPowerModeAlert(WindowsPowerMode.BestPerformance));
+                return;
+            }
 
             int? battery = null;
             if (parts.Length > 1 && int.TryParse(parts[1].Trim(), out int b))
@@ -2193,6 +2215,7 @@ public partial class MainWindow : Window
 
     private static BitmapImage? _cachedHeadsetIcon;
     private static BitmapImage? _cachedPhoneIcon;
+    private static BitmapImage? _cachedBluetoothLogo;
 
     private static ImageSource? GetBluetoothDeviceIcon(BluetoothDeviceKind kind)
     {
@@ -2200,20 +2223,30 @@ public partial class MainWindow : Window
         {
             if (kind == BluetoothDeviceKind.Smartphone)
             {
-                _cachedPhoneIcon ??= new BitmapImage(new Uri("pack://application:,,,/Resources/win_phone.png", UriKind.Absolute));
+                _cachedPhoneIcon ??= new BitmapImage(new Uri("pack://application:,,,/Resources/mobile_icon.png", UriKind.Absolute));
                 return _cachedPhoneIcon;
+            }
+            else if (kind == BluetoothDeviceKind.AudioHeadset)
+            {
+                _cachedHeadsetIcon ??= new BitmapImage(new Uri("pack://application:,,,/Resources/headphones_icon.png", UriKind.Absolute));
+                return _cachedHeadsetIcon;
             }
             else
             {
-                _cachedHeadsetIcon ??= new BitmapImage(new Uri("pack://application:,,,/Resources/win_headset.png", UriKind.Absolute));
-                return _cachedHeadsetIcon;
+                _cachedBluetoothLogo ??= new BitmapImage(new Uri("pack://application:,,,/Resources/bluetooth_logo.png", UriKind.Absolute));
+                return _cachedBluetoothLogo;
             }
         }
         catch
         {
             try
             {
-                string relPath = kind == BluetoothDeviceKind.Smartphone ? "Resources/win_phone.png" : "Resources/win_headset.png";
+                string relPath = kind switch
+                {
+                    BluetoothDeviceKind.Smartphone => "Resources/mobile_icon.png",
+                    BluetoothDeviceKind.AudioHeadset => "Resources/headphones_icon.png",
+                    _ => "Resources/bluetooth_logo.png"
+                };
                 string fullPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relPath);
                 if (System.IO.File.Exists(fullPath))
                 {
@@ -2312,13 +2345,8 @@ public partial class MainWindow : Window
 
         UIElement[] signalParts =
         {
-            CompactWifiOuterArc,
-            CompactWifiMiddleArc,
-            CompactWifiInnerArc,
-            CompactWifiDot,
-            CompactHotspotOuterArcs,
-            CompactHotspotAntenna,
-            CompactHotspotCenter,
+            CompactWifiIcon,
+            CompactHotspotIcon,
             MediaWifiStatusGlyph,
             TimerWifiStatusGlyph,
             VoiceWifiStatusGlyph,
@@ -2385,11 +2413,16 @@ public partial class MainWindow : Window
 
             ClearTemporaryAlerts();
 
-            // Populate compact glimpse UI (white Bluetooth icon + device name)
+            // Set device icon (Smartphone, Headphones, or Bluetooth Logo)
+            var iconSource = GetBluetoothDeviceIcon(dev.DeviceKind);
+            CompactBluetoothIcon.Source = iconSource;
+            ExpandedBluetoothIcon.Source = iconSource;
+
+            // Populate compact glimpse UI (Bluetooth/device icon + device name)
             CompactBluetoothDeviceName.Text = dev.Name;
             CompactBluetoothDeviceName.Visibility = Visibility.Visible;
 
-            // Populate expanded UI (white Bluetooth icon + "Connected" + "[Device] ready to use" + Battery Cell)
+            // Populate expanded UI (Bluetooth/device icon + "Connected" + "[Device] ready to use" + Battery Cell)
             ExpandedBluetoothTitleText.Text = $"{dev.Name} ready to use";
             UpdateBluetoothBatteryCell(dev.BatteryPercent);
 

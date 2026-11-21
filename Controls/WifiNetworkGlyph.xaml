@@ -5,26 +5,18 @@
              Height="17"
              SnapsToDevicePixels="True">
     <Grid>
-        <Viewbox x:Name="WifiIcon">
-            <Canvas Width="24" Height="24">
-                <Path Data="M 2.5,8 C 7.8,3.3 16.2,3.3 21.5,8 M 6,12 C 9.4,9 14.6,9 18,12 M 9.5,16 C 11,14.8 13,14.8 14.5,16"
-                      Stroke="#4DB8FF"
-                      StrokeThickness="2"
-                      StrokeStartLineCap="Round"
-                      StrokeEndLineCap="Round" />
-                <Ellipse Canvas.Left="10.2" Canvas.Top="18" Width="3.6" Height="3.6" Fill="#4DB8FF" />
-            </Canvas>
-        </Viewbox>
-        <Viewbox x:Name="HotspotIcon" Visibility="Collapsed">
-            <Canvas Width="24" Height="24">
-                <Path Data="M 3,6 C 5.5,3.8 8.3,2.8 12,2.8 C 15.7,2.8 18.5,3.8 21,6 M 5,9.5 C 7.1,7.8 9.2,7 12,7 C 14.8,7 16.9,7.8 19,9.5 M 12,10 L 12,17 M 9,21 L 12,17 L 15,21 M 8.5,21 L 15.5,21"
-                      Stroke="#4DB8FF"
-                      StrokeThickness="1.8"
-                      StrokeStartLineCap="Round"
-                      StrokeEndLineCap="Round"
-                      StrokeLineJoin="Round" />
-                <Ellipse Canvas.Left="10.3" Canvas.Top="9" Width="3.4" Height="3.4" Fill="#4DB8FF" />
-            </Canvas>
-        </Viewbox>
+        <Image x:Name="WifiIcon"
+               Source="pack://application:,,,/Resources/wifi_icon.png"
+               Width="16" Height="14"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               RenderOptions.BitmapScalingMode="HighQuality" />
+        <Image x:Name="HotspotIcon"
+               Source="pack://application:,,,/Resources/hotspot_icon_blue.png"
+               Width="16" Height="14"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               Visibility="Collapsed"
+               RenderOptions.BitmapScalingMode="HighQuality" />
     </Grid>
 </UserControl>

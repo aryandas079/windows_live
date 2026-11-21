@@ -984,16 +984,23 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Solid Color Oval Rectangle (Pure Green, Blue, or Red pill with no logo) -->
+                    <!-- Left: Solid Color Oval Rectangle (Pure Green, Blue, or Red pill; leaf icon for Low Power Mode) -->
                     <Border x:Name="CompactPowerModeBadge"
                             Grid.Column="0"
-                            Width="36" Height="18"
-                            CornerRadius="9"
+                            Width="36" Height="20"
+                            CornerRadius="10"
                             Background="#30D158"
                             VerticalAlignment="Center">
                         <Border.Effect>
                             <DropShadowEffect x:Name="PowerModeBadgeGlow" Color="#30D158" BlurRadius="8" ShadowDepth="0" Opacity="0.6" />
                         </Border.Effect>
+                        <Image x:Name="CompactPowerModeLeafIcon"
+                               Source="pack://application:,,,/Resources/lowpower_leaf.png"
+                               Width="16" Height="16"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               Visibility="Collapsed" />
                     </Border>
 
                     <!-- Center: Notch Space -->
@@ -1065,18 +1072,14 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: White Bluetooth Icon + Connected Device Name -->
+                    <!-- Left: Bluetooth / Mobile / Headphone Device Icon + Connected Device Name -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Viewbox Width="12" Height="16" VerticalAlignment="Center" Margin="0,0,7,0">
-                            <Canvas Width="22" Height="24">
-                                <Path Data="M 5.5,17.5 L 16.5,6.5 L 11,1 L 11,23 L 16.5,17.5 L 5.5,6.5"
-                                      Stroke="#FFFFFF"
-                                      StrokeThickness="2.2"
-                                      StrokeLineJoin="Round"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round" />
-                            </Canvas>
-                        </Viewbox>
+                        <Image x:Name="CompactBluetoothIcon"
+                               Source="pack://application:,,,/Resources/bluetooth_logo.png"
+                               Width="18" Height="18"
+                               VerticalAlignment="Center"
+                               Margin="0,0,7,0"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
                         <TextBlock x:Name="CompactBluetoothDeviceName"
                                    Text=""
                                    FontSize="13"
@@ -1129,36 +1132,19 @@
                       Background="Transparent"
                       ToolTip="Wi-Fi connection or mobile hotspot is active">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0">
-                        <Viewbox x:Name="CompactWifiIcon" Width="23" Height="21" VerticalAlignment="Center" Margin="0,0,8,0">
-                            <Canvas Width="24" Height="22">
-                                <Path x:Name="CompactWifiOuterArc"
-                                      Data="M 1,6.5 C 7.2,0.8 16.8,0.8 23,6.5"
-                                      Stroke="#4DB8FF" StrokeThickness="2.3"
-                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                <Path x:Name="CompactWifiMiddleArc"
-                                      Data="M 5,10.5 C 9.2,6.8 14.8,6.8 19,10.5"
-                                      Stroke="#4DB8FF" StrokeThickness="2.3"
-                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                <Path x:Name="CompactWifiInnerArc"
-                                      Data="M 9,14.5 C 10.8,12.9 13.2,12.9 15,14.5"
-                                      Stroke="#4DB8FF" StrokeThickness="2.3"
-                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                <Ellipse x:Name="CompactWifiDot" Canvas.Left="10.1" Canvas.Top="17" Width="3.8" Height="3.8" Fill="#4DB8FF" />
-                            </Canvas>
-                        </Viewbox>
-                        <Viewbox x:Name="CompactHotspotIcon" Width="23" Height="21" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="Collapsed">
-                            <Canvas Width="24" Height="22">
-                                <Path x:Name="CompactHotspotOuterArcs"
-                                      Data="M 3,5 C 5.4,2.9 8.2,1.8 12,1.8 C 15.8,1.8 18.6,2.9 21,5 M 3,9 C 5.4,6.9 8.2,5.8 12,5.8 C 15.8,5.8 18.6,6.9 21,9"
-                                      Stroke="#4DB8FF" StrokeThickness="1.8"
-                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                <Path x:Name="CompactHotspotAntenna"
-                                      Data="M 12,8.5 L 12,16.2 M 9.4,20 L 12,16.2 L 14.6,20 M 8.8,20 L 15.2,20"
-                                      Stroke="#4DB8FF" StrokeThickness="1.8"
-                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
-                                <Ellipse x:Name="CompactHotspotCenter" Canvas.Left="10.2" Canvas.Top="7.3" Width="3.6" Height="3.6" Fill="#4DB8FF" />
-                            </Canvas>
-                        </Viewbox>
+                        <Image x:Name="CompactWifiIcon"
+                               Source="pack://application:,,,/Resources/wifi_icon.png"
+                               Width="22" Height="19"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                        <Image x:Name="CompactHotspotIcon"
+                               Source="pack://application:,,,/Resources/hotspot_icon.png"
+                               Width="22" Height="19"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"
+                               Visibility="Collapsed"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
                         <TextBlock x:Name="CompactWifiStatusText"
                                    Text="Wi-Fi"
                                    FontSize="13.5"
@@ -1690,20 +1676,13 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Left: White Bluetooth Icon -->
-                        <Viewbox Grid.Column="0"
-                                 Width="22" Height="28"
-                                 VerticalAlignment="Center"
-                                 Margin="4,0,16,0">
-                            <Canvas Width="22" Height="24">
-                                <Path Data="M 5.5,17.5 L 16.5,6.5 L 11,1 L 11,23 L 16.5,17.5 L 5.5,6.5"
-                                      Stroke="#FFFFFF"
-                                      StrokeThickness="2.2"
-                                      StrokeLineJoin="Round"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round" />
-                            </Canvas>
-                        </Viewbox>
+                        <!-- Left: Device Icon (Bluetooth badge, Headphones, or Mobile) -->
+                        <Image x:Name="ExpandedBluetoothIcon"
+                               Source="pack://application:,,,/Resources/bluetooth_logo.png"
+                               Width="28" Height="28"
+                               VerticalAlignment="Center"
+                               Margin="4,0,16,0"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
 
                         <!-- Middle: "Connected" + "[DeviceName] ready to use" -->
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">

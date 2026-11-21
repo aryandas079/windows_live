@@ -1208,7 +1208,7 @@ public partial class MainWindow : Window
         }
 
         double targetHeight = _activeCategory == IslandCategory.AppNotification
-            ? 72.0
+            ? 86.0
             : _activeCategory == IslandCategory.IncomingCall
                 ? 82.0
                 : _activeCategory == IslandCategory.BluetoothDevice
@@ -1490,7 +1490,7 @@ public partial class MainWindow : Window
         if (_isExpanded)
         {
             double targetHeight = _activeCategory == IslandCategory.AppNotification
-                ? 72.0
+                ? 86.0
                 : _activeCategory == IslandCategory.IncomingCall
                     ? 82.0
                     : _activeCategory == IslandCategory.BluetoothDevice
@@ -2295,6 +2295,24 @@ public partial class MainWindow : Window
             if (name.Equals("lyrics_toggle", StringComparison.OrdinalIgnoreCase))
             {
                 Dispatcher.Invoke(ToggleLiveLyrics);
+                return;
+            }
+            if (name.Equals("notif", StringComparison.OrdinalIgnoreCase) || name.Equals("notification", StringComparison.OrdinalIgnoreCase))
+            {
+                string app = parts.Length > 1 ? parts[1].Trim() : "Blinkit";
+                string title = parts.Length > 2 ? parts[2].Trim() : app;
+                string msg = parts.Length > 3 ? parts[3].Trim().Replace("\\n", "\n") : "Steal deals at Winter Sale 👇 • ✨ GO24 Steel Insulated Coffee Mug @ ₹̵8̵4̵9̵ ₹649\n✨ Femora Tea Cup Set @ ₹̵8̵5̵0̵ ₹729";
+                Dispatcher.Invoke(() =>
+                {
+                    var notif = new IslandNotification
+                    {
+                        AppName = app,
+                        Title = title,
+                        Message = msg,
+                        ReceivedTime = DateTime.Now
+                    };
+                    OnNotificationReceived(notif);
+                });
                 return;
             }
 

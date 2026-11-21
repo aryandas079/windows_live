@@ -190,11 +190,17 @@ public class NotificationWatcherService
 
                 if (elements.Count >= 2)
                 {
-                    return (elements[0]!, string.Join(" • ", elements.Skip(1)));
+                    string msg = string.Join(" • ", elements.Skip(1));
+                    msg = System.Text.RegularExpressions.Regex.Replace(msg, @"[ \t]*\r?\n[ \t]*", "\n");
+                    msg = System.Text.RegularExpressions.Regex.Replace(msg, @"\n{2,}", "\n");
+                    return (elements[0]!, msg.Trim());
                 }
                 else if (elements.Count == 1)
                 {
-                    return (fallbackApp, elements[0]!);
+                    string msg = elements[0]!;
+                    msg = System.Text.RegularExpressions.Regex.Replace(msg, @"[ \t]*\r?\n[ \t]*", "\n");
+                    msg = System.Text.RegularExpressions.Regex.Replace(msg, @"\n{2,}", "\n");
+                    return (fallbackApp, msg.Trim());
                 }
             }
         }

@@ -62,15 +62,23 @@ public class MediaManager
         SimulateTrack("Windows Live Studio", "Starry Horizon", TimeSpan.FromSeconds(45), TimeSpan.FromMinutes(3) + TimeSpan.FromSeconds(24));
     }
 
-    public void SimulateTrack(string artist, string title, TimeSpan? position = null, TimeSpan? duration = null)
+    public void SimulateTrack(string artist, string title, TimeSpan? position = null, TimeSpan? duration = null, string? sourceApp = null)
     {
         _isDemoMode = true;
+        string app = sourceApp ?? "Media Player";
+        bool isBrowser = app.Contains("Chrome", StringComparison.OrdinalIgnoreCase) ||
+                         app.Contains("Edge", StringComparison.OrdinalIgnoreCase) ||
+                         app.Contains("Firefox", StringComparison.OrdinalIgnoreCase) ||
+                         app.Contains("Brave", StringComparison.OrdinalIgnoreCase) ||
+                         app.Contains("Browser", StringComparison.OrdinalIgnoreCase);
+
         _currentTrack = new MediaTrackInfo
         {
             Title = title,
             Artist = artist,
             AlbumTitle = "Album",
-            SourceApp = "Media Player",
+            SourceApp = app,
+            IsBrowser = isBrowser,
             IsPlaying = true,
             Position = position ?? TimeSpan.FromSeconds(25),
             Duration = duration ?? TimeSpan.FromMinutes(3) + TimeSpan.FromSeconds(20),
@@ -188,12 +196,21 @@ public class MediaManager
                 }
             }
 
-            string source = _currentSession.SourceAppUserModelId ?? "Media Player";
-            if (source.Contains("Spotify", StringComparison.OrdinalIgnoreCase)) source = "Spotify";
-            else if (source.Contains("Chrome", StringComparison.OrdinalIgnoreCase)) source = "Chrome";
-            else if (source.Contains("Edge", StringComparison.OrdinalIgnoreCase)) source = "Edge";
-            else if (source.Contains("AppleMusic", StringComparison.OrdinalIgnoreCase)) source = "Apple Music";
-            else if (source.Contains("ZuneMusic", StringComparison.OrdinalIgnoreCase) || source.Contains("Media", StringComparison.OrdinalIgnoreCase)) source = "Media Player";
+            string rawSource = _currentSession.SourceAppUserModelId ?? "Media Player";
+            string source = rawSource;
+            bool isBrowser = false;
+
+            if (rawSource.Contains("Spotify", StringComparison.OrdinalIgnoreCase)) source = "Spotify";
+            else if (rawSource.Contains("AppleMusic", StringComparison.OrdinalIgnoreCase)) source = "Apple Music";
+            else if (rawSource.Contains("Chrome", StringComparison.OrdinalIgnoreCase)) { source = "Chrome"; isBrowser = true; }
+            else if (rawSource.Contains("Edge", StringComparison.OrdinalIgnoreCase) || rawSource.Contains("msedge", StringComparison.OrdinalIgnoreCase)) { source = "Edge"; isBrowser = true; }
+            else if (rawSource.Contains("Firefox", StringComparison.OrdinalIgnoreCase) || rawSource.Contains("Mozilla", StringComparison.OrdinalIgnoreCase)) { source = "Firefox"; isBrowser = true; }
+            else if (rawSource.Contains("Brave", StringComparison.OrdinalIgnoreCase)) { source = "Brave"; isBrowser = true; }
+            else if (rawSource.Contains("Opera", StringComparison.OrdinalIgnoreCase)) { source = "Opera"; isBrowser = true; }
+            else if (rawSource.Contains("Vivaldi", StringComparison.OrdinalIgnoreCase)) { source = "Vivaldi"; isBrowser = true; }
+            else if (rawSource.Contains("Arc", StringComparison.OrdinalIgnoreCase)) { source = "Arc"; isBrowser = true; }
+            else if (rawSource.Contains("Browser", StringComparison.OrdinalIgnoreCase) || rawSource.Contains("Chromium", StringComparison.OrdinalIgnoreCase)) { source = "Browser"; isBrowser = true; }
+            else if (rawSource.Contains("ZuneMusic", StringComparison.OrdinalIgnoreCase) || rawSource.Contains("Media", StringComparison.OrdinalIgnoreCase)) source = "Media Player";
 
             bool isPlaying = playbackInfo?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
             bool hasTitle = !string.IsNullOrWhiteSpace(props?.Title);
@@ -204,6 +221,7 @@ public class MediaManager
                 Artist = props?.Artist ?? string.Empty,
                 AlbumTitle = props?.AlbumTitle ?? string.Empty,
                 SourceApp = source,
+                IsBrowser = isBrowser,
                 Thumbnail = thumbnailImage,
                 IsPlaying = isPlaying,
                 Position = timeline?.Position ?? TimeSpan.Zero,

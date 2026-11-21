@@ -14,6 +14,22 @@ public class MediaTrackInfo
     public TimeSpan Position { get; set; } = TimeSpan.Zero;
     public TimeSpan Duration { get; set; } = TimeSpan.FromMinutes(3);
     public bool HasMedia { get; set; } = false;
+    public bool IsBrowser { get; set; } = false;
+
+    public bool IsDetectedBrowser => IsBrowser ||
+        (!string.IsNullOrWhiteSpace(SourceApp) && (
+            SourceApp.Contains("Chrome", StringComparison.OrdinalIgnoreCase) ||
+            SourceApp.Contains("Edge", StringComparison.OrdinalIgnoreCase) ||
+            SourceApp.Contains("msedge", StringComparison.OrdinalIgnoreCase) ||
+            SourceApp.Contains("Firefox", StringComparison.OrdinalIgnoreCase) ||
+            SourceApp.Contains("Mozilla", StringComparison.OrdinalIgnoreCase) ||
+            SourceApp.Contains("Brave", StringComparison.OrdinalIgnoreCase) ||
+            SourceApp.Contains("Opera", StringComparison.OrdinalIgnoreCase) ||
+            SourceApp.Contains("Vivaldi", StringComparison.OrdinalIgnoreCase) ||
+            SourceApp.Contains("Arc", StringComparison.OrdinalIgnoreCase) ||
+            SourceApp.Contains("Browser", StringComparison.OrdinalIgnoreCase) ||
+            SourceApp.Contains("Chromium", StringComparison.OrdinalIgnoreCase)
+        ));
 
     public double ProgressFraction
     {

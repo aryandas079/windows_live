@@ -1252,6 +1252,7 @@
                                     Width="36" Height="36"
                                     ToolTip="Live Lyrics / Captions"
                                     Margin="8,0,0,0"
+                                    Visibility="Collapsed"
                                     Click="ExpandedLyricsButton_Click">
                                 <Viewbox Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Canvas Width="24" Height="24">
@@ -1774,12 +1775,12 @@
                                        Opacity="0.85"
                                        Margin="0,0,0,3" />
 
-                            <!-- Current / Active Lyric Line (Warm Peach Highlight #C98F71, Bold) -->
+                            <!-- Current / Active Lyric Line (Bold, Windows Accent Color) -->
                             <TextBlock x:Name="LyricsLineCurrent"
                                        Text="♪ Loading Lyrics... ♪"
                                        FontSize="15.5"
                                        FontWeight="Bold"
-                                       Foreground="#C98F71"
+                                       Foreground="{DynamicResource AccentColorBrush}"
                                        TextAlignment="Center"
                                        TextTrimming="CharacterEllipsis"
                                        TextWrapping="NoWrap"
@@ -2067,48 +2068,5 @@
             </StackPanel>
         </Grid>
 
-        <!-- Satellite Lyrics Capsule Button (Double Quotes Icon near notch) -->
-        <Grid x:Name="LyricsSatelliteButton"
-              Height="36"
-              Width="36"
-              VerticalAlignment="Top"
-              HorizontalAlignment="Center"
-              Cursor="Hand"
-              Visibility="Collapsed"
-              Opacity="0.0"
-              ToolTip="Live Lyrics / Captions"
-              MouseEnter="LyricsSatelliteButton_MouseEnter"
-              MouseLeave="LyricsSatelliteButton_MouseLeave"
-              MouseDown="LyricsSatelliteButton_MouseDown">
-            <Grid.RenderTransform>
-                <TranslateTransform x:Name="LyricsSatelliteTranslate" X="0" Y="0" />
-            </Grid.RenderTransform>
-            <!-- Shadow -->
-            <controls:DynamicIslandNotch IsNotchMode="False"
-                                         CornerRadius="18"
-                                         Fill="#000000"
-                                         StrokeThickness="0">
-                <controls:DynamicIslandNotch.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="14" Opacity="0.45" ShadowDepth="2" Direction="270" />
-                </controls:DynamicIslandNotch.Effect>
-            </controls:DynamicIslandNotch>
-
-            <!-- Surface Base Circle -->
-            <controls:DynamicIslandNotch x:Name="LyricsSatelliteNotch"
-                                         IsNotchMode="False"
-                                         CornerRadius="18"
-                                         Fill="{DynamicResource SurfaceDarkBrush}"
-                                         Stroke="{DynamicResource SurfaceBorderBrush}"
-                                         StrokeThickness="1" />
-
-            <!-- Content: Double Quotes Icon -->
-            <Viewbox Width="16" Height="16" VerticalAlignment="Center" HorizontalAlignment="Center">
-                <Canvas Width="24" Height="24">
-                    <Path x:Name="LyricsSatelliteIconPath"
-                          Fill="#FFFFFF"
-                          Data="M 4.5,11 C 4.5,7.2 7.0,5.0 10.2,4.2 L 10.8,6.0 C 8.5,6.6 7.2,8.0 7.0,9.8 L 9.8,9.8 C 10.9,9.8 11.8,10.7 11.8,11.8 L 11.8,16.5 C 11.8,17.6 10.9,18.5 9.8,18.5 L 6.5,18.5 C 5.4,18.5 4.5,17.6 4.5,16.5 Z M 14.5,11 C 14.5,7.2 17.0,5.0 20.2,4.2 L 20.8,6.0 C 18.5,6.6 17.2,8.0 17.0,9.8 L 19.8,9.8 C 20.9,9.8 21.8,10.7 21.8,11.8 L 21.8,16.5 C 21.8,17.6 20.9,18.5 19.8,18.5 L 16.5,18.5 C 15.4,18.5 14.5,17.6 14.5,16.5 Z" />
-                </Canvas>
-            </Viewbox>
-        </Grid>
     </Grid>
 </Window>

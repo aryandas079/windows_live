@@ -83,13 +83,14 @@ public class LyricsService
 {
     public event Action<ParsedLyrics>? LyricsLoaded;
     public event Action<string, string, string>? ActiveLineChanged;
+    public event Action<bool>? LyricsAvailabilityChanged;
 
     private static readonly HttpClient _httpClient = new()
     {
-        Timeout = TimeSpan.FromSeconds(5)
+        Timeout = TimeSpan.FromSeconds(3)
     };
 
-    private readonly ConcurrentDictionary<string, ParsedLyrics> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ParsedLyrics?> _cache = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _syncTimer;
     private readonly Dispatcher _dispatcher;
 
@@ -140,15 +141,20 @@ public class LyricsService
         _syncTimer.Stop();
     }
 
-    public void LoadTrack(string artist, string title, TimeSpan duration, bool isPlaying)
+    public void LoadTrack(string artist, string title, TimeSpan duration, bool isPlaying, bool isBrowser = false)
     {
-        if (string.IsNullOrWhiteSpace(title))
+        if (isBrowser || string.IsNullOrWhiteSpace(title))
         {
+            _cts?.Cancel();
+            _cts = null;
             _currentLyrics = null;
-            _currentTrackKey = string.Empty;
+            _currentTrackKey = isBrowser ? $"[browser]{title}" : string.Empty;
             _lastActiveIndex = -2;
             _lastCurrentLine = string.Empty;
-            ActiveLineChanged?.Invoke(string.Empty, "No track playing", string.Empty);
+            _dispatcher.Invoke(() =>
+            {
+                LyricsAvailabilityChanged?.Invoke(false);
+            });
             return;
         }
 
@@ -165,11 +171,21 @@ public class LyricsService
         _lastActiveIndex = -2;
         _lastCurrentLine = string.Empty;
 
+        // Check cache first (including negative cache where value is null)
         if (_cache.TryGetValue(key, out var cached))
         {
-            _currentLyrics = cached;
-            LyricsLoaded?.Invoke(cached);
-            UpdateCurrentLines();
+            if (cached != null && cached.Lines.Count > 0)
+            {
+                _currentLyrics = cached;
+                LyricsLoaded?.Invoke(cached);
+                LyricsAvailabilityChanged?.Invoke(true);
+                UpdateCurrentLines();
+            }
+            else
+            {
+                _currentLyrics = null;
+                LyricsAvailabilityChanged?.Invoke(false);
+            }
             return;
         }
 
@@ -187,32 +203,38 @@ public class LyricsService
                 if (lyrics != null && lyrics.Lines.Count > 0)
                 {
                     _cache[key] = lyrics;
+                    _dispatcher.Invoke(() =>
+                    {
+                        if (token.IsCancellationRequested) return;
+                        _currentLyrics = lyrics;
+                        LyricsLoaded?.Invoke(lyrics);
+                        LyricsAvailabilityChanged?.Invoke(true);
+                        UpdateCurrentLines();
+                    });
                 }
                 else
                 {
-                    lyrics = CreateFallbackLyrics(artist, title, duration);
-                    _cache[key] = lyrics;
+                    // Negative cache: no lyrics available for this song
+                    _cache[key] = null;
+                    _dispatcher.Invoke(() =>
+                    {
+                        if (token.IsCancellationRequested) return;
+                        _currentLyrics = null;
+                        LyricsAvailabilityChanged?.Invoke(false);
+                    });
                 }
-
-                _dispatcher.Invoke(() =>
-                {
-                    if (token.IsCancellationRequested) return;
-                    _currentLyrics = lyrics;
-                    LyricsLoaded?.Invoke(lyrics);
-                    UpdateCurrentLines();
-                });
             }
             catch (Exception ex)
             {
                 App.Log($"LyricsService fetch error: {ex.Message}");
                 if (!token.IsCancellationRequested)
                 {
-                    var fallback = CreateFallbackLyrics(artist, title, duration);
+                    _cache[key] = null;
                     _dispatcher.Invoke(() =>
                     {
-                        _currentLyrics = fallback;
-                        LyricsLoaded?.Invoke(fallback);
-                        UpdateCurrentLines();
+                        if (token.IsCancellationRequested) return;
+                        _currentLyrics = null;
+                        LyricsAvailabilityChanged?.Invoke(false);
                     });
                 }
             }
@@ -229,6 +251,7 @@ public class LyricsService
         _lastActiveIndex = -2;
         _lastCurrentLine = string.Empty;
         LyricsLoaded?.Invoke(lyrics);
+        LyricsAvailabilityChanged?.Invoke(lyrics.Lines.Count > 0);
         UpdateCurrentLines();
     }
 
@@ -256,39 +279,47 @@ public class LyricsService
     {
         try
         {
-            // 1. Direct GET
-            string directUrl = $"https://lrclib.net/api/get?artist_name={Uri.EscapeDataString(artist)}&track_name={Uri.EscapeDataString(title)}";
-            if (duration > TimeSpan.Zero)
-            {
-                directUrl += $"&duration={(int)duration.TotalSeconds}";
-            }
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            linkedCts.CancelAfter(TimeSpan.FromMilliseconds(2500)); // Fast 2.5s maximum timeout
+            var token = linkedCts.Token;
 
-            using var directResp = await _httpClient.GetAsync(directUrl, ct);
+            // 1. Direct GET without strict duration (super fast ~200ms and avoids 404 duration mismatches)
+            string directUrl = $"https://lrclib.net/api/get?artist_name={Uri.EscapeDataString(artist)}&track_name={Uri.EscapeDataString(title)}";
+
+            using var directResp = await _httpClient.GetAsync(directUrl, token);
             if (directResp.IsSuccessStatusCode)
             {
-                string json = await directResp.Content.ReadAsStringAsync(ct);
+                string json = await directResp.Content.ReadAsStringAsync(token);
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
+
+                // Check instrumental
+                if (root.TryGetProperty("instrumental", out var instProp) && instProp.ValueKind == JsonValueKind.True)
+                {
+                    return null;
+                }
 
                 string synced = root.TryGetProperty("syncedLyrics", out var sp) && sp.ValueKind == JsonValueKind.String ? sp.GetString() ?? string.Empty : string.Empty;
                 string plain = root.TryGetProperty("plainLyrics", out var pp) && pp.ValueKind == JsonValueKind.String ? pp.GetString() ?? string.Empty : string.Empty;
 
                 if (!string.IsNullOrWhiteSpace(synced))
                 {
-                    return ParseLrc(synced, artist, title);
+                    var parsed = ParseLrc(synced, artist, title);
+                    if (parsed.Lines.Count > 0) return parsed;
                 }
                 if (!string.IsNullOrWhiteSpace(plain))
                 {
-                    return ParsePlainLyrics(plain, artist, title, duration);
+                    var parsed = ParsePlainLyrics(plain, artist, title, duration);
+                    if (parsed.Lines.Count > 0) return parsed;
                 }
             }
 
-            // 2. Search Fallback
+            // 2. Search Fallback (if direct get was 404 or lacked lyrics)
             string searchUrl = $"https://lrclib.net/api/search?q={Uri.EscapeDataString(artist + " " + title)}";
-            using var searchResp = await _httpClient.GetAsync(searchUrl, ct);
+            using var searchResp = await _httpClient.GetAsync(searchUrl, token);
             if (searchResp.IsSuccessStatusCode)
             {
-                string json = await searchResp.Content.ReadAsStringAsync(ct);
+                string json = await searchResp.Content.ReadAsStringAsync(token);
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.ValueKind == JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0)
                 {
@@ -297,6 +328,11 @@ public class LyricsService
 
                     foreach (var item in doc.RootElement.EnumerateArray())
                     {
+                        if (item.TryGetProperty("instrumental", out var ip) && ip.ValueKind == JsonValueKind.True)
+                        {
+                            continue;
+                        }
+
                         if (item.TryGetProperty("syncedLyrics", out var sp) && sp.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(sp.GetString()))
                         {
                             bestSynced = item;
@@ -311,15 +347,21 @@ public class LyricsService
                     if (bestSynced.HasValue)
                     {
                         string s = bestSynced.Value.GetProperty("syncedLyrics").GetString()!;
-                        return ParseLrc(s, artist, title);
+                        var parsed = ParseLrc(s, artist, title);
+                        if (parsed.Lines.Count > 0) return parsed;
                     }
                     if (bestPlain.HasValue)
                     {
                         string p = bestPlain.Value.GetProperty("plainLyrics").GetString()!;
-                        return ParsePlainLyrics(p, artist, title, duration);
+                        var parsed = ParsePlainLyrics(p, artist, title, duration);
+                        if (parsed.Lines.Count > 0) return parsed;
                     }
                 }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Fast timeout or track changed
         }
         catch (Exception ex)
         {
@@ -391,24 +433,6 @@ public class LyricsService
             result.Lines.Add(new LyricLine(t, rawLines[i]));
         }
 
-        return result;
-    }
-
-    private static ParsedLyrics CreateFallbackLyrics(string artist, string title, TimeSpan duration)
-    {
-        var result = new ParsedLyrics
-        {
-            Artist = artist,
-            Title = title,
-            IsSynced = false
-        };
-
-        result.Lines.Add(new LyricLine(TimeSpan.Zero, $"♪ {title} ♪"));
-        if (!string.IsNullOrWhiteSpace(artist))
-        {
-            result.Lines.Add(new LyricLine(TimeSpan.FromSeconds(3), artist));
-        }
-        result.Lines.Add(new LyricLine(TimeSpan.FromSeconds(6), "(Live Captions / Lyrics)"));
         return result;
     }
 

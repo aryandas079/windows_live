@@ -320,7 +320,6 @@ public class MediaManager
             if (timeline != null)
             {
                 SynchronizeTimeline(timeline.Position, timeline.LastUpdatedTime, timeline.EndTime, isPlaying);
-                TrackChanged?.Invoke(_currentTrack);
             }
         }
         catch { }
@@ -363,12 +362,10 @@ public class MediaManager
                 newPos = TimeSpan.Zero;
             }
             _currentTrack.Position = newPos;
-            TrackChanged?.Invoke(_currentTrack);
         }
         else if (_currentSession != null && _currentTrack.IsPlaying)
         {
             _currentTrack.Position = GetLivePosition();
-            TrackChanged?.Invoke(_currentTrack);
         }
     }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -21,18 +22,19 @@ public class ParsedLyrics
     public List<LyricLine> Lines { get; set; } = new();
     public bool IsSynced { get; set; } = false;
 
-    public (string Prev, string Current, string Next, int Index) GetLinesAt(TimeSpan position)
+    public (string Prev, string Current, string Next, string NextPlusOne, int Index) GetLinesAt(TimeSpan position)
     {
         if (Lines.Count == 0)
         {
-            return (string.Empty, !string.IsNullOrWhiteSpace(Title) ? $"♪ {Title} ♪" : "♪ Music ♪", string.Empty, -1);
+            return (string.Empty, !string.IsNullOrWhiteSpace(Title) ? $"♪ {Title} ♪" : "♪ Music ♪", string.Empty, string.Empty, -1);
         }
 
         // Before first line
         if (position < Lines[0].Time)
         {
             string firstLine = string.IsNullOrWhiteSpace(Lines[0].Text) ? (Lines.Count > 1 ? Lines[1].Text : string.Empty) : Lines[0].Text;
-            return (string.Empty, !string.IsNullOrWhiteSpace(Title) ? $"♪ {Title} ♪" : "♪ Music ♪", firstLine, -1);
+            string secondLine = Lines.Count > 1 ? Lines[1].Text : string.Empty;
+            return (string.Empty, !string.IsNullOrWhiteSpace(Title) ? $"♪ {Title} ♪" : "♪ Music ♪", firstLine, secondLine, -1);
         }
 
         // Find active line
@@ -66,23 +68,38 @@ public class ParsedLyrics
         }
 
         string next = string.Empty;
+        int nextIdx = -1;
         for (int i = activeIdx + 1; i < Lines.Count; i++)
         {
             if (!string.IsNullOrWhiteSpace(Lines[i].Text))
             {
                 next = Lines[i].Text;
+                nextIdx = i;
                 break;
             }
         }
 
-        return (prev, curr, next, activeIdx);
+        string nextPlusOne = string.Empty;
+        if (nextIdx >= 0)
+        {
+            for (int i = nextIdx + 1; i < Lines.Count; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(Lines[i].Text))
+                {
+                    nextPlusOne = Lines[i].Text;
+                    break;
+                }
+            }
+        }
+
+        return (prev, curr, next, nextPlusOne, activeIdx);
     }
 }
 
 public class LyricsService
 {
     public event Action<ParsedLyrics>? LyricsLoaded;
-    public event Action<string, string, string>? ActiveLineChanged;
+    public event Action<string, string, string, string, int, int>? ActiveLineChanged;
     public event Action<bool>? LyricsAvailabilityChanged;
 
     private static readonly HttpClient _httpClient = new()
@@ -103,6 +120,18 @@ public class LyricsService
     private Func<TimeSpan>? _positionProvider;
     private Func<bool>? _isPlayingProvider;
 
+    private double _leadTimeMs = 680.0; // Calibrated 680ms lead time compensates for WASAPI output buffer & Bluetooth latency
+    public double LeadTimeMs
+    {
+        get => _leadTimeMs;
+        set => _leadTimeMs = Math.Clamp(value, 0.0, 2500.0);
+    }
+
+    public void SetLeadTime(double ms)
+    {
+        LeadTimeMs = ms;
+    }
+
     static LyricsService()
     {
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("WindowsLiveDynamicIsland/1.0 (Windows NT 10.0; Win64; x64)");
@@ -114,7 +143,7 @@ public class LyricsService
 
         _syncTimer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher)
         {
-            Interval = TimeSpan.FromMilliseconds(30)
+            Interval = TimeSpan.FromMilliseconds(20) // 50 updates/sec for smooth live tracking
         };
         _syncTimer.Tick += OnSyncTimerTick;
     }
@@ -266,17 +295,30 @@ public class LyricsService
 
         TimeSpan pos = _positionProvider?.Invoke() ?? TimeSpan.Zero;
         
-        // Add a 220ms lead time to account for Windows audio rendering buffer latency
-        // so the line highlights at the exact onset of the singer's vocals
-        TimeSpan syncPos = pos + TimeSpan.FromMilliseconds(220);
-        var (prev, curr, next, idx) = _currentLyrics.GetLinesAt(syncPos);
+        // Calibrated lead time to compensate for Windows WASAPI audio engine output latency & Bluetooth delay
+        // so the line highlights at the exact acoustic onset of the singer's vocals
+        TimeSpan syncPos = pos + TimeSpan.FromMilliseconds(_leadTimeMs);
+        var (prev, curr, next, nextPlusOne, idx) = _currentLyrics.GetLinesAt(syncPos);
 
         if (idx != _lastActiveIndex || !string.Equals(curr, _lastCurrentLine, StringComparison.Ordinal))
         {
+            int oldIdx = _lastActiveIndex;
             _lastActiveIndex = idx;
             _lastCurrentLine = curr;
-            ActiveLineChanged?.Invoke(prev, curr, next);
+            ActiveLineChanged?.Invoke(prev, curr, next, nextPlusOne, idx, oldIdx);
         }
+    }
+
+    public void ForceRefresh()
+    {
+        if (_currentLyrics == null) return;
+
+        TimeSpan pos = _positionProvider?.Invoke() ?? TimeSpan.Zero;
+        TimeSpan syncPos = pos + TimeSpan.FromMilliseconds(_leadTimeMs);
+        var (prev, curr, next, nextPlusOne, idx) = _currentLyrics.GetLinesAt(syncPos);
+        _lastActiveIndex = idx;
+        _lastCurrentLine = curr;
+        ActiveLineChanged?.Invoke(prev, curr, next, nextPlusOne, idx, -2);
     }
 
     private static async Task<ParsedLyrics?> FetchLyricsFromLrclibAsync(string artist, string title, TimeSpan duration, CancellationToken ct)
@@ -384,7 +426,7 @@ public class LyricsService
             IsSynced = true
         };
 
-        var regex = new Regex(@"^\[(\d+):(\d+(?:\.\d+)?)\](.*)$", RegexOptions.Compiled);
+        var timeTagRegex = new Regex(@"\[(\d+):(\d+(?:\.\d+)?)\]", RegexOptions.Compiled);
 
         using var reader = new StringReader(lrcText);
         string? line;
@@ -393,15 +435,20 @@ public class LyricsService
             line = line.Trim();
             if (string.IsNullOrWhiteSpace(line)) continue;
 
-            var match = regex.Match(line);
-            if (match.Success)
+            var matches = timeTagRegex.Matches(line);
+            if (matches.Count > 0)
             {
-                if (double.TryParse(match.Groups[1].Value, out double min) &&
-                    double.TryParse(match.Groups[2].Value, out double sec))
+                int lastTagEnd = matches[^1].Index + matches[^1].Length;
+                string text = line[lastTagEnd..].Trim();
+
+                foreach (Match match in matches)
                 {
-                    var time = TimeSpan.FromSeconds(min * 60.0 + sec);
-                    string text = match.Groups[3].Value.Trim();
-                    result.Lines.Add(new LyricLine(time, text));
+                    if (double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double min) &&
+                        double.TryParse(match.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sec))
+                    {
+                        var time = TimeSpan.FromSeconds(min * 60.0 + sec);
+                        result.Lines.Add(new LyricLine(time, text));
+                    }
                 }
             }
         }

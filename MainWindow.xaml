@@ -1764,73 +1764,121 @@
                     </Grid>
 
                     <!-- ============================================== -->
-                    <!-- 13. LIVE LYRICS / CAPTIONS (Matches Reference Image) -->
+                    <!-- 13. LIVE LYRICS / CAPTIONS (Kinetic Fluid Dual-Layer) -->
                     <!-- ============================================== -->
                     <Grid x:Name="ViewLiveLyrics"
                           Visibility="Collapsed"
                           VerticalAlignment="Center"
                           HorizontalAlignment="Stretch"
+                          ClipToBounds="True"
                           Cursor="Hand"
                           Background="Transparent"
                           MouseDown="ViewLiveLyrics_MouseDown"
                           ToolTip="Click to toggle lyrics / media player">
-                        <StackPanel Orientation="Vertical"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Margin="14,1,14,1">
-                            <!-- Previous Lyric Line (Muted Gray #8D8D8D) -->
-                            <TextBlock x:Name="LyricsLinePrevious"
-                                       Text=""
-                                       FontSize="13"
-                                       FontWeight="Medium"
-                                       Foreground="#8D8D8D"
-                                       TextAlignment="Center"
-                                       TextTrimming="CharacterEllipsis"
-                                       TextWrapping="NoWrap"
-                                       HorizontalAlignment="Center"
-                                       Opacity="0.75"
-                                       Margin="0,0,0,2">
-                                <TextBlock.RenderTransform>
-                                    <TranslateTransform x:Name="LyricsPrevTranslate" Y="0" />
-                                </TextBlock.RenderTransform>
-                            </TextBlock>
+                        
+                        <!-- Layer A -->
+                        <Grid x:Name="LyricsLayerA"
+                              VerticalAlignment="Center"
+                              HorizontalAlignment="Stretch"
+                              RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <TranslateTransform x:Name="LyricsTransA" Y="0" />
+                            </Grid.RenderTransform>
+                            <StackPanel Orientation="Vertical"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Margin="16,2,16,2">
+                                <TextBlock x:Name="LyricsA_Prev"
+                                           Text=""
+                                           FontSize="13"
+                                           FontWeight="Medium"
+                                           Foreground="#8D8D8D"
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           HorizontalAlignment="Center"
+                                           Opacity="0.65"
+                                           Margin="0,0,0,3" />
+                                <TextBlock x:Name="LyricsA_Curr"
+                                           Text="♪ Loading Lyrics... ♪"
+                                           FontSize="15"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource AccentColorBrush}"
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,3"
+                                           RenderTransformOrigin="0.5,0.5">
+                                    <TextBlock.RenderTransform>
+                                        <ScaleTransform x:Name="LyricsA_Scale" ScaleX="1.0" ScaleY="1.0" />
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                                <TextBlock x:Name="LyricsA_Next"
+                                           Text=""
+                                           FontSize="13"
+                                           FontWeight="Medium"
+                                           Foreground="#8D8D8D"
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           HorizontalAlignment="Center"
+                                           Opacity="0.65" />
+                            </StackPanel>
+                        </Grid>
 
-                            <!-- Current / Active Lyric Line (Bold, Windows Accent Color) -->
-                            <TextBlock x:Name="LyricsLineCurrent"
-                                       Text="♪ Loading Lyrics... ♪"
-                                       FontSize="15.5"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource AccentColorBrush}"
-                                       TextAlignment="Center"
-                                       TextTrimming="CharacterEllipsis"
-                                       TextWrapping="NoWrap"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,0,0,2"
-                                       RenderTransformOrigin="0.5,0.5">
-                                <TextBlock.RenderTransform>
-                                    <TransformGroup>
-                                        <TranslateTransform x:Name="LyricsCurrentTranslate" Y="0" />
-                                        <ScaleTransform x:Name="LyricsCurrentScale" ScaleX="1.0" ScaleY="1.0" />
-                                    </TransformGroup>
-                                </TextBlock.RenderTransform>
-                            </TextBlock>
-
-                            <!-- Next Lyric Line (Muted Gray #8D8D8D) -->
-                            <TextBlock x:Name="LyricsLineNext"
-                                       Text=""
-                                       FontSize="13"
-                                       FontWeight="Medium"
-                                       Foreground="#8D8D8D"
-                                       TextAlignment="Center"
-                                       TextTrimming="CharacterEllipsis"
-                                       TextWrapping="NoWrap"
-                                       HorizontalAlignment="Center"
-                                       Opacity="0.75">
-                                <TextBlock.RenderTransform>
-                                    <TranslateTransform x:Name="LyricsNextTranslate" Y="0" />
-                                </TextBlock.RenderTransform>
-                            </TextBlock>
-                        </StackPanel>
+                        <!-- Layer B -->
+                        <Grid x:Name="LyricsLayerB"
+                              VerticalAlignment="Center"
+                              HorizontalAlignment="Stretch"
+                              Opacity="0.0"
+                              Visibility="Collapsed"
+                              RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <TranslateTransform x:Name="LyricsTransB" Y="0" />
+                            </Grid.RenderTransform>
+                            <StackPanel Orientation="Vertical"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Margin="16,2,16,2">
+                                <TextBlock x:Name="LyricsB_Prev"
+                                           Text=""
+                                           FontSize="13"
+                                           FontWeight="Medium"
+                                           Foreground="#8D8D8D"
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           HorizontalAlignment="Center"
+                                           Opacity="0.65"
+                                           Margin="0,0,0,3" />
+                                <TextBlock x:Name="LyricsB_Curr"
+                                           Text=""
+                                           FontSize="15"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource AccentColorBrush}"
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,3"
+                                           RenderTransformOrigin="0.5,0.5">
+                                    <TextBlock.RenderTransform>
+                                        <ScaleTransform x:Name="LyricsB_Scale" ScaleX="1.0" ScaleY="1.0" />
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                                <TextBlock x:Name="LyricsB_Next"
+                                           Text=""
+                                           FontSize="13"
+                                           FontWeight="Medium"
+                                           Foreground="#8D8D8D"
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           HorizontalAlignment="Center"
+                                           Opacity="0.65" />
+                            </StackPanel>
+                        </Grid>
                     </Grid>
 
                 </Grid>

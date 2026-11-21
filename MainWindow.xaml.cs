@@ -97,8 +97,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _unlockAlertTimer;
     private readonly DispatcherTimer _topMostTimer;
     private readonly LyricsService _lyricsService;
-    private const double ExpandedLyricsWidth = 430.0;
-    private const double ExpandedLyricsHeight = 90.0;
+    private const double ExpandedLyricsWidth = 450.0;
+    private const double ExpandedLyricsHeight = 94.0;
 
     private IslandCategory _activeCategory = IslandCategory.MediaPlayback;
     private bool _isExpanded = false;
@@ -2297,6 +2297,14 @@ public partial class MainWindow : Window
                 Dispatcher.Invoke(ToggleLiveLyrics);
                 return;
             }
+            if (name.Equals("lyrics_lead", StringComparison.OrdinalIgnoreCase))
+            {
+                if (parts.Length > 1 && double.TryParse(parts[1].Trim(), out double leadMs))
+                {
+                    _lyricsService.SetLeadTime(leadMs);
+                }
+                return;
+            }
             if (name.Equals("notif", StringComparison.OrdinalIgnoreCase) || name.Equals("notification", StringComparison.OrdinalIgnoreCase))
             {
                 string app = parts.Length > 1 ? parts[1].Trim() : "Blinkit";
@@ -4121,6 +4129,8 @@ public partial class MainWindow : Window
         }
     }
 
+    private bool _isLyricsLayerAActive = true;
+
     private void ToggleLiveLyrics()
     {
         if (!IsMusicActive || !_lyricsService.HasLyrics) return;
@@ -4147,7 +4157,6 @@ public partial class MainWindow : Window
             _autoCollapseTimer.Stop();
 
             _lyricsService.StartTracking();
-            _lyricsService.UpdateCurrentLines();
 
             CompactView.BeginAnimation(OpacityProperty, null);
             CompactView.Opacity = 0.0;
@@ -4160,44 +4169,111 @@ public partial class MainWindow : Window
 
             AnimateIsland(ExpandedLyricsWidth, ExpandedLyricsHeight);
             UpdateLyricsIconState();
+
+            // Reset layer transforms and force immediate line render
+            _isLyricsLayerAActive = true;
+            LyricsLayerA.BeginAnimation(OpacityProperty, null);
+            LyricsLayerB.BeginAnimation(OpacityProperty, null);
+            LyricsTransA.BeginAnimation(TranslateTransform.YProperty, null);
+            LyricsTransB.BeginAnimation(TranslateTransform.YProperty, null);
+            LyricsLayerA.Visibility = Visibility.Visible;
+            LyricsLayerA.Opacity = 1.0;
+            LyricsTransA.Y = 0;
+            LyricsLayerB.Visibility = Visibility.Collapsed;
+            LyricsLayerB.Opacity = 0.0;
+            LyricsTransB.Y = 0;
+
+            _lyricsService.ForceRefresh();
         }
     }
 
-    private void OnLyricsActiveLineChanged(string prev, string curr, string next)
+    private void OnLyricsActiveLineChanged(string prev, string curr, string next, string nextPlusOne, int newIdx, int oldIdx)
     {
         Dispatcher.Invoke(() =>
         {
-            LyricsLinePrevious.Text = prev;
-            LyricsLineCurrent.Text = string.IsNullOrWhiteSpace(curr) ? "♪ Music ♪" : curr;
-            LyricsLineNext.Text = next;
+            string cleanCurr = string.IsNullOrWhiteSpace(curr) ? "♪ Music ♪" : curr;
 
-            if (_activeCategory == IslandCategory.LiveLyrics && ViewLiveLyrics.Visibility == Visibility.Visible)
+            if (_activeCategory != IslandCategory.LiveLyrics || ViewLiveLyrics.Visibility != Visibility.Visible || oldIdx == -2)
             {
-                var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-                var dur = TimeSpan.FromMilliseconds(220);
-
-                // 1. Current Active Line: Smooth upward glide, subtle scale bloom (0.95 -> 1.0), and crisp fade
-                var currentSlide = new DoubleAnimation(6.0, 0.0, dur) { EasingFunction = ease };
-                var currentFade = new DoubleAnimation(0.35, 1.0, dur) { EasingFunction = ease };
-                var currentScale = new DoubleAnimation(0.96, 1.0, dur) { EasingFunction = ease };
-
-                LyricsCurrentTranslate?.BeginAnimation(TranslateTransform.YProperty, currentSlide);
-                LyricsLineCurrent.BeginAnimation(OpacityProperty, currentFade);
-                LyricsCurrentScale?.BeginAnimation(ScaleTransform.ScaleXProperty, currentScale);
-                LyricsCurrentScale?.BeginAnimation(ScaleTransform.ScaleYProperty, currentScale);
-
-                // 2. Previous Line: Smooth glide into upper position and subtle fade
-                var prevSlide = new DoubleAnimation(4.0, 0.0, dur) { EasingFunction = ease };
-                var prevFade = new DoubleAnimation(0.30, 0.75, dur) { EasingFunction = ease };
-                LyricsPrevTranslate?.BeginAnimation(TranslateTransform.YProperty, prevSlide);
-                LyricsLinePrevious.BeginAnimation(OpacityProperty, prevFade);
-
-                // 3. Next Line: Smooth entrance glide from below
-                var nextSlide = new DoubleAnimation(5.0, 0.0, dur) { EasingFunction = ease };
-                var nextFade = new DoubleAnimation(0.20, 0.75, dur) { EasingFunction = ease };
-                LyricsNextTranslate?.BeginAnimation(TranslateTransform.YProperty, nextSlide);
-                LyricsLineNext.BeginAnimation(OpacityProperty, nextFade);
+                // Immediate update without animation
+                var actPrev = _isLyricsLayerAActive ? LyricsA_Prev : LyricsB_Prev;
+                var actCurr = _isLyricsLayerAActive ? LyricsA_Curr : LyricsB_Curr;
+                var actNext = _isLyricsLayerAActive ? LyricsA_Next : LyricsB_Next;
+                if (actPrev != null) actPrev.Text = prev;
+                if (actCurr != null) actCurr.Text = cleanCurr;
+                if (actNext != null) actNext.Text = next;
+                return;
             }
+
+            var incomingLayer = _isLyricsLayerAActive ? LyricsLayerB : LyricsLayerA;
+            var outgoingLayer = _isLyricsLayerAActive ? LyricsLayerA : LyricsLayerB;
+            var incomingTrans = _isLyricsLayerAActive ? LyricsTransB : LyricsTransA;
+            var outgoingTrans = _isLyricsLayerAActive ? LyricsTransA : LyricsTransB;
+            var incomingScale = _isLyricsLayerAActive ? LyricsB_Scale : LyricsA_Scale;
+
+            var inPrev = _isLyricsLayerAActive ? LyricsB_Prev : LyricsA_Prev;
+            var inCurr = _isLyricsLayerAActive ? LyricsB_Curr : LyricsA_Curr;
+            var inNext = _isLyricsLayerAActive ? LyricsB_Next : LyricsA_Next;
+
+            if (inPrev != null) inPrev.Text = prev;
+            if (inCurr != null) inCurr.Text = cleanCurr;
+            if (inNext != null) inNext.Text = next;
+
+            incomingLayer.Visibility = Visibility.Visible;
+
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var dur = TimeSpan.FromMilliseconds(260);
+
+            if (newIdx == oldIdx + 1)
+            {
+                // Natural forward roll: lines glide smoothly UPWARDS
+                var outSlide = new DoubleAnimation(0.0, -18.0, dur) { EasingFunction = ease };
+                var outFade = new DoubleAnimation(1.0, 0.0, dur) { EasingFunction = ease };
+
+                var inSlide = new DoubleAnimation(18.0, 0.0, dur) { EasingFunction = ease };
+                var inFade = new DoubleAnimation(0.0, 1.0, dur) { EasingFunction = ease };
+                var inScaleAnim = new DoubleAnimation(0.95, 1.0, dur) { EasingFunction = ease };
+
+                outgoingTrans.BeginAnimation(TranslateTransform.YProperty, outSlide);
+                outgoingLayer.BeginAnimation(OpacityProperty, outFade);
+
+                incomingTrans.BeginAnimation(TranslateTransform.YProperty, inSlide);
+                incomingLayer.BeginAnimation(OpacityProperty, inFade);
+                incomingScale?.BeginAnimation(ScaleTransform.ScaleXProperty, inScaleAnim);
+                incomingScale?.BeginAnimation(ScaleTransform.ScaleYProperty, inScaleAnim);
+            }
+            else if (newIdx == oldIdx - 1)
+            {
+                // Backward roll: lines glide smoothly DOWNWARDS
+                var outSlide = new DoubleAnimation(0.0, 18.0, dur) { EasingFunction = ease };
+                var outFade = new DoubleAnimation(1.0, 0.0, dur) { EasingFunction = ease };
+
+                var inSlide = new DoubleAnimation(-18.0, 0.0, dur) { EasingFunction = ease };
+                var inFade = new DoubleAnimation(0.0, 1.0, dur) { EasingFunction = ease };
+
+                outgoingTrans.BeginAnimation(TranslateTransform.YProperty, outSlide);
+                outgoingLayer.BeginAnimation(OpacityProperty, outFade);
+
+                incomingTrans.BeginAnimation(TranslateTransform.YProperty, inSlide);
+                incomingLayer.BeginAnimation(OpacityProperty, inFade);
+            }
+            else
+            {
+                // Seek or skip: gentle cross-fade
+                var crossDur = TimeSpan.FromMilliseconds(160);
+                var outFade = new DoubleAnimation(1.0, 0.0, crossDur) { EasingFunction = ease };
+                var inFade = new DoubleAnimation(0.0, 1.0, crossDur) { EasingFunction = ease };
+
+                outgoingTrans.BeginAnimation(TranslateTransform.YProperty, null);
+                outgoingTrans.Y = 0;
+                incomingTrans.BeginAnimation(TranslateTransform.YProperty, null);
+                incomingTrans.Y = 0;
+
+                outgoingLayer.BeginAnimation(OpacityProperty, outFade);
+                incomingLayer.BeginAnimation(OpacityProperty, inFade);
+            }
+
+            _isLyricsLayerAActive = !_isLyricsLayerAActive;
         });
     }
 

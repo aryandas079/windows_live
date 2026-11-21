@@ -138,6 +138,7 @@ public partial class MainWindow : Window
     private const double ExpandedHeight = 86.0;
 
     private bool _isExplicitExit = false;
+    private uint _msgTaskbarCreated = 0;
 
     private bool _isChargingAlertActive = false;
     private bool _isNotificationAlertActive = false;
@@ -363,29 +364,42 @@ public partial class MainWindow : Window
             _notificationService.NotificationReceived += OnNotificationReceived;
             _notificationService.NotificationsChanged += OnNotificationsChanged;
             _focusAssistService.FocusAssistChanged += OnFocusAssistChanged;
-            _focusAssistService.Start();
             _nightLightService.NightModeChanged += OnNightModeChanged;
-            _nightLightService.Start();
             _alarmService.AlarmStateChanged += OnAlarmStateChanged;
             _alarmService.SnoozeStarted += OnAlarmSnoozeStarted;
             _bluetoothService.DeviceConnected += OnBluetoothDeviceConnected;
             _bluetoothService.DeviceDisconnected += OnBluetoothDeviceDisconnected;
-            _bluetoothService.Start();
             _wifiService.StateChanged += OnWifiActivityStateChanged;
-            SetupBluetoothTestTriggerWatcher();
             _powerModeService = new PowerModeWatcherService();
             _powerModeService.PowerModeChanged += OnPowerModeChanged;
-            _powerModeService.Start();
             _privacyService = new PrivacyIndicatorService();
             _privacyService.PrivacyStateChanged += OnPrivacyStateChanged;
-            _privacyService.Start();
             _windowsClockService.TimerStateChanged += OnWindowsClockTimerChanged;
-            _windowsClockService.Start();
             _voiceRecordingService.RecordingStateChanged += OnVoiceRecordingStateChanged;
             _voiceRecordingService.RecordingStateChanged += info => _privacyService.SetWasapiMicState(info.IsRecording);
-            _voiceRecordingService.Start();
             _screenRecordingService.RecordingStateChanged += OnScreenRecordingStateChanged;
-            _screenRecordingService.Start();
+
+            // Launch heavy background watchers in parallel so window renders instantly without delay
+            Task.Run(() =>
+            {
+                try
+                {
+                    _focusAssistService.Start();
+                    _nightLightService.Start();
+                    _bluetoothService.Start();
+                    _powerModeService.Start();
+                    _privacyService.Start();
+                    _windowsClockService.Start();
+                    _voiceRecordingService.Start();
+                    _screenRecordingService.Start();
+                    SetupBluetoothTestTriggerWatcher();
+                    App.Log("All background services started asynchronously in parallel.");
+                }
+                catch (Exception ex)
+                {
+                    App.Log($"Error starting background services: {ex.Message}");
+                }
+            });
 
             App.Log("Initializing LyricsService...");
             _lyricsService = new LyricsService(Dispatcher);
@@ -741,6 +755,7 @@ public partial class MainWindow : Window
             {
                 App.Log("MainWindow SourceInitialized");
                 WindowHelper.MakeToolWindow(this);
+                _msgTaskbarCreated = WindowHelper.RegisterWindowMessage("TaskbarCreated");
             };
             Loaded += OnLoaded;
             Closing += (s, e) =>
@@ -957,6 +972,13 @@ public partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (_msgTaskbarCreated != 0 && (uint)msg == _msgTaskbarCreated)
+        {
+            App.Log("TaskbarCreated received: Explorer restarted, re-aligning dock");
+            PositionWindow();
+            WindowHelper.EnsureTopMost(this);
+        }
+
         if (msg == 0x0046) // WM_WINDOWPOSCHANGING: keep topmost unconditionally
         {
             try
@@ -2794,10 +2816,12 @@ public partial class MainWindow : Window
         {
             Dispatcher.Invoke(() =>
             {
-                PositionWindow();
-                WindowHelper.EnsureTopMost(this);
+                RefreshOnWake();
                 TriggerUnlockAnimation();
             });
+
+            Task.Delay(400).ContinueWith(_ => Dispatcher.Invoke(RefreshOnWake));
+            Task.Delay(1200).ContinueWith(_ => Dispatcher.Invoke(RefreshOnWake));
         }
         else if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionLock)
         {
@@ -2813,15 +2837,26 @@ public partial class MainWindow : Window
         App.Log($"SystemEvents_PowerModeChanged: Mode={e.Mode}");
         if (e.Mode == Microsoft.Win32.PowerModes.Resume)
         {
-            Dispatcher.Invoke(() =>
-            {
-                App.Log("Waking from sleep / power resume: refreshing layout, window position and services");
-                PositionWindow();
-                WindowHelper.EnsureTopMost(this);
-                UpdateClock();
-                OnPowerStatusChanged();
-                UpdateCompactViewVisibility();
-            });
+            Dispatcher.Invoke(RefreshOnWake);
+
+            // Staggered post-wake re-checks to guarantee proper positioning as display drivers wake up
+            Task.Delay(400).ContinueWith(_ => Dispatcher.Invoke(RefreshOnWake));
+            Task.Delay(1200).ContinueWith(_ => Dispatcher.Invoke(RefreshOnWake));
+        }
+    }
+
+    private void RefreshOnWake()
+    {
+        App.Log("Waking from sleep / power resume: refreshing layout, window position and services");
+        PositionWindow();
+        WindowHelper.EnsureTopMost(this);
+        UpdateClock();
+        OnPowerStatusChanged();
+        UpdateNightModePillVisibility();
+        UpdateCompactViewVisibility();
+        if (IslandContainer.Visibility != Visibility.Visible || IslandContainer.Opacity < 0.1)
+        {
+            ShowDockSmooth();
         }
     }
 

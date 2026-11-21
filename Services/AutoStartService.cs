@@ -61,18 +61,36 @@ public static class AutoStartService
                 }
             }
 
-            // 2. Ensure StartupApproved entries are enabled (02 00 00 00 = enabled)
+            // 2. Disable Windows' artificial 5-10 second Explorer startup delay!
+            // Setting StartupDelayInMSec = 0 forces Windows to launch startup apps IMMEDIATELY at boot/logon.
+            EnsureInstantStartupDelay();
+
+            // 3. Ensure StartupApproved entries are enabled (02 00 00 00 = enabled)
             EnsureStartupApproved(AppName, "WindowsLive.lnk");
 
-            // 3. Register Windows Startup Folder Shortcut (.lnk)
+            // 4. Register Windows Startup Folder Shortcut (.lnk)
             EnsureStartupShortcut(exePath);
-
-            // 4. Register Windows Task Scheduler logon task for instant, reliable launch
-            EnsureScheduledLogonTask(exePath);
         }
         catch (Exception ex)
         {
             App.Log($"AutoStartService error: {ex.Message}");
+        }
+    }
+
+    private static void EnsureInstantStartupDelay()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize", true);
+            if (key != null)
+            {
+                key.SetValue("StartupDelayInMSec", 0, RegistryValueKind.DWord);
+                App.Log("AutoStartService: Configured StartupDelayInMSec = 0 for zero-delay instant boot startup");
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"AutoStartService EnsureInstantStartupDelay error: {ex.Message}");
         }
     }
 
@@ -135,32 +153,6 @@ public static class AutoStartService
         catch (Exception ex)
         {
             App.Log($"AutoStartService EnsureStartupShortcut error: {ex.Message}");
-        }
-    }
-
-    private static void EnsureScheduledLogonTask(string exePath)
-    {
-        try
-        {
-            // Use schtasks to register an on-logon scheduled task without elevation prompt.
-            // /SC ONLOGON executes immediately when the user logs in after reboot/restart.
-            string workingDir = Path.GetDirectoryName(exePath) ?? AppDomain.CurrentDomain.BaseDirectory;
-            string command = $"schtasks /Create /TN \"{TaskName}\" /TR \"\\\"{exePath}\\\"\" /SC ONLOGON /F /RL LIMITED";
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/c {command}",
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-            using var proc = Process.Start(psi);
-            proc?.WaitForExit(2000);
-            App.Log($"AutoStartService: Registered Task Scheduler logon task '{TaskName}'");
-        }
-        catch (Exception ex)
-        {
-            App.Log($"AutoStartService EnsureScheduledLogonTask error: {ex.Message}");
         }
     }
 }

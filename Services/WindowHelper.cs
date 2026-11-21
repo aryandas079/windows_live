@@ -34,6 +34,9 @@ public static class WindowHelper
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool ChangeWindowMessageFilterEx(IntPtr hWnd, uint message, uint action, IntPtr pChangeFilterStruct);
 
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    public static extern uint RegisterWindowMessage(string lpString);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct WINDOWPOS
     {

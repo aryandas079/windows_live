@@ -92,22 +92,21 @@ public partial class App : Application
             base.OnStartup(e);
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            // Ensure app autostarts on Windows boot, login, restart, and shutdown
-            Services.AutoStartService.EnsureAutoStartRegistered();
-
-            SessionEnding += (s, args) =>
-            {
-                Log($"App.SessionEnding: Reason={args.ReasonSessionEnding}");
-            };
-
-            Log("Creating MainWindow...");
-
+            Log("Creating MainWindow for instant launch...");
             var win = new MainWindow();
             MainWindow = win;
             Log("Calling win.Show()...");
             win.Show();
             Services.WindowHelper.MakeToolWindow(win);
-            Log("win.Show() completed successfully!");
+            Log("win.Show() completed successfully in zero time!");
+
+            // Run autostart registration asynchronously in background so it never blocks UI launch
+            System.Threading.Tasks.Task.Run(() => Services.AutoStartService.EnsureAutoStartRegistered());
+
+            SessionEnding += (s, args) =>
+            {
+                Log($"App.SessionEnding: Reason={args.ReasonSessionEnding}");
+            };
         }
         catch (Exception ex)
         {

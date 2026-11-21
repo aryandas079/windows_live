@@ -106,15 +106,15 @@ public partial class MainWindow : Window
     private bool _isNotchMode = true;
     private bool _isDraggingSlider = false;
 
-    private const double CompactDefaultWidth = 160.0;
-    private const double CompactMediaWidth = 240.0;
+    private const double CompactDefaultWidth = 120.0; // 0.75x of original 160.0
+    private const double CompactMediaWidth = 180.0;   // 0.75x of original 240.0
     private const double CompactWifiWidth = 250.0;
     private const double CompactChargingWidth = 260.0;
     private const double CompactNotificationWidth = 220.0;
     private const double CompactUnlockWidth = 210.0;
-    private const double CompactSilentRingWidth = 240.0;
+    private const double CompactSilentRingWidth = 180.0; // 0.75x of original 240.0
     private const double CompactDndWidth = 260.0;
-    private const double CompactNightModeWidth = 240.0;
+    private const double CompactNightModeWidth = 180.0;  // 0.75x of original 240.0
     private const double CompactAlarmWidth = 130.0;
     private const double CompactBluetoothWidth = 230.0;
     private const double CompactIncomingCallWidth = 260.0;
@@ -123,8 +123,8 @@ public partial class MainWindow : Window
     private const double CompactPowerEfficiencyWidth = 250.0;
     private const double CompactPowerBalancedWidth = 200.0;
     private const double CompactPowerPerformanceWidth = 235.0;
-    private const double CompactTimerWidth = 240.0;
-    private const double CompactRecordingWidth = 210.0;
+    private const double CompactTimerWidth = 180.0;      // 0.75x of original 240.0
+    private const double CompactRecordingWidth = 160.0;  // 0.75x of original 210.0
     private const double CompactScreenRecordingWidth = CompactDefaultWidth;
     private const double CompactSplitLeadingWidth = CompactMediaWidth;
     private const double DetachedBubbleWidth = 78.0;

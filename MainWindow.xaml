@@ -28,7 +28,7 @@
 
         <!-- Island Container -->
         <Grid x:Name="IslandContainer"
-              Width="120" Height="36"
+              Width="160" Height="36"
               VerticalAlignment="Top"
               HorizontalAlignment="Center"
               AllowDrop="True"

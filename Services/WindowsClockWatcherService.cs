@@ -118,28 +118,31 @@ public class WindowsClockWatcherService
     private static IntPtr FindClockWindowHandle()
     {
         var proc = Process.GetProcessesByName("Time");
-        if (proc.Length == 0) return IntPtr.Zero;
-
-        uint timePid = (uint)proc[0].Id;
+        uint timePid = proc.Length > 0 ? (uint)proc[0].Id : 0;
         IntPtr foundHwnd = IntPtr.Zero;
 
         EnumWindows((hWnd, lParam) =>
         {
-            GetWindowThreadProcessId(hWnd, out uint pid);
-            if (pid == timePid)
+            if (timePid != 0)
             {
-                foundHwnd = hWnd;
-                return false;
+                GetWindowThreadProcessId(hWnd, out uint pid);
+                if (pid == timePid)
+                {
+                    foundHwnd = hWnd;
+                    return false;
+                }
             }
 
             var sbClass = new StringBuilder(256);
             GetClassName(hWnd, sbClass, 256);
-            if (sbClass.ToString() == "ApplicationFrameWindow")
+            string cls = sbClass.ToString();
+            if (cls == "ApplicationFrameWindow" || cls.Contains("Window") || cls.Contains("WinUI"))
             {
                 var sbTitle = new StringBuilder(256);
                 GetWindowText(hWnd, sbTitle, 256);
                 string title = sbTitle.ToString();
-                if (title.Contains("Clock", StringComparison.OrdinalIgnoreCase))
+                if (title.Contains("Clock", StringComparison.OrdinalIgnoreCase) ||
+                    title.Contains("Alarms", StringComparison.OrdinalIgnoreCase))
                 {
                     foundHwnd = hWnd;
                     return false;

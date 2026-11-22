@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Threading;
+using Microsoft.Win32;
 
 namespace WindowsLive.Services;
 
@@ -24,7 +25,7 @@ public class FocusAssistWatcherService
     {
         _pollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(800)
+            Interval = TimeSpan.FromMilliseconds(500)
         };
         _pollTimer.Tick += (s, e) => CheckState();
     }
@@ -39,29 +40,50 @@ public class FocusAssistWatcherService
     {
         try
         {
-            var manager = Windows.UI.Notifications.ToastNotificationManager.GetDefault();
-            if (manager != null)
+            FocusAssistState state = FocusAssistState.Off;
+
+            // 1. ToastNotificationManager
+            try
             {
-                var mode = manager.NotificationMode;
-                FocusAssistState state = mode switch
+                var manager = Windows.UI.Notifications.ToastNotificationManager.GetDefault();
+                if (manager != null)
                 {
-                    Windows.UI.Notifications.ToastNotificationMode.PriorityOnly => FocusAssistState.PriorityOnly,
-                    Windows.UI.Notifications.ToastNotificationMode.AlarmsOnly => FocusAssistState.AlarmsOnly,
-                    _ => FocusAssistState.Off
-                };
-
-                if (!_initialized)
-                {
-                    _initialized = true;
-                    _lastState = state;
-                    return;
+                    state = manager.NotificationMode switch
+                    {
+                        Windows.UI.Notifications.ToastNotificationMode.PriorityOnly => FocusAssistState.PriorityOnly,
+                        Windows.UI.Notifications.ToastNotificationMode.AlarmsOnly => FocusAssistState.AlarmsOnly,
+                        _ => FocusAssistState.Off
+                    };
                 }
+            }
+            catch { }
 
-                if (state != _lastState)
+            // 2. Fallback to Windows 11 Registry
+            if (state == FocusAssistState.Off)
+            {
+                try
                 {
-                    _lastState = state;
-                    FocusAssistChanged?.Invoke(state);
+                    object? toastsEnabled = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings", "NOC_GLOBAL_SETTING_TOASTS_ENABLED", null);
+                    if (toastsEnabled is int val && val == 0)
+                    {
+                        state = FocusAssistState.PriorityOnly;
+                    }
                 }
+                catch { }
+            }
+
+            if (!_initialized)
+            {
+                _initialized = true;
+                _lastState = state;
+                return;
+            }
+
+            if (state != _lastState)
+            {
+                App.Log($"FocusAssistWatcherService: Focus state changed to {state}");
+                _lastState = state;
+                FocusAssistChanged?.Invoke(state);
             }
         }
         catch (Exception ex)

@@ -34,6 +34,15 @@ public class ScreenRecordingService
     private readonly string _snippingToolTempDir;
     private readonly string _capturesDir;
 
+    // Track active file growth for Snipping Tool & Game Bar to prevent false triggers when apps are only open
+    private string? _lastSnippingFile;
+    private long _lastSnippingSize = 0;
+    private DateTime _lastSnippingTime = DateTime.MinValue;
+
+    private string? _lastCapturesFile;
+    private long _lastCapturesSize = 0;
+    private DateTime _lastCapturesTime = DateTime.MinValue;
+
     [DllImport("user32.dll")]
     private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
@@ -143,7 +152,9 @@ public class ScreenRecordingService
             bool isRecordingDetected = false;
             string detectedAppName = "Screen Recording";
 
-            // 1. Check Windows 11 Snipping Tool active recording file
+            // 1. Check Windows 11 Snipping Tool active recording
+            // Snipping tool writes to TempState\Recordings during active capture.
+            // When user is merely viewing a preview or opening Snipping Tool, the file is NOT actively growing.
             if (Directory.Exists(_snippingToolTempDir))
             {
                 try
@@ -156,30 +167,100 @@ public class ScreenRecordingService
 
                     foreach (var file in recentFiles)
                     {
-                        // File modified within the last 3.5 seconds or locked for writing
-                        if ((DateTime.Now - file.LastWriteTime).TotalSeconds < 3.5 || IsFileLocked(file.FullName))
+                        double ageSec = (DateTime.Now - file.LastWriteTime).TotalSeconds;
+                        // File must have been touched within 2.5 seconds
+                        if (ageSec < 2.5)
                         {
-                            isRecordingDetected = true;
-                            detectedAppName = "Snipping Tool";
-                            break;
+                            long currLen = file.Length;
+                            if (file.FullName == _lastSnippingFile)
+                            {
+                                if (currLen > _lastSnippingSize)
+                                {
+                                    // File is actively growing in size: guaranteed active recording!
+                                    _lastSnippingSize = currLen;
+                                    _lastSnippingTime = DateTime.Now;
+                                    isRecordingDetected = true;
+                                    detectedAppName = "Snipping Tool";
+                                    break;
+                                }
+                                else if ((DateTime.Now - _lastSnippingTime).TotalSeconds < 2.5 && IsFileLocked(file.FullName))
+                                {
+                                    // Grace period between write flushes
+                                    isRecordingDetected = true;
+                                    detectedAppName = "Snipping Tool";
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                _lastSnippingFile = file.FullName;
+                                _lastSnippingSize = currLen;
+                                _lastSnippingTime = DateTime.Now;
+                                if (IsFileLocked(file.FullName))
+                                {
+                                    isRecordingDetected = true;
+                                    detectedAppName = "Snipping Tool";
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
                 catch { }
             }
 
-            // 2. Check Windows Game Bar Screen Recording (bcastdvr.exe)
-            if (!isRecordingDetected)
+            // 2. Check Videos\Captures folder for Xbox Game Bar active recording
+            // Only consider it recording if a file is actively being written and locked by Game Bar
+            if (!isRecordingDetected && Directory.Exists(_capturesDir))
             {
-                var bcast = Process.GetProcessesByName("bcastdvr");
-                if (bcast.Length > 0)
+                try
                 {
-                    isRecordingDetected = true;
-                    detectedAppName = "Xbox Game Bar";
+                    var dirInfo = new DirectoryInfo(_capturesDir);
+                    var recentFiles = dirInfo.GetFiles("*.mp4")
+                        .Concat(dirInfo.GetFiles("*.mkv"))
+                        .OrderByDescending(f => f.LastWriteTime)
+                        .Take(2);
+
+                    foreach (var file in recentFiles)
+                    {
+                        double ageSec = (DateTime.Now - file.LastWriteTime).TotalSeconds;
+                        if (ageSec < 2.5 && IsFileLocked(file.FullName))
+                        {
+                            long currLen = file.Length;
+                            if (file.FullName == _lastCapturesFile)
+                            {
+                                if (currLen > _lastCapturesSize)
+                                {
+                                    _lastCapturesSize = currLen;
+                                    _lastCapturesTime = DateTime.Now;
+                                    isRecordingDetected = true;
+                                    detectedAppName = "Xbox Game Bar";
+                                    break;
+                                }
+                                else if ((DateTime.Now - _lastCapturesTime).TotalSeconds < 2.5)
+                                {
+                                    isRecordingDetected = true;
+                                    detectedAppName = "Xbox Game Bar";
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                _lastCapturesFile = file.FullName;
+                                _lastCapturesSize = currLen;
+                                _lastCapturesTime = DateTime.Now;
+                                isRecordingDetected = true;
+                                detectedAppName = "Xbox Game Bar";
+                                break;
+                            }
+                        }
+                    }
                 }
+                catch { }
             }
 
             // 3. Check OBS Studio active recording
+            // OBS Studio appends "[Recording: ...]" to its main window title only when recording is active.
             if (!isRecordingDetected)
             {
                 var obs = Process.GetProcessesByName("obs64").Concat(Process.GetProcessesByName("obs32"));
@@ -201,7 +282,7 @@ public class ScreenRecordingService
                 }
             }
 
-            // 4. Check ShareX ffmpeg screen recording
+            // 4. Check ShareX screen recording
             if (!isRecordingDetected)
             {
                 var ffmpegProcs = Process.GetProcessesByName("ffmpeg");
@@ -216,44 +297,31 @@ public class ScreenRecordingService
                 }
             }
 
-            // 5. Check other common screen recording processes
+            // 5. Check other common screen recording processes by active window title (NOT mere process existence)
             if (!isRecordingDetected)
             {
-                string[] knownRecorders = { "bdcam", "CamRecorder", "Loom", "Action", "fraps", "D3DGear", "BBFlashBack" };
+                string[] knownRecorders = { "bdcam", "CamRecorder", "Loom", "Action", "D3DGear" };
                 foreach (var name in knownRecorders)
                 {
                     var procs = Process.GetProcessesByName(name);
-                    if (procs.Length > 0)
+                    foreach (var p in procs)
                     {
-                        isRecordingDetected = true;
-                        detectedAppName = name;
-                        break;
-                    }
-                }
-            }
-
-            // 6. Check Videos\Captures folder for recent file actively being written
-            if (!isRecordingDetected && Directory.Exists(_capturesDir))
-            {
-                try
-                {
-                    var dirInfo = new DirectoryInfo(_capturesDir);
-                    var recentFiles = dirInfo.GetFiles("*.mp4")
-                        .Concat(dirInfo.GetFiles("*.mkv"))
-                        .OrderByDescending(f => f.LastWriteTime)
-                        .Take(2);
-
-                    foreach (var file in recentFiles)
-                    {
-                        if ((DateTime.Now - file.LastWriteTime).TotalSeconds < 3.5 && IsFileLocked(file.FullName))
+                        try
                         {
-                            isRecordingDetected = true;
-                            detectedAppName = "Screen Recording";
-                            break;
+                            string title = p.MainWindowTitle;
+                            if (!string.IsNullOrEmpty(title) &&
+                                (title.IndexOf("Recording", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                 title.IndexOf("Rec [", StringComparison.OrdinalIgnoreCase) >= 0))
+                            {
+                                isRecordingDetected = true;
+                                detectedAppName = name;
+                                break;
+                            }
                         }
+                        catch { }
                     }
+                    if (isRecordingDetected) break;
                 }
-                catch { }
             }
 
             if (isRecordingDetected)

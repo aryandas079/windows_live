@@ -1,5 +1,7 @@
 using System;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
 
@@ -29,6 +31,11 @@ public class VoiceRecordingService
     public bool IsCallActive => _isRecording && _isDetectedCall;
     public TimeSpan CurrentDuration => _isRecording ? (DateTime.Now - _recordingStartTime) : TimeSpan.Zero;
     public string ActiveAppName => _activeAppName;
+
+    private readonly string[] _soundRecordDirs;
+    private string? _lastAudioRecordFile;
+    private long _lastAudioRecordSize = 0;
+    private DateTime _lastAudioRecordTime = DateTime.MinValue;
 
     #region COM Interop Definitions
 
@@ -123,9 +130,19 @@ public class VoiceRecordingService
 
     public VoiceRecordingService()
     {
+        string myDocs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        _soundRecordDirs = new[]
+        {
+            Path.Combine(myDocs, "Sound recordings"),
+            Path.Combine(myDocs, "Sound Recordings"),
+            Path.Combine(localAppData, "Packages", "Microsoft.WindowsSoundRecorder_8wekyb3d8bbwe", "TempState"),
+            Path.Combine(localAppData, "Packages", "Microsoft.WindowsSoundRecorder_8wekyb3d8bbwe", "LocalState")
+        };
+
         _pollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(200)
+            Interval = TimeSpan.FromMilliseconds(250)
         };
         _pollTimer.Tick += (s, e) => PollMicrophoneState();
     }
@@ -285,7 +302,7 @@ public class VoiceRecordingService
         {
             bool anySessionActive = false;
             float currentPeak = GetCurrentPeak();
-            string detectedApp = "Microphone";
+            string detectedApp = "Voice Recorder";
             bool isDetectedCall = false;
 
             var enumerator = CreateEnumerator();
@@ -313,7 +330,6 @@ public class VoiceRecordingService
                                 sc2.GetState(out AudioSessionState state);
                                 if (state == AudioSessionState.AudioSessionStateActive)
                                 {
-                                    anySessionActive = true;
                                     sc2.GetProcessId(out int pid);
                                     if (pid > 0)
                                     {
@@ -322,83 +338,153 @@ public class VoiceRecordingService
                                             var proc = Process.GetProcessById(pid);
                                             string pName = proc.ProcessName;
                                             string title = proc.MainWindowTitle ?? string.Empty;
-                                            if (pName.IndexOf("SoundRec", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                pName.IndexOf("VoiceRecord", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                title.IndexOf("Sound Recorder", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                title.IndexOf("Voice Recorder", StringComparison.OrdinalIgnoreCase) >= 0)
+
+                                            // 1. Exclude screen recording tools and toolbars (handled by ScreenRecordingService)
+                                            if (pName.IndexOf("SnippingTool", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                pName.IndexOf("ScreenSketch", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                title.IndexOf("Recording toolbar", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                title.IndexOf("Snipping Tool", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                pName.IndexOf("bcastdvr", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                pName.IndexOf("obs", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
-                                                detectedApp = "Voice Recorder";
-                                                isDetectedCall = false;
+                                                SafeRelease(scObj);
+                                                continue;
                                             }
-                                            else if (pName.IndexOf("WhatsApp", StringComparison.OrdinalIgnoreCase) >= 0)
+
+                                            // 2. Active voice/video call detection
+                                            if (pName.IndexOf("WhatsApp", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "WhatsApp Voice";
                                                 isDetectedCall = true;
+                                                anySessionActive = true;
+                                                SafeRelease(scObj);
+                                                break;
                                             }
                                             else if (pName.IndexOf("Telegram", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "Telegram Voice";
                                                 isDetectedCall = true;
+                                                anySessionActive = true;
+                                                SafeRelease(scObj);
+                                                break;
                                             }
                                             else if (pName.IndexOf("teams", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "Microsoft Teams";
                                                 isDetectedCall = true;
+                                                anySessionActive = true;
+                                                SafeRelease(scObj);
+                                                break;
                                             }
                                             else if (pName.IndexOf("zoom", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "Zoom Meeting";
                                                 isDetectedCall = true;
+                                                anySessionActive = true;
+                                                SafeRelease(scObj);
+                                                break;
                                             }
                                             else if (pName.IndexOf("skype", StringComparison.OrdinalIgnoreCase) >= 0 ||
                                                      pName.IndexOf("lync", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "Skype";
                                                 isDetectedCall = true;
+                                                anySessionActive = true;
+                                                SafeRelease(scObj);
+                                                break;
                                             }
                                             else if (pName.IndexOf("discord", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
                                                 detectedApp = "Discord";
                                                 isDetectedCall = true;
+                                                anySessionActive = true;
+                                                SafeRelease(scObj);
+                                                break;
                                             }
-                                            else if (pName.IndexOf("Audacity", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            else if (pName.IndexOf("PhoneExperienceHost", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
-                                                detectedApp = "Audacity";
-                                                isDetectedCall = false;
+                                                detectedApp = "Phone Link";
+                                                isDetectedCall = true;
+                                                anySessionActive = true;
+                                                SafeRelease(scObj);
+                                                break;
                                             }
-                                            else if (pName.IndexOf("OBS", StringComparison.OrdinalIgnoreCase) >= 0)
+
+                                            // 3. Web browser calls (e.g. Google Meet, Webex)
+                                            if (pName.IndexOf("chrome", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                pName.IndexOf("msedge", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                pName.IndexOf("firefox", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                pName.IndexOf("brave", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
-                                                detectedApp = "OBS Recording";
-                                                isDetectedCall = false;
-                                            }
-                                            else if (pName.IndexOf("chrome", StringComparison.OrdinalIgnoreCase) >= 0)
-                                            {
-                                                detectedApp = "Chrome (Mic)";
-                                                isDetectedCall = false;
-                                            }
-                                            else if (pName.IndexOf("msedge", StringComparison.OrdinalIgnoreCase) >= 0)
-                                            {
-                                                detectedApp = "Edge (Mic)";
-                                                isDetectedCall = false;
-                                            }
-                                            else if (!string.IsNullOrWhiteSpace(proc.MainWindowTitle))
-                                            {
-                                                detectedApp = proc.MainWindowTitle;
-                                                string titleLower = proc.MainWindowTitle.ToLowerInvariant();
-                                                if (titleLower.Contains("call") || titleLower.Contains("meet") || titleLower.Contains("huddle"))
+                                                string titleLower = title.ToLowerInvariant();
+                                                if (titleLower.Contains("meet") || titleLower.Contains("teams") ||
+                                                    titleLower.Contains("zoom") || titleLower.Contains("webex") ||
+                                                    titleLower.Contains("call") || titleLower.Contains("huddle"))
                                                 {
+                                                    detectedApp = "Web Call";
                                                     isDetectedCall = true;
+                                                    anySessionActive = true;
+                                                    SafeRelease(scObj);
+                                                    break;
                                                 }
+                                                // Otherwise ignore web browser mic usage (handled by privacy indicator)
+                                                SafeRelease(scObj);
+                                                continue;
                                             }
-                                            else
+
+                                            // 4. Windows Sound Recorder / Voice Recorder
+                                            // When merely opened, Sound Recorder opens a WASAPI capture stream for its level meter.
+                                            // We ONLY treat it as recording if an audio file is actively being written / growing!
+                                            if (pName.IndexOf("SoundRec", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                pName.IndexOf("VoiceRecord", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                title.IndexOf("Sound Recorder", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                title.IndexOf("Voice Recorder", StringComparison.OrdinalIgnoreCase) >= 0)
                                             {
-                                                detectedApp = pName;
+                                                if (IsSoundRecorderActivelyRecording())
+                                                {
+                                                    detectedApp = "Voice Recorder";
+                                                    isDetectedCall = false;
+                                                    anySessionActive = true;
+                                                    SafeRelease(scObj);
+                                                    break;
+                                                }
+                                                // Merely open or idle -> ignore!
+                                                SafeRelease(scObj);
+                                                continue;
+                                            }
+
+                                            // 5. Audacity
+                                            if (pName.IndexOf("Audacity", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                if (title.IndexOf("Recording", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                    title.IndexOf("Rec", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                {
+                                                    detectedApp = "Audacity";
+                                                    isDetectedCall = false;
+                                                    anySessionActive = true;
+                                                    SafeRelease(scObj);
+                                                    break;
+                                                }
+                                                SafeRelease(scObj);
+                                                continue;
+                                            }
+
+                                            // 6. Generic calls with explicit titles
+                                            if (!string.IsNullOrWhiteSpace(title))
+                                            {
+                                                string tLower = title.ToLowerInvariant();
+                                                if (tLower.Contains("call") || tLower.Contains("meeting") || tLower.Contains("huddle"))
+                                                {
+                                                    detectedApp = title;
+                                                    isDetectedCall = true;
+                                                    anySessionActive = true;
+                                                    SafeRelease(scObj);
+                                                    break;
+                                                }
                                             }
                                         }
                                         catch { }
                                     }
-                                    SafeRelease(scObj);
-                                    break;
                                 }
                             }
                             SafeRelease(scObj);
@@ -456,11 +542,86 @@ public class VoiceRecordingService
         }
     }
 
+    private bool IsSoundRecorderActivelyRecording()
+    {
+        foreach (var dir in _soundRecordDirs)
+        {
+            if (!Directory.Exists(dir)) continue;
+            try
+            {
+                var dirInfo = new DirectoryInfo(dir);
+                var recentFiles = dirInfo.GetFiles("*.*")
+                    .Where(f =>
+                    {
+                        string ext = f.Extension.ToLowerInvariant();
+                        return ext == ".m4a" || ext == ".mp3" || ext == ".wav" || ext == ".wma" || ext == ".tmp";
+                    })
+                    .OrderByDescending(f => f.LastWriteTime)
+                    .Take(2);
+
+                foreach (var file in recentFiles)
+                {
+                    double ageSec = (DateTime.Now - file.LastWriteTime).TotalSeconds;
+                    if (ageSec < 2.5)
+                    {
+                        long currLen = file.Length;
+                        if (file.FullName == _lastAudioRecordFile)
+                        {
+                            if (currLen > _lastAudioRecordSize)
+                            {
+                                _lastAudioRecordSize = currLen;
+                                _lastAudioRecordTime = DateTime.Now;
+                                return true;
+                            }
+                            else if ((DateTime.Now - _lastAudioRecordTime).TotalSeconds < 2.5 && IsFileLocked(file.FullName))
+                            {
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            _lastAudioRecordFile = file.FullName;
+                            _lastAudioRecordSize = currLen;
+                            _lastAudioRecordTime = DateTime.Now;
+                            if (IsFileLocked(file.FullName))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+        return false;
+    }
+
+    private static bool IsFileLocked(string filePath)
+    {
+        try
+        {
+            using var stream = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static void SafeRelease(object? comObj)
     {
         if (comObj != null && Marshal.IsComObject(comObj))
         {
-            try { Marshal.ReleaseComObject(comObj); } catch { }
+            try
+            {
+                Marshal.ReleaseComObject(comObj);
+            }
+            catch { }
         }
     }
 }

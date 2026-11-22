@@ -289,7 +289,10 @@
                 <Grid x:Name="CompactChargingView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="12,0,14,0">
+                      Margin="12,0,14,0"
+                      Background="Transparent"
+                      Cursor="Hand"
+                      MouseDown="CompactChargingView_MouseDown">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />

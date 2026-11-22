@@ -1,6 +1,8 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using Microsoft.Win32;
+using Windows.System.Power;
 
 namespace WindowsLive.Services;
 
@@ -13,7 +15,7 @@ public enum WindowsPowerMode
 
 /// <summary>
 /// Monitors Windows 10/11 User Power Mode changes ("Best Power Efficiency", "Balanced", "Best Performance")
-/// using the official Effective Power Mode notifications API from PowrProf.dll.
+/// using a dual mechanism: PowrProf.dll effective power mode notifications + registry polling fallback.
 /// </summary>
 public class PowerModeWatcherService
 {
@@ -47,18 +49,46 @@ public class PowerModeWatcherService
         IntPtr RegistrationHandle
     );
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SYSTEM_POWER_STATUS
+    {
+        public byte ACLineStatus;
+        public byte BatteryFlag;
+        public byte BatteryLifePercent;
+        public byte SystemStatusFlag;
+        public int BatteryLifeTime;
+        public int BatteryFullLifeTime;
+    }
+
+    [DllImport("kernel32.dll")]
+    private static extern bool GetSystemPowerStatus(out SYSTEM_POWER_STATUS lpSystemPowerStatus);
+
     private readonly Dispatcher _dispatcher;
+    private readonly DispatcherTimer _pollTimer;
     private EffectivePowerModeCallback? _callback;
     private IntPtr _regHandle = IntPtr.Zero;
     private bool _isFirstCallback = true;
+    private bool _started = false;
+
+    private const string PowerSchemesRegKey = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes";
 
     public PowerModeWatcherService()
     {
         _dispatcher = Dispatcher.CurrentDispatcher;
+        CurrentMode = ResolveCurrentSystemMode();
+
+        _pollTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(350)
+        };
+        _pollTimer.Tick += (s, e) => CheckSystemPowerMode();
     }
 
     public void Start()
     {
+        if (_started) return;
+        _started = true;
+
         try
         {
             _callback = OnEffectivePowerModeChanged;
@@ -83,10 +113,19 @@ public class PowerModeWatcherService
         {
             App.Log($"PowerModeWatcherService Start error: {ex.Message}");
         }
+
+        try
+        {
+            PowerManager.EnergySaverStatusChanged += (s, e) => CheckSystemPowerMode();
+        }
+        catch { }
+
+        _pollTimer.Start();
     }
 
     public void Stop()
     {
+        _pollTimer.Stop();
         try
         {
             if (_regHandle != IntPtr.Zero)
@@ -101,6 +140,75 @@ public class PowerModeWatcherService
         }
     }
 
+    public void CheckSystemPowerMode(bool forceNotify = false)
+    {
+        try
+        {
+            var resolved = ResolveCurrentSystemMode();
+            if (resolved != CurrentMode || forceNotify)
+            {
+                App.Log($"PowerModeWatcherService: Mode change detected via Registry/EnergySaver: {CurrentMode} -> {resolved} (Force={forceNotify})");
+                CurrentMode = resolved;
+                _dispatcher.Invoke(() =>
+                {
+                    PowerModeChanged?.Invoke(resolved);
+                });
+            }
+        }
+        catch { }
+    }
+
+    private static WindowsPowerMode ResolveCurrentSystemMode()
+    {
+        try
+        {
+            // 1. Check Energy Saver
+            try
+            {
+                if (PowerManager.EnergySaverStatus == EnergySaverStatus.On)
+                {
+                    return WindowsPowerMode.BestPowerEfficiency;
+                }
+            }
+            catch { }
+
+            // 2. Read Active Overlay AC/DC power scheme & ActivePowerScheme
+            object? acScheme = Registry.GetValue(PowerSchemesRegKey, "ActiveOverlayAcPowerScheme", null);
+            object? dcScheme = Registry.GetValue(PowerSchemesRegKey, "ActiveOverlayDcPowerScheme", null);
+            object? activeScheme = Registry.GetValue(PowerSchemesRegKey, "ActivePowerScheme", null);
+
+            bool isAc = true;
+            if (GetSystemPowerStatus(out var status))
+            {
+                isAc = status.ACLineStatus != 0;
+            }
+
+            string overlayStr = (isAc
+                ? (acScheme as string ?? dcScheme as string)
+                : (dcScheme as string ?? acScheme as string)) ?? string.Empty;
+            overlayStr = overlayStr.ToLowerInvariant();
+
+            string schemeStr = (activeScheme as string ?? string.Empty).ToLowerInvariant();
+
+            // 961cc777 = Better Battery-life Overlay (matches Win 11 Best Power Efficiency)
+            if (overlayStr.Contains("961cc777") || schemeStr.Contains("a1841308"))
+            {
+                return WindowsPowerMode.BestPowerEfficiency;
+            }
+
+            // ded574b5 = Max Performance Overlay, 3af9b8d9 = High Performance Overlay
+            // 8c5e7fda = High Performance, e9a42b02 = Ultimate Performance
+            if (overlayStr.Contains("ded574b5") || overlayStr.Contains("3af9b8d9") ||
+                schemeStr.Contains("8c5e7fda") || schemeStr.Contains("e9a42b02"))
+            {
+                return WindowsPowerMode.BestPerformance;
+            }
+        }
+        catch { }
+
+        return WindowsPowerMode.Balanced;
+    }
+
     private void OnEffectivePowerModeChanged(EFFECTIVE_POWER_MODE rawMode, IntPtr context)
     {
         WindowsPowerMode mode = rawMode switch
@@ -113,14 +221,11 @@ public class PowerModeWatcherService
         bool isFirst = _isFirstCallback;
         _isFirstCallback = false;
 
-        WindowsPowerMode previous = CurrentMode;
-        CurrentMode = mode;
-
         App.Log($"PowerModeWatcherService: RawMode={rawMode} => WindowsPowerMode={mode} (Initial={isFirst})");
 
-        // Suppress notification on cold launch; only notify on actual subsequent changes
-        if (!isFirst && mode != previous)
+        if (!isFirst && mode != CurrentMode)
         {
+            CurrentMode = mode;
             App.Log($"PowerModeWatcherService: Dispatched PowerModeChanged({mode})");
             _dispatcher.Invoke(() =>
             {

@@ -12,9 +12,11 @@ public class VolumeManager
     private readonly DispatcherTimer _pollTimer;
     private float _lastVolume = 0.5f;
     private bool _lastMute = false;
+    private bool _lastIsSilent = false;
 
     public float CurrentVolume => _lastVolume;
     public bool IsMuted => _lastMute;
+    public bool IsSilent => _lastIsSilent;
 
     public VolumeManager()
     {
@@ -82,16 +84,19 @@ public class VolumeManager
             _audioEndpoint.GetMasterVolumeLevelScalar(out float vol);
             _audioEndpoint.GetMute(out bool mute);
 
-            if (forceNotify || Math.Abs(vol - _lastVolume) > 0.01f || mute != _lastMute)
+            bool isSilent = mute || vol < 0.005f;
+
+            if (forceNotify || Math.Abs(vol - _lastVolume) > 0.01f || isSilent != _lastIsSilent || mute != _lastMute)
             {
-                bool muteChanged = (mute != _lastMute);
+                bool silentChanged = (isSilent != _lastIsSilent);
                 _lastVolume = vol;
                 _lastMute = mute;
-                if (muteChanged)
+                _lastIsSilent = isSilent;
+                if (silentChanged)
                 {
-                    App.Log($"VolumeManager PollVolumeState: Mute changed to {mute}, Vol={vol:F2}");
+                    App.Log($"VolumeManager PollVolumeState: Silent/Ring state changed to isSilent={isSilent}, Vol={vol:F2}, Mute={mute}");
                 }
-                VolumeChanged?.Invoke(vol, mute);
+                VolumeChanged?.Invoke(vol, isSilent);
             }
         }
         catch

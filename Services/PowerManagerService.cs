@@ -59,13 +59,24 @@ public class PowerManagerService
         }
         catch { }
 
+        try
+        {
+            Microsoft.Win32.SystemEvents.PowerModeChanged += (s, e) => UpdatePowerStatus();
+        }
+        catch { }
+
         // Fast poll timer ensures instant detection of cable plug-in/unplug/battery-saver toggle
         _pollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(1000)
+            Interval = TimeSpan.FromMilliseconds(300)
         };
         _pollTimer.Tick += (s, e) => UpdatePowerStatus();
         _pollTimer.Start();
+    }
+
+    public void PollNow()
+    {
+        UpdatePowerStatus();
     }
 
     public void TriggerAlert(BatteryAlertType type)

@@ -61,17 +61,31 @@ public class IslandNotification
                 combined.Contains("call from") ||
                 combined.Contains("incoming voice call") ||
                 combined.Contains("incoming video call") ||
+                combined.Contains("incoming audio") ||
+                combined.Contains("incoming video") ||
+                combined.Contains("voice call") ||
+                combined.Contains("video call") ||
+                combined.Contains("audio call") ||
                 combined.Contains("ringing...") ||
                 combined.Contains("is calling"))
             {
                 return true;
             }
 
-            // Phone Link call notification
-            if (combined.Contains("phonelink") || combined.Contains("your phone") || combined.Contains("phone link"))
+            // Communication / Calling Apps (WhatsApp, Telegram, Teams, Skype, Zoom, Phone Link, Discord, Meet)
+            bool isCallingApp = combined.Contains("whatsapp") || combined.Contains("telegram") ||
+                                combined.Contains("teams") || combined.Contains("skype") ||
+                                combined.Contains("zoom") || combined.Contains("discord") ||
+                                combined.Contains("phonelink") || combined.Contains("your phone") ||
+                                combined.Contains("phone link") || combined.Contains("google meet") ||
+                                combined.Contains("meet");
+
+            if (isCallingApp && (combined.Contains("call") || combined.Contains("incoming") || combined.Contains("ringing")))
             {
-                if (combined.Contains("call") || combined.Contains("incoming"))
+                if (!combined.Contains("missed") && !combined.Contains("ended") && !combined.Contains("declined"))
+                {
                     return true;
+                }
             }
 
             return false;

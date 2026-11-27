@@ -104,6 +104,25 @@ public static class WindowHelper
         return new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
     }
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetActiveWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr ProcessId);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
     public static void SetActivationEnabled(Window window, bool enable)
     {
         var helper = new WindowInteropHelper(window);
@@ -125,7 +144,36 @@ public static class WindowHelper
         }
 
         SetWindowLongAuto(hWnd, GWL_EXSTYLE, new IntPtr(style));
-        SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        uint flags = SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | (enable ? 0 : SWP_NOACTIVATE);
+        SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0, flags);
+
+        if (enable)
+        {
+            try
+            {
+                IntPtr fgWnd = GetForegroundWindow();
+                uint fgThread = GetWindowThreadProcessId(fgWnd, IntPtr.Zero);
+                uint curThread = GetCurrentThreadId();
+
+                if (fgThread != 0 && fgThread != curThread)
+                {
+                    AttachThreadInput(curThread, fgThread, true);
+                    SetForegroundWindow(hWnd);
+                    SetActiveWindow(hWnd);
+                    AttachThreadInput(curThread, fgThread, false);
+                }
+                else
+                {
+                    SetForegroundWindow(hWnd);
+                    SetActiveWindow(hWnd);
+                }
+            }
+            catch
+            {
+                SetForegroundWindow(hWnd);
+                SetActiveWindow(hWnd);
+            }
+        }
     }
 
     public static void MakeToolWindow(Window window)

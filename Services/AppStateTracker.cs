@@ -25,7 +25,7 @@ public class AppStateTracker
     {
         _pollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(250)
+            Interval = TimeSpan.FromMilliseconds(150)
         };
         _pollTimer.Tick += (s, e) => CheckForegroundWindow();
         _pollTimer.Start();
@@ -41,20 +41,24 @@ public class AppStateTracker
         try
         {
             IntPtr fg = GetForegroundWindow();
-            if (fg == IntPtr.Zero || fg == _dockHwnd) return;
+            if (fg == IntPtr.Zero || fg == _dockHwnd)
+            {
+                // If the dock itself or no window has focus, do not change state
+                return;
+            }
 
-            // Skip desktop and shell windows
             var sb = new StringBuilder(256);
             GetClassName(fg, sb, 256);
             string cls = sb.ToString();
 
+            // Desktop / shell windows: always Normal (notch must appear)
             if (cls == "Progman" || cls == "WorkerW" || cls == "Shell_TrayWnd")
             {
                 SetState(ForegroundAppState.Normal);
                 return;
             }
 
-            // Check monitor bounds
+            // Check monitor containing the foreground window
             IntPtr hMonitor = MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST);
             MONITORINFO mi = new MONITORINFO();
             mi.cbSize = Marshal.SizeOf(mi);
@@ -67,53 +71,39 @@ public class AppStateTracker
             RECT winRect;
             GetWindowRect(fg, out winRect);
 
-            // 1. Check FullScreen: window spans the entire monitor (or larger)
-            int monW = mi.rcMonitor.Right - mi.rcMonitor.Left;
-            int monH = mi.rcMonitor.Bottom - mi.rcMonitor.Top;
+            // An app in full-screen mode covers the entire monitor, including the taskbar.
+            // (with a small 4px tolerance for DWM / border margins)
+            bool coversEntireMonitor = (winRect.Left <= mi.rcMonitor.Left + 4 &&
+                                        winRect.Top <= mi.rcMonitor.Top + 4 &&
+                                        winRect.Right >= mi.rcMonitor.Right - 4 &&
+                                        winRect.Bottom >= mi.rcMonitor.Bottom - 4);
 
-            int winW = winRect.Right - winRect.Left;
-            int winH = winRect.Bottom - winRect.Top;
-
-            // Tolerances for border / multi-monitor bleed
-            bool isFullScreen = (winRect.Left <= mi.rcMonitor.Left &&
-                                 winRect.Top <= mi.rcMonitor.Top &&
-                                 winRect.Right >= mi.rcMonitor.Right &&
-                                 winRect.Bottom >= mi.rcMonitor.Bottom);
-
-            if (isFullScreen)
+            if (coversEntireMonitor)
             {
-                SetState(ForegroundAppState.FullScreen);
-                return;
-            }
+                // Check whether it's truly full screen or just maximized:
+                // When an app is MAXIMIZED:
+                // - The taskbar is still visible (rcWork is smaller than rcMonitor)
+                // - The window has WS_CAPTION (title bar)
+                // When an app is FULL SCREEN (YouTube, Netflix, games, VLC, F11):
+                // - It covers the taskbar completely
+                // - It removes the standard WS_CAPTION titlebar
+                long style = GetWindowLongAuto(fg, GWL_STYLE).ToInt64();
+                bool hasStandardCaption = (style & WS_CAPTION) == WS_CAPTION && (style & WS_THICKFRAME) == WS_THICKFRAME;
 
-            // 2. Check Maximized: either showCmd is SW_MAXIMIZE or window covers work area
-            WINDOWPLACEMENT wp = new WINDOWPLACEMENT();
-            wp.length = Marshal.SizeOf(wp);
-            GetWindowPlacement(fg, ref wp);
+                bool taskbarCovered = (mi.rcWork.Bottom < mi.rcMonitor.Bottom && winRect.Bottom >= mi.rcMonitor.Bottom - 4) ||
+                                      (mi.rcWork.Top > mi.rcMonitor.Top && winRect.Top <= mi.rcMonitor.Top + 4) ||
+                                      (mi.rcWork.Left > mi.rcMonitor.Left && winRect.Left <= mi.rcMonitor.Left + 4) ||
+                                      (mi.rcWork.Right < mi.rcMonitor.Right && winRect.Right >= mi.rcMonitor.Right - 4);
 
-            bool isMaximized = (wp.showCmd == SW_SHOWMAXIMIZED);
-
-            if (!isMaximized)
-            {
-                // Fallback: check if window matches or exceeds work area
-                int workW = mi.rcWork.Right - mi.rcWork.Left;
-                int workH = mi.rcWork.Bottom - mi.rcWork.Top;
-
-                if (Math.Abs(winW - workW) <= 20 && Math.Abs(winH - workH) <= 20 &&
-                    Math.Abs(winRect.Left - mi.rcWork.Left) <= 15 && Math.Abs(winRect.Top - mi.rcWork.Top) <= 15)
+                if (taskbarCovered || !hasStandardCaption)
                 {
-                    isMaximized = true;
+                    SetState(ForegroundAppState.FullScreen);
+                    return;
                 }
             }
 
-            if (isMaximized)
-            {
-                SetState(ForegroundAppState.Maximized);
-            }
-            else
-            {
-                SetState(ForegroundAppState.Normal);
-            }
+            // In all other cases (normal windowed, maximized app, etc.):
+            SetState(ForegroundAppState.Normal);
         }
         catch
         {
@@ -129,6 +119,23 @@ public class AppStateTracker
             StateChanged?.Invoke(state);
         }
     }
+
+    private static IntPtr GetWindowLongAuto(IntPtr hWnd, int nIndex)
+    {
+        if (IntPtr.Size == 8)
+            return GetWindowLongPtr64(hWnd, nIndex);
+        return new IntPtr(GetWindowLong32(hWnd, nIndex));
+    }
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
+    private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
+    private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
+
+    private const int GWL_STYLE = -16;
+    private const long WS_CAPTION = 0x00C00000L;
+    private const long WS_THICKFRAME = 0x00040000L;
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
@@ -152,7 +159,6 @@ public class AppStateTracker
     private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
     private const uint MONITOR_DEFAULTTONEAREST = 2;
-    private const int SW_SHOWMAXIMIZED = 3;
 
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT

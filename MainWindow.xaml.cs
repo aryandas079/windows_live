@@ -130,9 +130,11 @@ public partial class MainWindow : Window
     private const double DetachedBubbleWidth = 78.0;
     private const double DetachedBubbleGap = 16.0;
     private const double ActivityIndicatorBlinkIntervalMs = 1000.0;
-    private double _lastDetachedRightTargetX = double.NaN;
-    private double _lastDetachedLeftTargetX = double.NaN;
     private const double CompactHeight = 36.0;
+    private const double ActivityHoverHeight = 82.0;
+    private const double VoiceRecordingHoverWidth = 430.0;
+    private const double TimerHoverWidth = 430.0;
+    private const double AlarmHoverWidth = 430.0;
     private const double ExpandedWidth = 460.0;
     private const double ExpandedHeight = 86.0;
 
@@ -149,6 +151,7 @@ public partial class MainWindow : Window
     private bool _isDndAlertActive = false;
     private bool _isNightModeAlertActive = false;
     private bool _isAlarmActive = false;
+    private bool IsAlarmActive => _isAlarmActive || (_alarmService?.IsSnoozed ?? false);
     private bool _isBluetoothAlertActive = false;
     private bool _isWifiConnected = false;
     private bool _isHotspotActive = false;
@@ -182,6 +185,7 @@ public partial class MainWindow : Window
     private readonly WindowsClockWatcherService _windowsClockService;
     private readonly VoiceRecordingService _voiceRecordingService;
     private readonly ScreenRecordingService _screenRecordingService;
+    private readonly WeatherService _weatherService;
     private bool _isPrivacyIndicatorActive = false;
     private bool _lastMuteState = false;
     private bool _muteStateInitialized = false;
@@ -189,10 +193,13 @@ public partial class MainWindow : Window
     private bool IsVoiceRecordingActive => _voiceRecordingService?.IsRecording ?? false;
     private bool IsScreenRecordingActive => _screenRecordingService?.IsRecording ?? false;
     private bool IsRecordingActivityActive => IsVoiceRecordingActive || IsScreenRecordingActive;
-    private bool IsWifiActivityActive => _isWifiAlertActive && (_isWifiConnected || _isHotspotActive);
+    // Wi-Fi and hotspot are persistent background activities. The alert flag only
+    // controls the initial glimpse animation; it must never erase the active state.
+    private bool IsWifiActivityActive => _isWifiConnected || _isHotspotActive;
 
     private bool IsAnyTimerActive =>
         _focusService.IsRunning ||
+        _focusService.Remaining.TotalSeconds > 0 ||
         _windowsClockService.HasActiveTimer;
 
     private bool ShowRecordingDotWithMedia =>
@@ -209,19 +216,7 @@ public partial class MainWindow : Window
     private bool IsMusicPlaying =>
         _mediaManager?.CurrentTrack?.IsPlaying ?? false;
 
-        private bool IsSplitActive =>
-        !_isExpanded &&
-        !_isAlarmActive &&
-        !_isBluetoothAlertActive &&
-        !_isPowerModeAlertActive &&
-        !_isUnlockAlertActive &&
-        !_isSilentRingAlertActive &&
-        !_isDndAlertActive &&
-        !_isNightModeAlertActive &&
-        !_isChargingAlertActive &&
-        !_isNotificationAlertActive &&
-        !_isIncomingCallActive &&
-        ActiveRunningTasksCount >= 2;
+    private bool IsSplitActive => false;
 
     private int ActiveRunningTasksCount
     {
@@ -237,7 +232,7 @@ public partial class MainWindow : Window
     }
 
     private bool HasActiveContent =>
-        _isAlarmActive ||
+        IsAlarmActive ||
         _isBluetoothAlertActive ||
         _isPowerModeAlertActive ||
         _isUnlockAlertActive ||
@@ -260,7 +255,7 @@ public partial class MainWindow : Window
         _isNotificationAlertActive ||
         _isIncomingCallActive ||
         _isBluetoothAlertActive ||
-        _isAlarmActive ||
+        IsAlarmActive ||
         _isUnlockAlertActive ||
         _isSilentRingAlertActive ||
         _isDndAlertActive ||
@@ -293,9 +288,9 @@ public partial class MainWindow : Window
                 string caller = _currentIncomingCall?.Title ?? _currentIncomingCall?.AppName ?? "Call";
                 baseWidth = Math.Clamp(150.0 + (caller.Length * 8.0), 200.0, 280.0);
             }
-            else if (_isAlarmActive)
+            else if (IsAlarmActive)
             {
-                baseWidth = 140.0;
+                baseWidth = 205.0;
             }
             else if (_isUnlockAlertActive)
             {
@@ -331,7 +326,7 @@ public partial class MainWindow : Window
                 string dev = _activeBluetoothDevice?.Name ?? "Bluetooth";
                 baseWidth = Math.Clamp(140.0 + (dev.Length * 8.0), 190.0, 275.0);
             }
-            else if (_isWifiAlertActive && (_isWifiConnected || _isHotspotActive))
+            else if (_isWifiAlertActive && IsWifiActivityActive)
             {
                 string net = CompactWifiStatusText.Text ?? "Wi-Fi";
                 baseWidth = Math.Clamp(140.0 + (net.Length * 8.0), 185.0, 270.0);
@@ -340,21 +335,17 @@ public partial class MainWindow : Window
             {
                 baseWidth = CompactNotificationWidth;
             }
-            else if (IsSplitActive && IsMusicActive)
-            {
-                baseWidth = CompactSplitLeadingWidth;
-            }
             else if (IsScreenRecordingActive)
             {
-                baseWidth = 170.0;
+                baseWidth = _screenRecordingService?.IsPaused == true ? 215.0 : 195.0;
             }
-            else if (IsVoiceRecordingActive && !IsMusicActive)
+            else if (IsVoiceRecordingActive)
             {
-                baseWidth = 195.0;
+                baseWidth = (_voiceRecordingService?.IsPaused == true || _isVoiceRecHovered) ? 235.0 : 185.0;
             }
             else if (IsAnyTimerActive)
             {
-                baseWidth = 195.0;
+                baseWidth = (_isTimerHovered || (_windowsClockService.HasActiveTimer && !_windowsClockService.ActiveTimer!.IsRunning)) ? 220.0 : 180.0;
             }
             else if (IsMusicActive)
             {
@@ -363,6 +354,11 @@ public partial class MainWindow : Window
                 {
                     baseWidth += 18.0;
                 }
+            }
+            else if (IsWifiActivityActive)
+            {
+                string net = CompactWifiStatusText.Text ?? "Wi-Fi";
+                baseWidth = Math.Clamp(140.0 + (net.Length * 8.0), 185.0, 270.0);
             }
             else if (_isPrivacyIndicatorActive)
             {
@@ -424,6 +420,7 @@ public partial class MainWindow : Window
             _nightLightService.NightModeChanged += OnNightModeChanged;
             _alarmService.AlarmStateChanged += OnAlarmStateChanged;
             _alarmService.SnoozeStarted += OnAlarmSnoozeStarted;
+            _alarmService.SnoozeTick += OnAlarmSnoozeTick;
             _bluetoothService.DeviceConnected += OnBluetoothDeviceConnected;
             _bluetoothService.DeviceDisconnected += OnBluetoothDeviceDisconnected;
             _wifiService.StateChanged += OnWifiActivityStateChanged;
@@ -434,7 +431,10 @@ public partial class MainWindow : Window
             _windowsClockService.TimerStateChanged += OnWindowsClockTimerChanged;
             _voiceRecordingService.RecordingStateChanged += OnVoiceRecordingStateChanged;
             _voiceRecordingService.RecordingStateChanged += info => _privacyService.SetWasapiMicState(info.IsRecording);
+            _voiceRecordingService.AnyCaptureStreamChanged += isActive => _privacyService.SetWasapiMicState(isActive);
             _screenRecordingService.RecordingStateChanged += OnScreenRecordingStateChanged;
+            _weatherService = new WeatherService();
+            _weatherService.WeatherUpdated += OnWeatherUpdated;
 
             // Launch heavy background watchers in parallel so window renders instantly without delay
             Task.Run(() =>
@@ -449,6 +449,7 @@ public partial class MainWindow : Window
                     _windowsClockService.Start();
                     _voiceRecordingService.Start();
                     _screenRecordingService.Start();
+                    _weatherService.Start();
                     SetupBluetoothTestTriggerWatcher();
                     App.Log("All background services started asynchronously in parallel.");
                 }
@@ -510,11 +511,6 @@ public partial class MainWindow : Window
                 {
                     UpdateCompactViewVisibility();
                 }
-
-                if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-                {
-                    HideDockSmooth();
-                }
             };
 
             _incomingCallAlertTimer = new DispatcherTimer
@@ -534,13 +530,9 @@ public partial class MainWindow : Window
             _autoCollapseTimer.Tick += (s, e) =>
             {
                 _autoCollapseTimer.Stop();
-                if (!_isPinned && !IslandContainer.IsMouseOver)
+                if (!_isPinned && !IslandContainer.IsMouseOver && (_activeCategory != IslandCategory.IdleClockWeather || IdleWeatherSettingsPanel.Visibility != Visibility.Visible))
                 {
                     CollapseDock();
-                    if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert)
-                    {
-                        HideDockSmooth();
-                    }
                 }
             };
 
@@ -567,10 +559,6 @@ public partial class MainWindow : Window
                         IslandShadowEffect.BlurRadius = _themeService.IsDarkTheme ? 22 : 18;
 
                         UpdateCompactViewVisibility();
-                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-                        {
-                            HideDockSmooth();
-                        }
                     };
                     CompactChargingView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -593,10 +581,6 @@ public partial class MainWindow : Window
                         CompactUnlockView.Opacity = 1.0;
                         CompactUnlockView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
-                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-                        {
-                            HideDockSmooth();
-                        }
                     };
                     CompactUnlockView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -619,10 +603,6 @@ public partial class MainWindow : Window
                         CompactSilentRingView.Opacity = 1.0;
                         CompactSilentRingView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
-                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-                        {
-                            HideDockSmooth();
-                        }
                     };
                     CompactSilentRingView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -645,10 +625,6 @@ public partial class MainWindow : Window
                         CompactDndView.Opacity = 1.0;
                         CompactDndView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
-                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-                        {
-                            HideDockSmooth();
-                        }
                     };
                     CompactDndView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -671,10 +647,6 @@ public partial class MainWindow : Window
                         CompactNightModeView.Opacity = 1.0;
                         CompactNightModeView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
-                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-                        {
-                            HideDockSmooth();
-                        }
                     };
                     CompactNightModeView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -698,10 +670,6 @@ public partial class MainWindow : Window
                         CompactBluetoothView.Opacity = 1.0;
                         CompactBluetoothView.Visibility = Visibility.Collapsed;
                         UpdateCompactViewVisibility();
-                        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-                        {
-                            HideDockSmooth();
-                        }
                     };
                     CompactBluetoothView.BeginAnimation(OpacityProperty, fadeOut);
                 }
@@ -831,25 +799,13 @@ public partial class MainWindow : Window
             switch (state)
             {
                 case ForegroundAppState.FullScreen:
-                    // In FullScreen mode, privacy indicator and dock must not appear
-                    TopEdgeHotspot.Visibility = Visibility.Visible;
-                    if (!IslandContainer.IsMouseOver)
-                    {
-                        HideDockSmooth();
-                    }
+                    // In FullScreen mode in an app, the notch must disappear completely
+                    TopEdgeHotspot.Visibility = Visibility.Collapsed;
+                    HideDockImmediate();
                     break;
 
-                case ForegroundAppState.Maximized:
-                    // Hotspot active in notch area for hovering popout
-                    TopEdgeHotspot.Visibility = Visibility.Visible;
-                    if (!HasActiveAlert && !IslandContainer.IsMouseOver)
-                    {
-                        HideDockSmooth();
-                    }
-                    break;
-
-                case ForegroundAppState.Normal:
-                    // Desktop / non-maximized apps: dynamic island visible at top
+                default:
+                    // In all other cases (normal windowed, maximized app, desktop), the notch MUST appear!
                     TopEdgeHotspot.Visibility = Visibility.Collapsed;
                     ShowDockSmooth();
                     break;
@@ -859,29 +815,45 @@ public partial class MainWindow : Window
 
     private void TopEdgeHotspot_MouseEnter(object sender, MouseEventArgs e)
     {
+        if (_appStateTracker.CurrentState == ForegroundAppState.FullScreen) return;
         ShowDockSmooth();
         WindowHelper.EnsureTopMost(this);
     }
 
+    private void HideDockImmediate()
+    {
+        if (_isExpanded)
+        {
+            CollapseDock();
+        }
+
+        TopEdgeHotspot.Visibility = Visibility.Collapsed;
+
+        IslandContainer.BeginAnimation(OpacityProperty, null);
+        IslandContainer.Opacity = 0.0;
+        IslandContainer.Visibility = Visibility.Collapsed;
+
+        DetachedBubbleContainer.BeginAnimation(OpacityProperty, null);
+        DetachedBubbleContainer.Opacity = 0.0;
+        DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+
+        DetachedLeftContainer.BeginAnimation(OpacityProperty, null);
+        DetachedLeftContainer.Opacity = 0.0;
+        DetachedLeftContainer.Visibility = Visibility.Collapsed;
+    }
+
     private void HideDockSmooth()
     {
-        // Active work (playback, recording, or a timer) keeps the notch present even
-        // when the foreground window is fullscreen or the pointer leaves the dock.
-        if (HasActiveContent || HasActiveAlert) return;
-
-        var anim = new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(160));
-        anim.Completed += (s, e) =>
+        if (_appStateTracker.CurrentState == ForegroundAppState.FullScreen)
         {
-            if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-            {
-                IslandContainer.Visibility = Visibility.Collapsed;
-            }
-        };
-        IslandContainer.BeginAnimation(OpacityProperty, anim);
+            HideDockImmediate();
+        }
     }
 
     private void ShowDockSmooth()
     {
+        if (_appStateTracker.CurrentState == ForegroundAppState.FullScreen) return;
+
         IslandContainer.Visibility = Visibility.Visible;
         WindowHelper.EnsureTopMost(this);
         var anim = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(160));
@@ -1107,15 +1079,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        // User explicit requirement: "no need to expand for sound recording, timer, screen recording... it should just show in the notch..."
-        // If music is active in the notch, allow expanding music player
-        if (!IsMusicActive && (IsScreenRecordingActive || IsVoiceRecordingActive || IsAnyTimerActive || IsWifiActivityActive))
-        {
-            IslandContainer.Cursor = Cursors.Arrow;
-            return;
-        }
+        int activeOps = 0;
+        if (IsMusicActive) activeOps++;
+        if (IsAnyTimerActive) activeOps++;
+        if (IsVoiceRecordingActive || IsScreenRecordingActive) activeOps++;
 
-        IslandContainer.Cursor = (IsMusicActive || _isBluetoothAlertActive || HasActiveContent) ? Cursors.Hand : Cursors.Arrow;
+        IslandContainer.Cursor = (activeOps > 0 || _isBluetoothAlertActive || HasActiveAlert) ? Cursors.Hand : Cursors.Arrow;
+
         if (!_isExpanded)
         {
             if (_isBluetoothAlertActive)
@@ -1126,10 +1096,31 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // Only expand on hover if music is active/paused
-            if (IsMusicActive)
+            if (activeOps > 1)
             {
-                ExpandDock(IslandCategory.MediaPlayback);
+                ExpandDock(IslandCategory.MultiOperations);
+                return;
+            }
+
+            if (activeOps == 1)
+            {
+                if (IsVoiceRecordingActive)
+                {
+                    ExpandDock(IslandCategory.VoiceRecording);
+                }
+                else if (IsScreenRecordingActive)
+                {
+                    ExpandDock(IslandCategory.VoiceRecording);
+                }
+                else if (IsAnyTimerActive)
+                {
+                    ExpandDock(IslandCategory.FocusTimer);
+                }
+                else if (IsMusicActive)
+                {
+                    ExpandDock(IslandCategory.MediaPlayback);
+                }
+                return;
             }
         }
         else if (_isBluetoothAlertActive && _activeCategory == IslandCategory.BluetoothDevice)
@@ -1153,14 +1144,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_isExpanded && !_isPinned && !_isDraggingSlider)
+        if (_isExpanded && !_isPinned && !_isDraggingSlider && !(_activeCategory == IslandCategory.IdleClockWeather && IdleWeatherSettingsPanel.Visibility == Visibility.Visible))
         {
             _autoCollapseTimer.Stop();
             _autoCollapseTimer.Start();
-        }
-        else if (!_isExpanded && _appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert)
-        {
-            HideDockSmooth();
         }
     }
 
@@ -1203,9 +1190,19 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.LeftButton == MouseButtonState.Pressed && !_isExpanded)
+        if (e.LeftButton == MouseButtonState.Pressed)
         {
-            ExpandDock();
+            if (!_isExpanded)
+            {
+                ExpandDock();
+            }
+            else if (_activeCategory == IslandCategory.IdleClockWeather && IdleWeatherSettingsPanel.Visibility != Visibility.Visible)
+            {
+                if (e.OriginalSource is not System.Windows.Controls.TextBox && e.OriginalSource is not Wpf.Ui.Controls.TextBox)
+                {
+                    CollapseDock();
+                }
+            }
         }
     }
 
@@ -1215,6 +1212,11 @@ public partial class MainWindow : Window
         if (_isExpanded) return;
 
         _isExpanded = true;
+
+        int activeOps = 0;
+        if (IsMusicActive) activeOps++;
+        if (IsAnyTimerActive) activeOps++;
+        if (IsVoiceRecordingActive || IsScreenRecordingActive) activeOps++;
 
         if (preferredCategory.HasValue)
         {
@@ -1236,13 +1238,9 @@ public partial class MainWindow : Window
         {
             _activeCategory = IslandCategory.DeviceBattery;
         }
-        else if (IsMusicActive)
+        else if (activeOps > 1)
         {
-            _activeCategory = IslandCategory.MediaPlayback;
-        }
-        else if (IsAnyTimerActive)
-        {
-            _activeCategory = IslandCategory.FocusTimer;
+            _activeCategory = IslandCategory.MultiOperations;
         }
         else if (IsVoiceRecordingActive)
         {
@@ -1250,11 +1248,19 @@ public partial class MainWindow : Window
         }
         else if (IsScreenRecordingActive)
         {
-            _activeCategory = IslandCategory.ScreenRecording;
+            _activeCategory = IslandCategory.VoiceRecording;
+        }
+        else if (IsAnyTimerActive)
+        {
+            _activeCategory = IslandCategory.FocusTimer;
+        }
+        else if (IsMusicActive)
+        {
+            _activeCategory = IslandCategory.MediaPlayback;
         }
         else
         {
-            _activeCategory = IslandCategory.MediaPlayback;
+            _activeCategory = IslandCategory.IdleClockWeather;
         }
 
         double targetHeight = _activeCategory == IslandCategory.AppNotification
@@ -1265,7 +1271,11 @@ public partial class MainWindow : Window
                     ? ExpandedBluetoothHeight
                     : _activeCategory == IslandCategory.LiveLyrics
                         ? ExpandedLyricsHeight
-                        : ExpandedHeight;
+                        : _activeCategory == IslandCategory.IdleClockWeather
+                            ? 86.0
+                            : _activeCategory == IslandCategory.MultiOperations
+                                ? GetMultiOperationsHeight()
+                                : ExpandedHeight;
 
         double targetWidth = _activeCategory == IslandCategory.BluetoothDevice
             ? ExpandedBluetoothWidth
@@ -1273,7 +1283,9 @@ public partial class MainWindow : Window
                 ? 440.0
                 : _activeCategory == IslandCategory.LiveLyrics
                     ? ExpandedLyricsWidth
-                    : ExpandedWidth;
+                    : _activeCategory == IslandCategory.IdleClockWeather
+                        ? 380.0
+                        : ExpandedWidth;
 
         DetachedBubbleContainer.Visibility = Visibility.Collapsed;
         DetachedLeftContainer.Visibility = Visibility.Collapsed;
@@ -1305,6 +1317,11 @@ public partial class MainWindow : Window
         {
             _activeCategory = IslandCategory.MediaPlayback;
             UpdateLyricsIconState();
+        }
+        else if (_activeCategory == IslandCategory.IdleClockWeather)
+        {
+            IdleWeatherSettingsPanel.Visibility = Visibility.Collapsed;
+            IdleWeatherMainPanel.Visibility = Visibility.Visible;
         }
 
         // Restore non-activating window mode when collapsing
@@ -1361,134 +1378,8 @@ public partial class MainWindow : Window
 
     private void UpdateSplitBubbleAnimation(double mainIslandTargetWidth)
     {
-        if (IsSplitActive)
-        {
-            bool showTimerOnRight = IsAnyTimerActive && (IsMusicActive || IsRecordingActivityActive);
-            bool showRecordingOnLeft = false;
-            // Position detached satellite capsules smoothly on either side of the notch:
-            // Right Pill (e.g. Timer): (mainIslandTargetWidth / 2) + DetachedBubbleGap + (RightPillWidth / 2)
-            // Left Pill (e.g. Call / Recording): -((mainIslandTargetWidth / 2) + DetachedBubbleGap + (LeftPillWidth / 2))
-            var ease = new QuinticEase { EasingMode = EasingMode.EaseOut };
-            var dur = TimeSpan.FromMilliseconds(220);
-
-            if (showTimerOnRight)
-            {
-                double rightPillW = DetachedBubbleContainer.ActualWidth > 0 ? DetachedBubbleContainer.ActualWidth : DetachedBubbleWidth;
-                double rightX = (mainIslandTargetWidth / 2.0) + DetachedBubbleGap + (rightPillW / 2.0);
-                if (double.IsNaN(_lastDetachedRightTargetX) || Math.Abs(_lastDetachedRightTargetX - rightX) > 0.5)
-                {
-                    var rightAnim = new DoubleAnimation { To = rightX, Duration = dur, EasingFunction = ease };
-                    DetachedRightTranslate.BeginAnimation(TranslateTransform.XProperty, rightAnim);
-                    _lastDetachedRightTargetX = rightX;
-                }
-
-                if (DetachedBubbleContainer.Visibility != Visibility.Visible || DetachedBubbleContainer.Opacity < 0.1)
-                {
-                    DetachedBubbleContainer.Visibility = Visibility.Visible;
-                    var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(200)) { EasingFunction = ease };
-                    DetachedBubbleContainer.BeginAnimation(OpacityProperty, fadeIn);
-                }
-            }
-
-            // Left Pill: If 3 tasks are running, show a detached capsule on the left side of the notch as well
-            if (showRecordingOnLeft)
-            {
-                double leftPillW = DetachedLeftContainer.ActualWidth > 0 ? DetachedLeftContainer.ActualWidth : DetachedBubbleWidth;
-                double leftX = -((mainIslandTargetWidth / 2.0) + DetachedBubbleGap + (leftPillW / 2.0));
-
-                if (double.IsNaN(_lastDetachedLeftTargetX) || Math.Abs(_lastDetachedLeftTargetX - leftX) > 0.5)
-                {
-                    var leftAnim = new DoubleAnimation
-                    {
-                        To = leftX,
-                        Duration = dur,
-                        EasingFunction = ease
-                    };
-                    DetachedLeftTranslate.BeginAnimation(TranslateTransform.XProperty, leftAnim);
-                    _lastDetachedLeftTargetX = leftX;
-                }
-
-                UpdateDetachedLeftContent();
-
-                if (DetachedLeftContainer.Visibility != Visibility.Visible || DetachedLeftContainer.Opacity < 0.1)
-                {
-                    DetachedLeftContainer.Visibility = Visibility.Visible;
-                    var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(200))
-                    {
-                        EasingFunction = ease
-                    };
-                    DetachedLeftContainer.BeginAnimation(OpacityProperty, fadeIn);
-                }
-            }
-            else
-            {
-                if (DetachedLeftContainer.Visibility == Visibility.Visible)
-                {
-                    var fadeOut = new DoubleAnimation(DetachedLeftContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
-                    {
-                        EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseIn }
-                    };
-                    fadeOut.Completed += (s, e) =>
-                    {
-                        DetachedLeftContainer.Visibility = Visibility.Collapsed;
-                    };
-                    DetachedLeftContainer.BeginAnimation(OpacityProperty, fadeOut);
-                }
-            }
-
-            if (!showTimerOnRight)
-            {
-                _lastDetachedRightTargetX = double.NaN;
-                if (DetachedBubbleContainer.Visibility == Visibility.Visible)
-                {
-                    var fadeOut = new DoubleAnimation(DetachedBubbleContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150));
-                    fadeOut.Completed += (s, e) => DetachedBubbleContainer.Visibility = Visibility.Collapsed;
-                    DetachedBubbleContainer.BeginAnimation(OpacityProperty, fadeOut);
-                }
-                else
-                {
-                    DetachedBubbleContainer.Visibility = Visibility.Collapsed;
-                }
-            }
-        }
-        else
-        {
-            _lastDetachedRightTargetX = double.NaN;
-            _lastDetachedLeftTargetX = double.NaN;
-            if (DetachedBubbleContainer.Visibility == Visibility.Visible && DetachedBubbleContainer.Opacity > 0.0)
-            {
-                var fadeOut = new DoubleAnimation(DetachedBubbleContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
-                {
-                    EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseIn }
-                };
-                fadeOut.Completed += (s, e) =>
-                {
-                    DetachedBubbleContainer.Visibility = Visibility.Collapsed;
-                };
-                DetachedBubbleContainer.BeginAnimation(OpacityProperty, fadeOut);
-            }
-            else
-            {
-                DetachedBubbleContainer.Visibility = Visibility.Collapsed;
-            }
-
-            if (DetachedLeftContainer.Visibility == Visibility.Visible && DetachedLeftContainer.Opacity > 0.0)
-            {
-                var fadeOut = new DoubleAnimation(DetachedLeftContainer.Opacity, 0.0, TimeSpan.FromMilliseconds(150))
-                {
-                    EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseIn }
-                };
-                fadeOut.Completed += (s, e) =>
-                {
-                    DetachedLeftContainer.Visibility = Visibility.Collapsed;
-                };
-                DetachedLeftContainer.BeginAnimation(OpacityProperty, fadeOut);
-            }
-            else
-            {
-                DetachedLeftContainer.Visibility = Visibility.Collapsed;
-            }
-        }
+        DetachedBubbleContainer.Visibility = Visibility.Collapsed;
+        DetachedLeftContainer.Visibility = Visibility.Collapsed;
     }
 
     private void UpdateDetachedLeftContent()
@@ -1536,6 +1427,16 @@ public partial class MainWindow : Window
         ViewBluetoothDevice.Visibility = _activeCategory == IslandCategory.BluetoothDevice ? Visibility.Visible : Visibility.Collapsed;
         ViewIncomingCall.Visibility = _activeCategory == IslandCategory.IncomingCall ? Visibility.Visible : Visibility.Collapsed;
         ViewLiveLyrics.Visibility = _activeCategory == IslandCategory.LiveLyrics ? Visibility.Visible : Visibility.Collapsed;
+        ViewIdleClockWeather.Visibility = _activeCategory == IslandCategory.IdleClockWeather ? Visibility.Visible : Visibility.Collapsed;
+        ViewMultiOperations.Visibility = _activeCategory == IslandCategory.MultiOperations ? Visibility.Visible : Visibility.Collapsed;
+        if (_activeCategory == IslandCategory.IdleClockWeather)
+        {
+            UpdateIdleClockAndWeatherUI();
+        }
+        else if (_activeCategory == IslandCategory.MultiOperations)
+        {
+            UpdateMultiOperationsUI();
+        }
 
         if (_isExpanded)
         {
@@ -1547,19 +1448,172 @@ public partial class MainWindow : Window
                         ? ExpandedBluetoothHeight
                         : _activeCategory == IslandCategory.LiveLyrics
                             ? ExpandedLyricsHeight
-                            : ExpandedHeight;
+                            : _activeCategory == IslandCategory.IdleClockWeather
+                                ? 86.0
+                                : _activeCategory == IslandCategory.MultiOperations
+                                    ? GetMultiOperationsHeight()
+                                    : ExpandedHeight;
             double targetWidth = _activeCategory == IslandCategory.BluetoothDevice
                 ? ExpandedBluetoothWidth
                 : _activeCategory == IslandCategory.IncomingCall
                     ? 440.0
                     : _activeCategory == IslandCategory.LiveLyrics
                         ? ExpandedLyricsWidth
-                        : ExpandedWidth;
+                        : _activeCategory == IslandCategory.IdleClockWeather
+                            ? 380.0
+                            : ExpandedWidth;
             DetachedBubbleContainer.Visibility = Visibility.Collapsed;
             DetachedLeftContainer.Visibility = Visibility.Collapsed;
 
             AnimateIsland(targetWidth, targetHeight);
         }
+        else
+        {
+            ExpandedContainer.Visibility = Visibility.Collapsed;
+            ExpandedContainer.Opacity = 0.0;
+        }
+    }
+
+    private double GetMultiOperationsHeight()
+    {
+        int count = 0;
+        if (IsMusicActive) count++;
+        if (IsAnyTimerActive) count++;
+        if (IsVoiceRecordingActive || IsScreenRecordingActive) count++;
+        if (count >= 3) return 192.0;
+        if (count == 2) return 140.0;
+        return ExpandedHeight;
+    }
+
+    private void UpdateMultiOperationsUI()
+    {
+        if (ViewMultiOperations == null) return;
+
+        // 1. Media Row
+        if (IsMusicActive && _mediaManager?.CurrentTrack != null)
+        {
+            MultiOpMediaRow.Visibility = Visibility.Visible;
+            MultiOpMediaTitle.Text = string.IsNullOrWhiteSpace(_mediaManager.CurrentTrack.Title) ? "Music" : _mediaManager.CurrentTrack.Title;
+            MultiOpMediaArtist.Text = string.IsNullOrWhiteSpace(_mediaManager.CurrentTrack.Artist) ? "Media Player" : _mediaManager.CurrentTrack.Artist;
+            MultiOpPlayGlyph.Visibility = IsMusicPlaying ? Visibility.Collapsed : Visibility.Visible;
+            MultiOpPauseGlyph.Visibility = IsMusicPlaying ? Visibility.Visible : Visibility.Collapsed;
+            if (_mediaManager.CurrentTrack.Thumbnail != null)
+            {
+                MultiOpAlbumImage.Source = _mediaManager.CurrentTrack.Thumbnail;
+                MultiOpAlbumImage.Visibility = Visibility.Visible;
+                MultiOpAlbumSymbol.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                MultiOpAlbumImage.Source = null;
+                MultiOpAlbumImage.Visibility = Visibility.Collapsed;
+                MultiOpAlbumSymbol.Visibility = Visibility.Visible;
+            }
+        }
+        else
+        {
+            MultiOpMediaRow.Visibility = Visibility.Collapsed;
+        }
+
+        // 2. Timer Row
+        if (IsAnyTimerActive)
+        {
+            MultiOpTimerRow.Visibility = Visibility.Visible;
+            var clockTimer = _windowsClockService.ActiveTimer;
+            if (_windowsClockService.HasActiveTimer && clockTimer != null)
+            {
+                MultiOpTimerTitle.Text = string.IsNullOrWhiteSpace(clockTimer.Name) ? "Timer" : clockTimer.Name;
+                MultiOpTimerCountdown.Text = $"{FormatRemainingTime(clockTimer.RemainingTime)} remaining";
+                MultiOpTimerToggleBtn.Content = clockTimer.IsRunning ? "Pause" : "Resume";
+            }
+            else if (_focusService.IsRunning || _focusService.Remaining > TimeSpan.Zero)
+            {
+                MultiOpTimerTitle.Text = "Focus Timer";
+                MultiOpTimerCountdown.Text = $"{FormatRemainingTime(_focusService.Remaining)} remaining";
+                MultiOpTimerToggleBtn.Content = _focusService.IsRunning ? "Pause" : "Resume";
+            }
+        }
+        else
+        {
+            MultiOpTimerRow.Visibility = Visibility.Collapsed;
+        }
+
+        // 3. Recording Row (Voice or Screen)
+        if (IsVoiceRecordingActive || IsScreenRecordingActive)
+        {
+            MultiOpRecordingRow.Visibility = Visibility.Visible;
+            if (IsVoiceRecordingActive)
+            {
+                MultiOpRecordingTitle.Text = "Voice Recording";
+                MultiOpRecordingDuration.Text = $"{FormatRecordingDuration(_voiceRecordingService.CurrentDuration)} recorded";
+                MultiOpRecordingToggleBtn.Content = _voiceRecordingService.IsPaused ? "Resume" : "Pause";
+            }
+            else
+            {
+                MultiOpRecordingTitle.Text = "Screen Recording";
+                MultiOpRecordingDuration.Text = $"{FormatRecordingDuration(_screenRecordingService.CurrentDuration)} recorded";
+                MultiOpRecordingToggleBtn.Content = _screenRecordingService.IsPaused ? "Resume" : "Pause";
+            }
+        }
+        else
+        {
+            MultiOpRecordingRow.Visibility = Visibility.Collapsed;
+        }
+
+        // Dividers
+        MultiOpDivider1.Visibility = (MultiOpMediaRow.Visibility == Visibility.Visible &&
+            (MultiOpTimerRow.Visibility == Visibility.Visible || MultiOpRecordingRow.Visibility == Visibility.Visible))
+            ? Visibility.Visible : Visibility.Collapsed;
+
+        MultiOpDivider2.Visibility = (MultiOpTimerRow.Visibility == Visibility.Visible &&
+            MultiOpRecordingRow.Visibility == Visibility.Visible)
+            ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static string FormatRecordingDuration(TimeSpan duration)
+    {
+        int totalMins = (int)duration.TotalMinutes;
+        int secs = duration.Seconds;
+        return duration.Hours > 0
+            ? $"{duration.Hours}:{duration.Minutes:D2}:{secs:D2}"
+            : $"{totalMins:D2}:{secs:D2}";
+    }
+
+    private void ExpandedVoiceRecToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (IsVoiceRecordingActive)
+        {
+            _voiceRecordingService.TogglePauseResume();
+            bool isPaused = _voiceRecordingService.IsPaused;
+            ExpandedVoiceRecToggleBtn.Content = isPaused ? "Resume" : "Pause";
+            if (MultiOpRecordingToggleBtn != null) MultiOpRecordingToggleBtn.Content = isPaused ? "Resume" : "Pause";
+        }
+        else if (IsScreenRecordingActive)
+        {
+            _screenRecordingService.TogglePauseResume();
+            bool isPaused = _screenRecordingService.IsPaused;
+            ExpandedVoiceRecToggleBtn.Content = isPaused ? "Resume" : "Pause";
+            if (MultiOpRecordingToggleBtn != null) MultiOpRecordingToggleBtn.Content = isPaused ? "Resume" : "Pause";
+        }
+    }
+
+    private void ExpandedVoiceRecStopBtn_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (IsVoiceRecordingActive)
+        {
+            _voiceRecordingService.StopActiveRecording();
+        }
+        else if (IsScreenRecordingActive)
+        {
+            _screenRecordingService.StopActiveRecording();
+        }
+        if (_isExpanded && (_activeCategory == IslandCategory.VoiceRecording || _activeCategory == IslandCategory.ScreenRecording))
+        {
+            CollapseDock();
+        }
+        UpdateCompactViewVisibility();
     }
 
     private void OnTrackChanged(MediaTrackInfo track)
@@ -1571,7 +1625,7 @@ public partial class MainWindow : Window
                 ShowDockSmooth();
                 WindowHelper.EnsureTopMost(this);
 
-                if (!_isNotificationAlertActive && _activeCategory != IslandCategory.AppNotification && _activeCategory != IslandCategory.LiveLyrics)
+                if (!_isNotificationAlertActive && _activeCategory != IslandCategory.AppNotification && _activeCategory != IslandCategory.LiveLyrics && _activeCategory != IslandCategory.MultiOperations)
                 {
                     _activeCategory = IslandCategory.MediaPlayback;
                 }
@@ -1632,8 +1686,17 @@ public partial class MainWindow : Window
 
                 SplitEqualizer.IsPlaying = track.IsPlaying;
                 PlayPauseIcon.Symbol = track.IsPlaying ? SymbolRegular.Pause24 : SymbolRegular.Play24;
+                if (MultiOpPlayGlyph != null && MultiOpPauseGlyph != null)
+                {
+                    MultiOpPlayGlyph.Visibility = track.IsPlaying ? Visibility.Collapsed : Visibility.Visible;
+                    MultiOpPauseGlyph.Visibility = track.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
+                }
 
                 UpdateCompactViewVisibility();
+                if (_isExpanded && _activeCategory == IslandCategory.MultiOperations)
+                {
+                    UpdateMultiOperationsUI();
+                }
             }
             else
             {
@@ -1913,6 +1976,7 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() =>
         {
             _isAlarmActive = isRinging;
+            if (!isRinging) _isAlarmHovered = false;
             string cleanTitle = UwpResourceResolver.Clean(alarmTitle, "Alarm");
             CompactAlarmTitleText.Text = string.IsNullOrWhiteSpace(cleanTitle) ? "Alarm" : cleanTitle;
 
@@ -1968,40 +2032,117 @@ public partial class MainWindow : Window
                 StopAlarmWiggleAnimation();
             }
 
+            UpdateAlarmHoverPresentation();
             UpdateCompactViewVisibility();
+            if (_isExpanded && _activeCategory == IslandCategory.MultiOperations)
+            {
+                UpdateMultiOperationsUI();
+                AnimateIsland(ExpandedWidth, GetMultiOperationsHeight());
+            }
         });
     }
 
     private void CompactAlarmView_MouseDown(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
+    }
+
+    private void CompactAlarmView_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (!IsAlarmActive) return;
+        _isAlarmHovered = true;
+        UpdateAlarmHoverPresentation();
+    }
+
+    private void CompactAlarmView_MouseLeave(object sender, MouseEventArgs e)
+    {
+        _isAlarmHovered = false;
+        UpdateAlarmHoverPresentation();
+    }
+
+    private void AlarmSnoozeButton_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _isAlarmHovered = false;
+        _alarmService.Snooze(9);
+    }
+
+    private void AlarmDismissButton_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        DismissActiveAlarm();
+    }
+
+    private void DismissActiveAlarm()
+    {
         uint? nid = _alarmService.ActiveNotificationId;
         _alarmService.Dismiss();
         if (nid.HasValue)
         {
             _notificationService.Dismiss(nid.Value);
         }
+        _isAlarmActive = false;
+        _isAlarmHovered = false;
+        CompactAlarmView.Visibility = Visibility.Collapsed;
+        UpdateCompactViewVisibility();
+        AnimateCompactActivityState();
+    }
+
+    private void UpdateAlarmHoverPresentation()
+    {
+        if (_alarmService.IsSnoozed)
+        {
+            AlarmSnoozeButton.Visibility = Visibility.Collapsed;
+            AlarmDismissButton.Visibility = Visibility.Visible;
+            return;
+        }
+
+        CompactAlarmTitleText.Visibility = Visibility.Visible;
+        AlarmSnoozeButton.Visibility = Visibility.Visible;
+        AlarmDismissButton.Visibility = Visibility.Visible;
+
+        CompactAlarmIconViewbox.Width = 22.0;
+        CompactAlarmIconViewbox.Height = 22.0;
+        CompactAlarmTitleText.FontSize = 14.5;
+        AlarmDismissButton.Width = 28.0;
+        AlarmDismissButton.Height = 28.0;
+        AlarmDismissButton.CornerRadius = new CornerRadius(14.0);
+        AlarmDismissGlyph.Width = 10.0;
+        AlarmDismissGlyph.Height = 10.0;
+
+        AnimateCompactActivityState();
     }
 
     private void OnAlarmSnoozeStarted(TimeSpan duration)
     {
         Dispatcher.Invoke(() =>
         {
-            CompactAlarmTitleText.Text = $"Snoozed ({(int)duration.TotalMinutes}m)";
+            int mins = (int)duration.TotalMinutes;
+            CompactAlarmTitleText.Text = $"Snooze {mins}:00";
             CompactAlarmView.Visibility = Visibility.Visible;
-            AnimateIsland(CompactAlarmWidth, CompactHeight);
-
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
-            timer.Tick += (s, e) =>
+            AlarmSnoozeButton.Visibility = Visibility.Collapsed;
+            AlarmDismissButton.Visibility = Visibility.Visible;
+            if (_isExpanded)
             {
-                timer.Stop();
-                if (!_isAlarmActive)
-                {
-                    CompactAlarmView.Visibility = Visibility.Collapsed;
-                    UpdateCompactViewVisibility();
-                }
-            };
-            timer.Start();
+                CollapseDock();
+            }
+            AnimateCompactActivityState();
+            UpdateCompactViewVisibility();
+        });
+    }
+
+    private void OnAlarmSnoozeTick(TimeSpan remaining)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (!_alarmService.IsSnoozed) return;
+            int mins = (int)remaining.TotalMinutes;
+            int secs = remaining.Seconds;
+            CompactAlarmTitleText.Text = $"Snooze {mins}:{secs:D2}";
+            CompactAlarmView.Visibility = Visibility.Visible;
+            AlarmSnoozeButton.Visibility = Visibility.Collapsed;
+            AlarmDismissButton.Visibility = Visibility.Visible;
+            UpdateCompactViewVisibility();
         });
     }
 
@@ -2111,6 +2252,11 @@ public partial class MainWindow : Window
     {
         App.Log($"TriggerWifiConnectedAlert: Network='{networkName}', Hotspot={isHotspot}");
 
+        // Test/manual triggers also represent a live connection. Real watcher
+        // events set these before calling this method, so this is idempotent.
+        if (isHotspot) _isHotspotActive = true;
+        else _isWifiConnected = true;
+
         // Clear other alerts but keep this Wi-Fi alert active
         ClearTemporaryAlerts(keepWifi: true);
         _isWifiAlertActive = true;
@@ -2158,11 +2304,6 @@ public partial class MainWindow : Window
             CompactWifiView.Opacity = 1.0;
             CompactWifiView.Visibility = Visibility.Collapsed;
             UpdateCompactViewVisibility();
-
-            if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-            {
-                HideDockSmooth();
-            }
         };
         CompactWifiView.BeginAnimation(OpacityProperty, fadeOut);
     }
@@ -2624,6 +2765,11 @@ public partial class MainWindow : Window
             }
 
             UpdateCompactViewVisibility();
+            if (_isExpanded && _activeCategory == IslandCategory.MultiOperations)
+            {
+                UpdateMultiOperationsUI();
+                AnimateIsland(ExpandedWidth, GetMultiOperationsHeight());
+            }
         });
     }
 
@@ -2732,7 +2878,10 @@ public partial class MainWindow : Window
             CompactBluetoothView.Opacity = 0.0;
             CompactBluetoothView.Visibility = Visibility.Visible;
 
-            AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
+            if (!_isExpanded)
+            {
+                AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
+            }
 
             var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(160));
             CompactBluetoothView.BeginAnimation(OpacityProperty, fadeIn);
@@ -3251,7 +3400,7 @@ public partial class MainWindow : Window
             }
             else if (!_isExpanded && !(_mediaManager?.CurrentTrack?.HasMedia ?? false))
             {
-                AnimateIsland(CurrentCompactWidth, CompactHeight);
+                AnimateCompactActivityState();
             }
         });
     }
@@ -3279,17 +3428,73 @@ public partial class MainWindow : Window
             }
 
             UpdateCompactViewVisibility();
+            if (_isExpanded && _activeCategory == IslandCategory.MultiOperations)
+            {
+                UpdateMultiOperationsUI();
+                AnimateIsland(ExpandedWidth, GetMultiOperationsHeight());
+            }
         });
     }
 
-    private void CompactTimerPauseBtn_Click(object sender, RoutedEventArgs e)
+    private void CompactLiveTimerView_MouseEnter(object sender, MouseEventArgs e)
     {
-        e.Handled = true;
+        _isTimerHovered = true;
+        UpdateTimerHoverPresentation();
+    }
+
+    private void CompactLiveTimerView_MouseLeave(object sender, MouseEventArgs e)
+    {
+        _isTimerHovered = false;
+        UpdateTimerHoverPresentation();
+    }
+
+    private void UpdateTimerHoverPresentation()
+    {
+        if (!IsAnyTimerActive) return;
+        bool isPaused = false;
+        if (_windowsClockService.HasActiveTimer)
+        {
+            isPaused = !(_windowsClockService.ActiveTimer?.IsRunning ?? false);
+        }
+        else
+        {
+            isPaused = !_focusService.IsRunning && _focusService.Remaining.TotalSeconds > 0;
+        }
+
+        if (_isTimerHovered || isPaused)
+        {
+            CompactTimerControlsPanel.Visibility = Visibility.Visible;
+            CompactTimerBackgroundIcon.Visibility = Visibility.Collapsed;
+            if (isPaused)
+            {
+                CompactTimerPauseBar1.Visibility = Visibility.Collapsed;
+                CompactTimerPauseBar2.Visibility = Visibility.Collapsed;
+                CompactTimerPlayTriangle.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                CompactTimerPauseBar1.Visibility = Visibility.Visible;
+                CompactTimerPauseBar2.Visibility = Visibility.Visible;
+                CompactTimerPlayTriangle.Visibility = Visibility.Collapsed;
+            }
+        }
+        else
+        {
+            CompactTimerControlsPanel.Visibility = Visibility.Collapsed;
+            CompactTimerBackgroundIcon.Visibility = Visibility.Visible;
+        }
+        AnimateCompactActivityState();
+    }
+
+    private void HandleTimerPauseResumeToggle()
+    {
         if (_windowsClockService.HasActiveTimer)
         {
             if (_windowsClockService.ActiveTimer?.IsRunning == true)
             {
                 _windowsClockService.PauseActiveTimer();
+                FocusToggleButton.Content = "Resume";
+                if (MultiOpTimerToggleBtn != null) MultiOpTimerToggleBtn.Content = "Resume";
                 CompactTimerPauseBar1.Visibility = Visibility.Collapsed;
                 CompactTimerPauseBar2.Visibility = Visibility.Collapsed;
                 CompactTimerPlayTriangle.Visibility = Visibility.Visible;
@@ -3297,6 +3502,8 @@ public partial class MainWindow : Window
             else
             {
                 _windowsClockService.ResumeActiveTimer();
+                FocusToggleButton.Content = "Pause";
+                if (MultiOpTimerToggleBtn != null) MultiOpTimerToggleBtn.Content = "Pause";
                 CompactTimerPauseBar1.Visibility = Visibility.Visible;
                 CompactTimerPauseBar2.Visibility = Visibility.Visible;
                 CompactTimerPlayTriangle.Visibility = Visibility.Collapsed;
@@ -3305,23 +3512,85 @@ public partial class MainWindow : Window
         else if (_focusService.IsRunning)
         {
             _focusService.Pause();
+            FocusToggleButton.Content = "Resume";
+            if (MultiOpTimerToggleBtn != null) MultiOpTimerToggleBtn.Content = "Resume";
+            CompactTimerPauseBar1.Visibility = Visibility.Collapsed;
+            CompactTimerPauseBar2.Visibility = Visibility.Collapsed;
+            CompactTimerPlayTriangle.Visibility = Visibility.Visible;
         }
         else if (_focusService.Remaining.TotalSeconds > 0)
         {
             _focusService.Resume();
+            FocusToggleButton.Content = "Pause";
+            if (MultiOpTimerToggleBtn != null) MultiOpTimerToggleBtn.Content = "Pause";
+            CompactTimerPauseBar1.Visibility = Visibility.Visible;
+            CompactTimerPauseBar2.Visibility = Visibility.Visible;
+            CompactTimerPlayTriangle.Visibility = Visibility.Collapsed;
         }
+        UpdateTimerHoverPresentation();
+        UpdateTimerPillCountdown();
+        UpdateCompactViewVisibility();
+        if (_isExpanded && _activeCategory == IslandCategory.MultiOperations)
+        {
+            UpdateMultiOperationsUI();
+        }
+    }
+
+    private void CompactTimerPauseBtn_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        HandleTimerPauseResumeToggle();
+    }
+
+    private void CompactTimerPauseBtn_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        HandleTimerPauseResumeToggle();
+    }
+
+    private void MultiOpTimerToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        HandleTimerPauseResumeToggle();
+    }
+
+    private void HandleTimerCancel()
+    {
+        _windowsClockService.CancelCurrentTimer();
+        _focusService.Stop();
+        if (_isExpanded && (_activeCategory == IslandCategory.FocusTimer || _activeCategory == IslandCategory.MultiOperations))
+        {
+            if (_activeCategory == IslandCategory.FocusTimer)
+            {
+                CollapseDock();
+            }
+            else
+            {
+                UpdateMultiOperationsUI();
+                AnimateIsland(ExpandedWidth, GetMultiOperationsHeight());
+            }
+        }
+        UpdateCompactViewVisibility();
+        AnimateCompactActivityState();
     }
 
     private void CompactTimerCancelBtn_Click(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        _windowsClockService.CancelCurrentTimer();
-        _focusService.Stop();
-        if (_isExpanded && _activeCategory == IslandCategory.FocusTimer)
-        {
-            CollapseDock();
-        }
-        UpdateCompactViewVisibility();
+        HandleTimerCancel();
+    }
+
+    private void CompactTimerCancelBtn_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        HandleTimerCancel();
+    }
+
+    private void AnimateCompactActivityState()
+    {
+        if (_isExpanded) return;
+        CompactView.Height = CurrentCompactHeight;
+        AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
     }
 
     private void OnWindowsClockTimerChanged(WindowsClockTimerInfo? info)
@@ -3355,6 +3624,11 @@ public partial class MainWindow : Window
 
             UpdateTimerPillCountdown();
             UpdateCompactViewVisibility();
+            if (_isExpanded && _activeCategory == IslandCategory.MultiOperations)
+            {
+                UpdateMultiOperationsUI();
+                AnimateIsland(ExpandedWidth, GetMultiOperationsHeight());
+            }
         });
     }
 
@@ -3397,7 +3671,6 @@ public partial class MainWindow : Window
     private readonly double[] _currentRecBarHeights = new double[13] { 4.5, 7.5, 13.0, 11.0, 6.0, 13.5, 17.0, 13.0, 7.5, 4.5, 8.0, 12.0, 4.5 };
     private readonly double[] _targetRecBarHeights = new double[13] { 4.5, 7.5, 13.0, 11.0, 6.0, 13.5, 17.0, 13.0, 7.5, 4.5, 8.0, 12.0, 4.5 };
     private double _recWavePhase = 0.0;
-    private double _voiceEnergyEnvelope = 0.0;
     private DispatcherTimer? _recordingWaveformTimer;
 
     private void StartRecordingWaveformAnimation()
@@ -3424,64 +3697,67 @@ public partial class MainWindow : Window
 
     private void OnRecordingWaveformTick(object? sender, EventArgs e)
     {
-        if (!IsVoiceRecordingActive)
+        if (!IsVoiceRecordingActive && !IsScreenRecordingActive)
         {
             StopRecordingWaveformAnimation();
             return;
         }
 
-        // 1. Fetch instantaneous microphone audio peak directly with microseconds latency
-        float rawPeak = _voiceRecordingService.GetCurrentPeak();
-
-        // 2. Square-root expansion for authentic natural human voice dynamic range
-        double voiceEnergy = Math.Sqrt(Math.Clamp(rawPeak * 3.8, 0.0, 1.0));
-
-        // Fast attack / smooth release envelope follower
-        if (voiceEnergy > _voiceEnergyEnvelope)
+        // 1. Voice recording waveform bars (Simple, gentle, smooth)
+        if (IsVoiceRecordingActive)
         {
-            _voiceEnergyEnvelope += (voiceEnergy - _voiceEnergyEnvelope) * 0.75; // Fast rise
-        }
-        else
-        {
-            _voiceEnergyEnvelope += (voiceEnergy - _voiceEnergyEnvelope) * 0.16; // Smooth audio release
-        }
-
-        // 3. Increment phase for traveling harmonic ripples
-        _recWavePhase += 0.18;
-
-        Border[] bars = { RecBar1, RecBar2, RecBar3, RecBar4, RecBar5, RecBar6, RecBar7, RecBar8, RecBar9, RecBar10, RecBar11, RecBar12, RecBar13 };
-
-        for (int i = 0; i < bars.Length; i++)
-        {
-            // Organic multi-harmonic wave: living ripple across the pill so bars are never flat dots
-            double wave = Math.Sin(_recWavePhase + i * 0.52) * 0.65 + Math.Sin(_recWavePhase * 1.8 + i * 0.95) * 0.35;
-            double ambientH = BaseWaveProfile[i] * (0.75 + 0.35 * wave);
-
-            // Spikes: surge upward when voice energy is detected, modulated per-bar
-            double spikeMod = 0.8 + 0.4 * Math.Sin(_recWavePhase * 2.2 + i * 0.7);
-            double spikeBonus = _voiceEnergyEnvelope * 13.5 * BarSensitivity[i] * spikeMod;
-
-            double targetH = Math.Clamp(ambientH + spikeBonus, 3.5, 26.0);
-            _targetRecBarHeights[i] = targetH;
-
-            // Liquid spring interpolation: fast attack, smooth decay
-            double delta = _targetRecBarHeights[i] - _currentRecBarHeights[i];
-            if (delta > 0)
+            Border[] voiceBars = { RecBar1, RecBar2, RecBar3, RecBar4, RecBar5, RecBar6, RecBar7, RecBar8, RecBar9, RecBar10, RecBar11, RecBar12, RecBar13 };
+            if (_voiceRecordingService.IsPaused)
             {
-                _currentRecBarHeights[i] += delta * 0.60;
+                foreach (var bar in voiceBars)
+                {
+                    bar.Height = 3.5;
+                }
             }
             else
             {
-                _currentRecBarHeights[i] += delta * 0.25;
+                _recWavePhase += 0.10;
+                float peak = Math.Clamp(_voiceRecordingService.GetCurrentPeak() * 2.0f, 0.0f, 1.0f);
+                for (int i = 0; i < voiceBars.Length; i++)
+                {
+                    double wave = 0.5 + 0.5 * Math.Sin(_recWavePhase + i * 0.45);
+                    double h = 3.5 + (BaseWaveProfile[i] - 3.5) * (0.4 + 0.6 * wave) * (0.4 + 0.6 * peak);
+                    voiceBars[i].Height = Math.Clamp(h, 3.5, 18.0);
+                }
             }
+        }
 
-            double finalH = Math.Clamp(_currentRecBarHeights[i], 3.5, 26.0);
-            bars[i].Height = finalH;
+        // 2. Screen recording live sound waveform bars (Simple, calm)
+        if (IsScreenRecordingActive)
+        {
+            Border[] screenBars = { ScreenRecBar1, ScreenRecBar2, ScreenRecBar3, ScreenRecBar4, ScreenRecBar5, ScreenRecBar6, ScreenRecBar7, ScreenRecBar8, ScreenRecBar9 };
+            if (_screenRecordingService.IsPaused)
+            {
+                foreach (var bar in screenBars)
+                {
+                    bar.Height = 3.5;
+                }
+            }
+            else
+            {
+                double[] baseH = { 4.0, 6.0, 9.0, 12.0, 14.0, 12.0, 9.0, 6.0, 4.0 };
+                for (int i = 0; i < screenBars.Length; i++)
+                {
+                    double wave = 0.5 + 0.5 * Math.Sin(_recWavePhase + i * 0.5);
+                    double h = 3.5 + (baseH[i] - 3.5) * (0.5 + 0.5 * wave);
+                    screenBars[i].Height = Math.Clamp(h, 3.5, 15.0);
+                }
+            }
         }
     }
 
     private static readonly SolidColorBrush CallGreenBrush = new(Color.FromRgb(0x30, 0xD1, 0x58)); // #30D158 Vibrant Call Green
     private static readonly SolidColorBrush RecRedBrush = new(Color.FromRgb(0xFF, 0x45, 0x3A));   // #FF453A Vibrant Recording Red
+
+    private bool _isVoiceRecHovered = false;
+    private bool _isScreenRecHovered = false;
+    private bool _isTimerHovered = false;
+    private bool _isAlarmHovered = false;
 
     private void OnVoiceRecordingStateChanged(VoiceRecordingInfo info)
     {
@@ -3498,31 +3774,72 @@ public partial class MainWindow : Window
                     ? $"{info.Duration.Hours}:{info.Duration.Minutes:D2}:{secs:D2}"
                     : $"{totalMins:D2}:{secs:D2}";
 
-                CompactRecordingDurationText.Text = durStr;
                 RecordingDurationSubtext.Text = $"{durStr} recorded";
                 RecordingAppNameText.Text = $"{info.AppName} Recording";
 
-                // User Requirement: The green telephone icon & waveform bars should ONLY be shown during calls.
-                // When sound/voice/screen recording is on, show red colored bar and recording icon.
                 bool isCall = info.IsCall;
-                var themeBrush = isCall ? CallGreenBrush : RecRedBrush;
-
-                CompactCallIcon.Visibility = isCall ? Visibility.Visible : Visibility.Collapsed;
-                CompactRecordingMicIcon.Visibility = isCall ? Visibility.Collapsed : Visibility.Visible;
-                CompactRecordingDurationText.Foreground = themeBrush;
-
-                // Update all waveform bars color dynamically
-                Border[] bars = { RecBar1, RecBar2, RecBar3, RecBar4, RecBar5, RecBar6, RecBar7, RecBar8, RecBar9, RecBar10, RecBar11, RecBar12, RecBar13 };
-                foreach (var bar in bars)
+                if (isCall)
                 {
-                    bar.Background = themeBrush;
+                    CompactCallIcon.Visibility = Visibility.Visible;
+                    CompactCallDurationText.Visibility = Visibility.Visible;
+                    CompactCallDurationText.Text = durStr;
+                    CallWaveformBars.Visibility = Visibility.Visible;
+
+                    RecordingWaveformBars.Visibility = Visibility.Collapsed;
+                    VoiceRecDottedLine.Visibility = Visibility.Collapsed;
+                    CompactRecordingDurationText.Visibility = Visibility.Collapsed;
+                    VoiceRecCircleButton.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    CompactCallIcon.Visibility = Visibility.Collapsed;
+                    CompactCallDurationText.Visibility = Visibility.Collapsed;
+                    CallWaveformBars.Visibility = Visibility.Collapsed;
+
+                    CompactRecordingDurationText.Visibility = Visibility.Visible;
+                    CompactRecordingDurationText.Text = durStr;
+                    CompactRecordingDurationText.Foreground = RecRedBrush;
+
+                    if (info.IsPaused)
+                    {
+                        // Paused State (Matches media_1795358153445_a216724d.png Image 1):
+                        // Left: Flat dotted red line
+                        // Center/Right: Duration timer
+                        // Far Right: Circular button with white ring and red square
+                        RecordingWaveformBars.Visibility = Visibility.Collapsed;
+                        VoiceRecDottedLine.Visibility = Visibility.Visible;
+                        VoiceRecCircleButton.Visibility = Visibility.Visible;
+                        VoiceRecButtonInnerSquare.Visibility = Visibility.Visible;
+                        VoiceRecButtonPauseBars.Visibility = Visibility.Collapsed;
+                        VoiceRecCircleButton.ToolTip = "Resume Voice Recording";
+                    }
+                    else
+                    {
+                        // Active State (Matches media_1795358160957_d10c2751.png Image 2):
+                        // Left: Dynamic red waveform bars
+                        // Far Right: Duration timer (plus hover pause button)
+                        RecordingWaveformBars.Visibility = Visibility.Visible;
+                        VoiceRecDottedLine.Visibility = Visibility.Collapsed;
+                        VoiceRecCircleButton.Visibility = _isVoiceRecHovered ? Visibility.Visible : Visibility.Collapsed;
+                        VoiceRecButtonInnerSquare.Visibility = Visibility.Collapsed;
+                        VoiceRecButtonPauseBars.Visibility = Visibility.Visible;
+                        VoiceRecCircleButton.ToolTip = "Pause Voice Recording";
+                    }
+
+                    // Update all waveform bars color dynamically
+                    Border[] bars = { RecBar1, RecBar2, RecBar3, RecBar4, RecBar5, RecBar6, RecBar7, RecBar8, RecBar9, RecBar10, RecBar11, RecBar12, RecBar13 };
+                    foreach (var bar in bars)
+                    {
+                        bar.Background = RecRedBrush;
+                    }
                 }
 
                 StartRecordingWaveformAnimation();
-        if (IsSplitActive && !IsScreenRecordingActive)
-        {
-            UpdateDetachedLeftContent();
-        }
+                AnimateCompactActivityState();
+                if (IsSplitActive && !IsScreenRecordingActive)
+                {
+                    UpdateDetachedLeftContent();
+                }
             }
             else
             {
@@ -3533,6 +3850,11 @@ public partial class MainWindow : Window
                 }
             }
             UpdateCompactViewVisibility();
+            if (_isExpanded && _activeCategory == IslandCategory.MultiOperations)
+            {
+                UpdateMultiOperationsUI();
+                AnimateIsland(ExpandedWidth, GetMultiOperationsHeight());
+            }
         });
     }
 
@@ -3544,15 +3866,193 @@ public partial class MainWindow : Window
             {
                 ShowDockSmooth();
                 WindowHelper.EnsureTopMost(this);
+
+                int totalMins = (int)info.Duration.TotalMinutes;
+                int secs = info.Duration.Seconds;
+                string durStr = info.Duration.Hours > 0
+                    ? $"{info.Duration.Hours}:{info.Duration.Minutes:D2}:{secs:D2}"
+                    : $"{totalMins:D2}:{secs:D2}";
+
+                CompactScreenRecordingDurationText.Text = durStr;
+
+                if (info.IsPaused)
+                {
+                    ScreenRecWaveformBars.Visibility = Visibility.Collapsed;
+                    ScreenRecDottedLine.Visibility = Visibility.Visible;
+                    ScreenRecPlayPauseButton.Visibility = Visibility.Visible;
+                    UpdateScreenRecPlayPauseIcon(true);
+                    UpdateScreenRecPulseDot(true);
+                }
+                else
+                {
+                    ScreenRecWaveformBars.Visibility = Visibility.Visible;
+                    ScreenRecDottedLine.Visibility = Visibility.Collapsed;
+                    ScreenRecPlayPauseButton.Visibility = _isScreenRecHovered ? Visibility.Visible : Visibility.Collapsed;
+                    UpdateScreenRecPlayPauseIcon(false);
+                    UpdateScreenRecPulseDot(false);
+                }
+
+                StartRecordingWaveformAnimation();
             }
             else
             {
+                StopScreenRecPulseDot();
                 if (_isExpanded && _activeCategory == IslandCategory.ScreenRecording) CollapseDock();
             }
 
             UpdateSplitBubbleAnimation(CurrentCompactWidth);
             UpdateCompactViewVisibility();
+            if (_isExpanded && _activeCategory == IslandCategory.MultiOperations)
+            {
+                UpdateMultiOperationsUI();
+                AnimateIsland(ExpandedWidth, GetMultiOperationsHeight());
+            }
         });
+    }
+
+    private void CompactScreenRecordingView_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _isScreenRecHovered = true;
+        if (IsScreenRecordingActive)
+        {
+            ScreenRecWaveformBars.Visibility = Visibility.Collapsed;
+            ScreenRecDottedLine.Visibility = Visibility.Collapsed;
+            ScreenRecPlayPauseButton.Visibility = Visibility.Visible;
+            UpdateScreenRecPlayPauseIcon(_screenRecordingService.IsPaused);
+        }
+    }
+
+    private void CompactScreenRecordingView_MouseLeave(object sender, MouseEventArgs e)
+    {
+        _isScreenRecHovered = false;
+        if (IsScreenRecordingActive)
+        {
+            if (_screenRecordingService.IsPaused)
+            {
+                ScreenRecWaveformBars.Visibility = Visibility.Collapsed;
+                ScreenRecDottedLine.Visibility = Visibility.Visible;
+                ScreenRecPlayPauseButton.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                ScreenRecWaveformBars.Visibility = Visibility.Visible;
+                ScreenRecDottedLine.Visibility = Visibility.Collapsed;
+                ScreenRecPlayPauseButton.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private void ScreenRecPlayPauseButton_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _screenRecordingService.TogglePauseResume();
+        UpdateScreenRecPlayPauseIcon(_screenRecordingService.IsPaused);
+        UpdateScreenRecPulseDot(_screenRecordingService.IsPaused);
+    }
+
+    private void UpdateScreenRecPlayPauseIcon(bool isPaused)
+    {
+        if (ScreenRecPlayPauseIcon == null) return;
+        if (isPaused)
+        {
+            // Play icon (triangle)
+            ScreenRecPlayPauseIcon.Data = Geometry.Parse("M 8,5 L 19,12 L 8,19 L 8,5 Z");
+            ScreenRecPlayPauseButton.ToolTip = "Resume Screen Recording";
+        }
+        else
+        {
+            // Pause icon (two vertical bars)
+            ScreenRecPlayPauseIcon.Data = Geometry.Parse("M 6,19 L 10,19 L 10,5 L 6,5 L 6,19 Z M 14,5 L 14,19 L 18,19 L 18,5 L 14,5 Z");
+            ScreenRecPlayPauseButton.ToolTip = "Pause Screen Recording";
+        }
+    }
+
+    private void UpdateScreenRecPulseDot(bool isPaused)
+    {
+        if (ScreenRecPulseDot == null) return;
+        if (isPaused)
+        {
+            ScreenRecPulseDot.BeginAnimation(UIElement.OpacityProperty, null);
+            ScreenRecPulseDot.Opacity = 0.45;
+        }
+        else
+        {
+            var anim = new DoubleAnimation
+            {
+                From = 1.0,
+                To = 0.35,
+                Duration = TimeSpan.FromMilliseconds(700),
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            ScreenRecPulseDot.BeginAnimation(UIElement.OpacityProperty, anim);
+        }
+    }
+
+    private void StopScreenRecPulseDot()
+    {
+        if (ScreenRecPulseDot != null)
+        {
+            ScreenRecPulseDot.BeginAnimation(UIElement.OpacityProperty, null);
+            ScreenRecPulseDot.Opacity = 1.0;
+        }
+    }
+
+    private void CompactVoiceRecordingView_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _isVoiceRecHovered = true;
+        UpdateVoiceRecordingHoverPresentation();
+    }
+
+    private void CompactVoiceRecordingView_MouseLeave(object sender, MouseEventArgs e)
+    {
+        _isVoiceRecHovered = false;
+        UpdateVoiceRecordingHoverPresentation();
+    }
+
+    private void UpdateVoiceRecordingHoverPresentation()
+    {
+        if (!IsVoiceRecordingActive) return;
+        bool isPaused = _voiceRecordingService.IsPaused;
+        UpdateVoiceRecPlayPauseIcon(isPaused);
+
+        if (isPaused)
+        {
+            RecordingWaveformBars.Visibility = Visibility.Collapsed;
+            VoiceRecDottedLine.Visibility = Visibility.Visible;
+            VoiceRecCircleButton.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            RecordingWaveformBars.Visibility = Visibility.Visible;
+            VoiceRecDottedLine.Visibility = Visibility.Collapsed;
+            VoiceRecCircleButton.Visibility = _isVoiceRecHovered ? Visibility.Visible : Visibility.Collapsed;
+        }
+        AnimateCompactActivityState();
+    }
+
+    private void VoiceRecCircleButton_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _voiceRecordingService.TogglePauseResume();
+        UpdateVoiceRecordingHoverPresentation();
+    }
+
+    private void UpdateVoiceRecPlayPauseIcon(bool isPaused)
+    {
+        if (VoiceRecCircleButton == null) return;
+        if (isPaused)
+        {
+            VoiceRecButtonInnerSquare.Visibility = Visibility.Visible;
+            VoiceRecButtonPauseBars.Visibility = Visibility.Collapsed;
+            VoiceRecCircleButton.ToolTip = "Resume Voice Recording";
+        }
+        else
+        {
+            VoiceRecButtonInnerSquare.Visibility = Visibility.Collapsed;
+            VoiceRecButtonPauseBars.Visibility = Visibility.Visible;
+            VoiceRecCircleButton.ToolTip = "Pause Voice Recording";
+        }
     }
 
     private void ScreenRecordingStop_MouseDown(object sender, MouseButtonEventArgs e)
@@ -3589,7 +4089,176 @@ public partial class MainWindow : Window
 
         CompactTimeText.Text = timeStr;
         CompactDateText.Text = dateStr;
+
+        if (IdleClockTimeText != null)
+        {
+            IdleClockTimeText.Text = now.ToString("h:mm");
+            IdleClockAmPmText.Text = now.ToString("tt");
+            IdleClockDateText.Text = now.ToString("dddd, MMMM d");
+        }
     }
+
+    #region Idle Clock & Weather View
+
+    private void OnWeatherUpdated(WeatherInfo info)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            UpdateWeatherUI(info);
+        });
+    }
+
+    private void UpdateIdleClockAndWeatherUI()
+    {
+        UpdateClock();
+        UpdateWeatherUI(_weatherService.CurrentWeather);
+        if (WeatherLocationInput != null && string.IsNullOrWhiteSpace(WeatherLocationInput.Text))
+        {
+            WeatherLocationInput.Text = _weatherService.Settings.City;
+        }
+    }
+
+    private void UpdateWeatherUI(WeatherInfo? info)
+    {
+        if (info == null)
+        {
+            if (IdleWeatherTempText != null) IdleWeatherTempText.Text = "--°";
+            if (IdleWeatherConditionText != null) IdleWeatherConditionText.Text = "Loading...";
+            if (IdleWeatherLocationText != null) IdleWeatherLocationText.Text = _weatherService.Settings.City;
+            return;
+        }
+
+        if (IdleWeatherTempText != null) IdleWeatherTempText.Text = $"{info.Temperature:0}°";
+        if (IdleWeatherConditionText != null) IdleWeatherConditionText.Text = info.ConditionText;
+        if (IdleWeatherLocationText != null) IdleWeatherLocationText.Text = info.CityName;
+
+        // Update weather icon path & colors
+        if (IdleWeatherIconPath != null)
+        {
+            try
+            {
+                switch (info.WeatherIconKey)
+                {
+                    case "Sun":
+                        IdleWeatherIconPath.Data = Geometry.Parse("M12,7 A5,5 0 1,0 12,17 A5,5 0 1,0 12,7 Z M12,1 L12,4 M12,20 L12,23 M1,12 L4,12 M20,12 L22,12 M4.22,4.22 L6.34,6.34 M17.66,17.66 L19.78,19.78 M4.22,19.78 L6.34,17.66 M17.66,6.34 L19.78,4.22");
+                        IdleWeatherIconPath.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD60A"));
+                        IdleWeatherIconPath.Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD60A"));
+                        IdleWeatherIconPath.StrokeThickness = 1.8;
+                        break;
+                    case "Moon":
+                        IdleWeatherIconPath.Data = Geometry.Parse("M 12.3,10.2 C 7.5,10.2 3.6,6.3 3.6,1.5 C 3.6,1.0 3.7,0.5 3.8,0 C 1.5,1.2 0,3.6 0,6.4 C 0,10.5 3.3,13.8 7.4,13.8 C 10.2,13.8 12.6,12.3 13.8,10.0 C 13.3,10.1 12.8,10.2 12.3,10.2 Z");
+                        IdleWeatherIconPath.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5E5CE6"));
+                        IdleWeatherIconPath.Stroke = null;
+                        break;
+                    case "Rain":
+                        IdleWeatherIconPath.Data = Geometry.Parse("M19.35,10.04 C18.67,6.59 15.64,4 12,4 C9.11,4 6.6,5.64 5.35,8.04 C2.34,8.36 0,10.91 0,14 C0,17.31 2.69,20 6,20 L19,20 C21.76,20 24,17.76 24,15 C24,12.36 21.95,10.22 19.35,10.04 Z M8,22 L6,25 M12,22 L10,25 M16,22 L14,25");
+                        IdleWeatherIconPath.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0A84FF"));
+                        IdleWeatherIconPath.Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0A84FF"));
+                        IdleWeatherIconPath.StrokeThickness = 1.2;
+                        break;
+                    case "Snow":
+                        IdleWeatherIconPath.Data = Geometry.Parse("M12,2 L12,22 M2,12 L22,12 M4.93,4.93 L19.07,19.07 M4.93,19.07 L19.07,4.93 M9,4 L12,7 L15,4 M9,20 L12,17 L15,20 M4,9 L7,12 L4,15 M20,9 L17,12 L20,15");
+                        IdleWeatherIconPath.Fill = null;
+                        IdleWeatherIconPath.Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#64D2FF"));
+                        IdleWeatherIconPath.StrokeThickness = 1.5;
+                        break;
+                    case "Thunderstorm":
+                        IdleWeatherIconPath.Data = Geometry.Parse("M19.35,10.04 C18.67,6.59 15.64,4 12,4 C9.11,4 6.6,5.64 5.35,8.04 C2.34,8.36 0,10.91 0,14 C0,17.31 2.69,20 6,20 L13,20 L11,24 L16,24 L10,30 L12,25 L8,25 Z");
+                        IdleWeatherIconPath.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD60A"));
+                        IdleWeatherIconPath.Stroke = null;
+                        break;
+                    default:
+                        // Cloudy or Partly Cloudy
+                        IdleWeatherIconPath.Data = Geometry.Parse("M19.35,10.04 C18.67,6.59 15.64,4 12,4 C9.11,4 6.6,5.64 5.35,8.04 C2.34,8.36 0,10.91 0,14 C0,17.31 2.69,20 6,20 L19,20 C21.76,20 24,17.76 24,15 C24,12.36 21.95,10.22 19.35,10.04 Z");
+                        IdleWeatherIconPath.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#64D2FF"));
+                        IdleWeatherIconPath.Stroke = null;
+                        break;
+                }
+            }
+            catch { }
+        }
+    }
+
+    private void IdleWeatherGearButton_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _autoCollapseTimer.Stop();
+
+        // Enable window activation so physical keyboard routes directly to our TextBox
+        WindowHelper.SetActivationEnabled(this, true);
+        this.Activate();
+
+        IdleWeatherMainPanel.Visibility = Visibility.Collapsed;
+        IdleWeatherSettingsPanel.Visibility = Visibility.Visible;
+        WeatherLocationInput.Text = _weatherService.Settings.City;
+
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        {
+            WeatherLocationInput.Focus();
+            Keyboard.Focus(WeatherLocationInput);
+            WeatherLocationInput.SelectAll();
+        });
+    }
+
+    private void WeatherLocationInput_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        WindowHelper.SetActivationEnabled(this, true);
+        this.Activate();
+        WeatherLocationInput.Focus();
+    }
+
+    private void WeatherSettingsBackButton_MouseDown(object sender, MouseButtonEventArgs? e)
+    {
+        if (e != null) e.Handled = true;
+        WindowHelper.SetActivationEnabled(this, false);
+        IdleWeatherSettingsPanel.Visibility = Visibility.Collapsed;
+        IdleWeatherMainPanel.Visibility = Visibility.Visible;
+    }
+
+    private async void WeatherSaveButton_MouseDown(object sender, MouseButtonEventArgs? e)
+    {
+        if (e != null) e.Handled = true;
+        string query = WeatherLocationInput.Text;
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            await _weatherService.SetLocationAsync(query);
+        }
+        WindowHelper.SetActivationEnabled(this, false);
+        IdleWeatherSettingsPanel.Visibility = Visibility.Collapsed;
+        IdleWeatherMainPanel.Visibility = Visibility.Visible;
+    }
+
+    private void WeatherLocationInput_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            WeatherSaveButton_MouseDown(sender, null);
+        }
+        else if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            WeatherSettingsBackButton_MouseDown(sender, null);
+        }
+    }
+
+    private async void WeatherAutoDetectButton_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        await _weatherService.AutoDetectLocationAsync();
+        WeatherLocationInput.Text = _weatherService.Settings.City;
+        WindowHelper.SetActivationEnabled(this, false);
+        IdleWeatherSettingsPanel.Visibility = Visibility.Collapsed;
+        IdleWeatherMainPanel.Visibility = Visibility.Visible;
+    }
+
+    private async void WeatherTempToggle_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        await _weatherService.ToggleUnitAsync();
+    }
+
+    #endregion
 
     private async void PlayPauseButton_Click(object sender, RoutedEventArgs e)
     {
@@ -3610,10 +4279,6 @@ public partial class MainWindow : Window
     {
         _isPinned = false;
         CollapseDock();
-        if (_appStateTracker.CurrentState == ForegroundAppState.Maximized)
-        {
-            HideDockSmooth();
-        }
     }
 
     private void StyleToggleButton_Click(object sender, RoutedEventArgs e)
@@ -3636,34 +4301,14 @@ public partial class MainWindow : Window
 
     private void FocusToggleButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_windowsClockService.HasActiveTimer)
-        {
-            if (_windowsClockService.ActiveTimer?.IsRunning == true)
-            {
-                _windowsClockService.PauseActiveTimer();
-                FocusToggleButton.Content = "Resume";
-            }
-            else
-            {
-                _windowsClockService.ResumeActiveTimer();
-                FocusToggleButton.Content = "Pause";
-            }
-        }
-        else
-        {
-            _focusService.Toggle();
-        }
+        e.Handled = true;
+        HandleTimerPauseResumeToggle();
     }
 
     private void FocusCancelButton_Click(object sender, RoutedEventArgs e)
     {
-        _windowsClockService.CancelCurrentTimer();
-        _focusService.Stop();
-        if (_isExpanded && _activeCategory == IslandCategory.FocusTimer)
-        {
-            CollapseDock();
-        }
-        UpdateCompactViewVisibility();
+        e.Handled = true;
+        HandleTimerCancel();
     }
 
     private void HardwareBrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -3873,6 +4518,11 @@ public partial class MainWindow : Window
             }
 
             UpdateCompactViewVisibility();
+            if (_isExpanded && _activeCategory == IslandCategory.MultiOperations)
+            {
+                UpdateMultiOperationsUI();
+                AnimateIsland(ExpandedWidth, GetMultiOperationsHeight());
+            }
         });
     }
 
@@ -3901,6 +4551,31 @@ public partial class MainWindow : Window
 
     private void UpdateCompactViewVisibility()
     {
+        if (!IsAnyTimerActive && _isTimerHovered)
+        {
+            _isTimerHovered = false;
+            CompactTimerBackgroundIcon.Visibility = Visibility.Visible;
+            CompactTimerControlsPanel.Visibility = Visibility.Collapsed;
+            CompactTimerLabel.Visibility = Visibility.Collapsed;
+            CompactLiveTimerCountdownText.FontSize = 16.0;
+        }
+        if (!IsVoiceRecordingActive && _isVoiceRecHovered)
+        {
+            _isVoiceRecHovered = false;
+            VoiceRecCircleButton.Visibility = Visibility.Collapsed;
+            VoiceRecordingWaveformScale.ScaleX = 1.0;
+            VoiceRecordingWaveformScale.ScaleY = 1.0;
+            CompactRecordingDurationText.FontSize = 16.5;
+        }
+        if (!_isAlarmActive && _isAlarmHovered)
+        {
+            _isAlarmHovered = false;
+            CompactAlarmTitleText.Visibility = Visibility.Collapsed;
+            AlarmSnoozeButton.Visibility = Visibility.Collapsed;
+        }
+
+        CompactView.Height = CurrentCompactHeight;
+
         if (_isExpanded)
         {
             SetWifiActivityAnimation(false);
@@ -3923,6 +4598,8 @@ public partial class MainWindow : Window
         // Recover from stale expanded/animation visibility state. A background
         // activity should always have a visible compact presentation when collapsed.
         CompactView.Visibility = Visibility.Visible;
+        ExpandedContainer.BeginAnimation(OpacityProperty, null);
+        ExpandedContainer.Opacity = 0.0;
         ExpandedContainer.Visibility = Visibility.Collapsed;
         if (HasActiveContent &&
             (IslandContainer.Visibility != Visibility.Visible || IslandContainer.Opacity < 0.99))
@@ -4002,7 +4679,7 @@ public partial class MainWindow : Window
         {
             CompactBluetoothView.Visibility = Visibility.Visible;
         }
-        else if (_isWifiAlertActive && (_isWifiConnected || _isHotspotActive))
+        else if (_isWifiAlertActive && IsWifiActivityActive)
         {
             CompactWifiView.Visibility = Visibility.Visible;
         }
@@ -4030,6 +4707,10 @@ public partial class MainWindow : Window
         {
             CompactMediaView.Visibility = Visibility.Visible;
         }
+        else if (IsWifiActivityActive)
+        {
+            CompactWifiView.Visibility = Visibility.Visible;
+        }
         else
         {
             // Empty notch / idle dock: all subviews remain collapsed
@@ -4041,7 +4722,10 @@ public partial class MainWindow : Window
 
         if (!_isExpanded)
         {
-            AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
+            if (!_isExpanded)
+            {
+                AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
+            }
         }
     }
 
@@ -4177,11 +4861,6 @@ public partial class MainWindow : Window
         {
             UpdateCompactViewVisibility();
         }
-
-        if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-        {
-            HideDockSmooth();
-        }
     }
 
     private void SimulateTestIncomingCall()
@@ -4212,7 +4891,7 @@ public partial class MainWindow : Window
 
     private void DetachedLeftContainer_MouseLeave(object sender, MouseEventArgs e)
     {
-        if (_isExpanded && !_isPinned && !_isDraggingSlider)
+        if (_isExpanded && !_isPinned && !_isDraggingSlider && !(_activeCategory == IslandCategory.IdleClockWeather && IdleWeatherSettingsPanel.Visibility == Visibility.Visible))
         {
             _autoCollapseTimer.Stop();
             _autoCollapseTimer.Start();
@@ -4231,7 +4910,7 @@ public partial class MainWindow : Window
 
     private void DetachedBubbleContainer_MouseLeave(object sender, MouseEventArgs e)
     {
-        if (_isExpanded && !_isPinned && !_isDraggingSlider)
+        if (_isExpanded && !_isPinned && !_isDraggingSlider && !(_activeCategory == IslandCategory.IdleClockWeather && IdleWeatherSettingsPanel.Visibility == Visibility.Visible))
         {
             _autoCollapseTimer.Stop();
             _autoCollapseTimer.Start();
@@ -4250,7 +4929,7 @@ public partial class MainWindow : Window
 
     private void DetachedSecondaryContainer_MouseLeave(object sender, MouseEventArgs e)
     {
-        if (_isExpanded && !_isPinned && !_isDraggingSlider)
+        if (_isExpanded && !_isPinned && !_isDraggingSlider && !(_activeCategory == IslandCategory.IdleClockWeather && IdleWeatherSettingsPanel.Visibility == Visibility.Visible))
         {
             _autoCollapseTimer.Stop();
             _autoCollapseTimer.Start();
@@ -4507,6 +5186,10 @@ public partial class MainWindow : Window
         VoiceMicDot.Visibility = micVis;
 
         // 4. Screen Recording View
+        ScreenRecPrivacyPanel.Visibility = anyVis;
+        ScreenRecCameraDot.Visibility = camVis;
+        ScreenRecMicDot.Visibility = micVis;
+
         // 5. Live Timer View
         TimerPrivacyPanel.Visibility = anyVis;
         TimerCameraDot.Visibility = camVis;
@@ -4537,16 +5220,15 @@ public partial class MainWindow : Window
         {
             var anim = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(180));
             PrivacyIndicatorPanel.BeginAnimation(OpacityProperty, anim);
-            if (_appStateTracker.CurrentState != ForegroundAppState.Normal && !HasActiveAlert && !IslandContainer.IsMouseOver)
-            {
-                HideDockSmooth();
-            }
         }
 
         // Animate dock width to smoothly expand/contract
         if (!_isExpanded)
         {
-            AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
+            if (!_isExpanded)
+            {
+                AnimateIsland(CurrentCompactWidth, CurrentCompactHeight);
+            }
         }
     }
 
@@ -4569,6 +5251,32 @@ public partial class MainWindow : Window
             {
                 _privacyService.ToggleMicrophoneSimulation();
                 e.Handled = true;
+            }
+            else if (e.Key == Key.S)
+            {
+                _screenRecordingService.ToggleManualTest();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.V)
+            {
+                _voiceRecordingService.SimulateToggle();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Space)
+            {
+                if (IsScreenRecordingActive)
+                {
+                    _screenRecordingService.TogglePauseResume();
+                    UpdateScreenRecPlayPauseIcon(_screenRecordingService.IsPaused);
+                    UpdateScreenRecPulseDot(_screenRecordingService.IsPaused);
+                    e.Handled = true;
+                }
+                else if (IsVoiceRecordingActive)
+                {
+                    _voiceRecordingService.TogglePauseResume();
+                    UpdateVoiceRecPlayPauseIcon(_voiceRecordingService.IsPaused);
+                    e.Handled = true;
+                }
             }
             else if (e.Key == Key.I)
             {

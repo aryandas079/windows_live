@@ -26,13 +26,16 @@
         <Setter Property="Width" Value="36" />
         <Setter Property="Height" Value="36" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="CircleBorder"
                             Background="{TemplateBinding Background}"
-                            CornerRadius="18"
-                            Width="36" Height="36">
+                            CornerRadius="999"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            RenderTransformOrigin="0.5,0.5">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -41,6 +44,11 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="CircleBorder" Property="Opacity" Value="0.6" />
+                            <Setter TargetName="CircleBorder" Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="0.92" ScaleY="0.92" />
+                                </Setter.Value>
+                            </Setter>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -58,6 +66,7 @@
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -66,7 +75,8 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="6"
-                            Padding="{TemplateBinding Padding}">
+                            Padding="{TemplateBinding Padding}"
+                            RenderTransformOrigin="0.5,0.5">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -77,7 +87,7 @@
                             <Setter TargetName="RootBorder" Property="Background" Value="{DynamicResource SubtleHoverBrush}" />
                             <Setter TargetName="RootBorder" Property="RenderTransform">
                                 <Setter.Value>
-                                    <ScaleTransform ScaleX="0.94" ScaleY="0.94" CenterX="14" CenterY="14" />
+                                    <ScaleTransform ScaleX="0.94" ScaleY="0.94" />
                                 </Setter.Value>
                             </Setter>
                         </Trigger>
@@ -94,13 +104,16 @@
         <Setter Property="Width" Value="44" />
         <Setter Property="Height" Value="44" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="CircleBorder"
                             Background="{TemplateBinding Background}"
-                            CornerRadius="22"
-                            Width="44" Height="44">
+                            CornerRadius="999"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            RenderTransformOrigin="0.5,0.5">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -116,7 +129,7 @@
                             <Setter TargetName="CircleBorder" Property="Opacity" Value="0.75" />
                             <Setter TargetName="CircleBorder" Property="RenderTransform">
                                 <Setter.Value>
-                                    <ScaleTransform ScaleX="0.92" ScaleY="0.92" CenterX="22" CenterY="22" />
+                                    <ScaleTransform ScaleX="0.92" ScaleY="0.92" />
                                 </Setter.Value>
                             </Setter>
                         </Trigger>

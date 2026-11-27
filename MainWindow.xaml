@@ -523,7 +523,10 @@
                 <Grid x:Name="CompactLiveTimerView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="6,0,16,0">
+                      Margin="10,0,10,0"
+                      Background="Transparent"
+                      MouseEnter="CompactLiveTimerView_MouseEnter"
+                      MouseLeave="CompactLiveTimerView_MouseLeave">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -532,16 +535,29 @@
 
                     <!-- Left: Control Buttons Group -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Small background state: stopwatch icon only. -->
+                        <Viewbox x:Name="CompactTimerBackgroundIcon" Width="22" Height="22" Margin="0,0,8,0" VerticalAlignment="Center">
+                            <Canvas Width="24" Height="24">
+                                <Ellipse Canvas.Left="4" Canvas.Top="5" Width="16" Height="16" Fill="#FF9418" />
+                                <Rectangle Canvas.Left="9" Canvas.Top="1" Width="6" Height="4" RadiusX="1.5" RadiusY="1.5" Fill="#FF9418" />
+                                <Line X1="16.8" Y1="5.4" X2="19.6" Y2="3.1" Stroke="#FF9418" StrokeThickness="2" StrokeStartLineCap="Round" />
+                                <Path Data="M 12,9 L 12,13 L 15.5,13" Stroke="#2B1700" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                            </Canvas>
+                        </Viewbox>
+
+                        <StackPanel x:Name="CompactTimerControlsPanel" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                         <!-- Amber Circular Pause / Resume Button -->
                         <Button x:Name="CompactTimerPauseBtn"
                                 Width="28" Height="28"
                                 Margin="0,0,6,0"
                                 Padding="0"
-                                Background="#382500"
-                                BorderBrush="#6B4800"
+                                Background="#26F59E0B"
+                                BorderBrush="#40F59E0B"
                                 BorderThickness="1"
                                 Cursor="Hand"
-                                Click="CompactTimerPauseBtn_Click">
+                                ToolTip="Pause / Resume Timer"
+                                Click="CompactTimerPauseBtn_Click"
+                                PreviewMouseDown="CompactTimerPauseBtn_PreviewMouseDown">
                             <Button.Style>
                                 <Style TargetType="Button">
                                     <Setter Property="Template">
@@ -556,10 +572,10 @@
                                                 </Border>
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="PBorder" Property="Background" Value="#4D3300" />
+                                                        <Setter TargetName="PBorder" Property="Background" Value="#4DF59E0B" />
                                                     </Trigger>
                                                     <Trigger Property="IsPressed" Value="True">
-                                                        <Setter TargetName="PBorder" Property="Background" Value="#291A00" />
+                                                        <Setter TargetName="PBorder" Property="Background" Value="#66F59E0B" />
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
@@ -567,23 +583,27 @@
                                     </Setter>
                                 </Style>
                             </Button.Style>
-                            <Canvas Width="10" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <!-- Amber Pause Bars (or Play Triangle) -->
-                                <Rectangle x:Name="CompactTimerPauseBar1" Width="3" Height="11" Canvas.Left="0" Canvas.Top="0.5" RadiusX="1" RadiusY="1" Fill="#F59E0B" />
-                                <Rectangle x:Name="CompactTimerPauseBar2" Width="3" Height="11" Canvas.Left="7" Canvas.Top="0.5" RadiusX="1" RadiusY="1" Fill="#F59E0B" />
-                                <Path x:Name="CompactTimerPlayTriangle" Data="M 1,0.5 L 9,6 L 1,11.5 Z" Fill="#F59E0B" Visibility="Collapsed" />
-                            </Canvas>
+                            <Viewbox x:Name="CompactTimerPauseGlyph" Width="10" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Canvas Width="10" Height="12">
+                                    <!-- Amber Pause Bars (or Play Triangle) -->
+                                    <Rectangle x:Name="CompactTimerPauseBar1" Width="3" Height="11" Canvas.Left="0" Canvas.Top="0.5" RadiusX="1" RadiusY="1" Fill="#F59E0B" />
+                                    <Rectangle x:Name="CompactTimerPauseBar2" Width="3" Height="11" Canvas.Left="7" Canvas.Top="0.5" RadiusX="1" RadiusY="1" Fill="#F59E0B" />
+                                    <Path x:Name="CompactTimerPlayTriangle" Data="M 1,0.5 L 9,6 L 1,11.5 Z" Fill="#F59E0B" Visibility="Collapsed" />
+                                </Canvas>
+                            </Viewbox>
                         </Button>
 
-                        <!-- Dark Circular Close / Cancel Button (X) -->
+                        <!-- Subtle Translucent Circular Close / Cancel Button (X) -->
                         <Button x:Name="CompactTimerCancelBtn"
                                 Width="28" Height="28"
                                 Padding="0"
-                                Background="#1A1A1E"
-                                BorderBrush="#2C2C30"
+                                Background="#26FFFFFF"
+                                BorderBrush="#20FFFFFF"
                                 BorderThickness="1"
                                 Cursor="Hand"
-                                Click="CompactTimerCancelBtn_Click">
+                                ToolTip="Cancel Timer"
+                                Click="CompactTimerCancelBtn_Click"
+                                PreviewMouseDown="CompactTimerCancelBtn_PreviewMouseDown">
                             <Button.Style>
                                 <Style TargetType="Button">
                                     <Setter Property="Template">
@@ -598,10 +618,10 @@
                                                 </Border>
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="CBorder" Property="Background" Value="#2A2A30" />
+                                                        <Setter TargetName="CBorder" Property="Background" Value="#40FFFFFF" />
                                                     </Trigger>
                                                     <Trigger Property="IsPressed" Value="True">
-                                                        <Setter TargetName="CBorder" Property="Background" Value="#101014" />
+                                                        <Setter TargetName="CBorder" Property="Background" Value="#66FFFFFF" />
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
@@ -609,12 +629,15 @@
                                     </Setter>
                                 </Style>
                             </Button.Style>
-                            <Canvas Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <!-- Clean Crisp White 'X' -->
-                                <Line X1="1" Y1="1" X2="9" Y2="9" Stroke="White" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                <Line X1="9" Y1="1" X2="1" Y2="9" Stroke="White" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                            </Canvas>
+                            <Viewbox x:Name="CompactTimerCancelGlyph" Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Canvas Width="10" Height="10">
+                                    <!-- Clean Crisp White 'X' -->
+                                    <Line X1="1" Y1="1" X2="9" Y2="9" Stroke="White" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                    <Line X1="9" Y1="1" X2="1" Y2="9" Stroke="White" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                </Canvas>
+                            </Viewbox>
                         </Button>
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- Center: Notch Space -->
@@ -627,11 +650,13 @@
                                 <Path Fill="#FF9F0A" Data="M 12.3,10.2 C 7.5,10.2 3.6,6.3 3.6,1.5 C 3.6,1.0 3.7,0.5 3.8,0 C 1.5,1.2 0,3.6 0,6.4 C 0,10.5 3.3,13.8 7.4,13.8 C 10.2,13.8 12.6,12.3 13.8,10.0 C 13.3,10.1 12.8,10.2 12.3,10.2 Z" />
                             </Canvas>
                         </Viewbox>
-                        <TextBlock Text="Timer "
+                        <TextBlock x:Name="CompactTimerLabel"
+                                   Text="Timer "
                                    FontSize="15"
                                    FontWeight="SemiBold"
                                    Foreground="#F59E0B"
-                                   VerticalAlignment="Center" />
+                                   VerticalAlignment="Center"
+                                   Visibility="Collapsed" />
                         <TextBlock x:Name="CompactLiveTimerCountdownText"
                                    Text="0:58"
                                    FontSize="18"
@@ -748,54 +773,44 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- 10. Live Call / Audio Call Pill (Matches User Uploaded Reference media_1794722326989_0583e504.png) -->
-                <!-- Left: Green Telephone Handset Icon (#30D158) + Call Duration in #30D158 -->
-                <!-- Center: Camera Notch Space -->
-                <!-- Right: Active Call Waveform Bars in #30D158 + Privacy Indicators -->
+                <!-- 10. Live Call / Voice Recording Pill (Matches User Uploaded References media_1795358153445_a216724d.png & media_1795358160957_d10c2751.png) -->
                 <Grid x:Name="CompactVoiceRecordingView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="12,0,12,0">
+                      Margin="10,0,10,0"
+                      MouseEnter="CompactVoiceRecordingView_MouseEnter"
+                      MouseLeave="CompactVoiceRecordingView_MouseLeave">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" MinWidth="12" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Call Icon (Green) or Sound Recording Icon (Red) + Duration Timer (e.g. 00:03) -->
+                    <!-- LEFT COLUMN -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <!-- Apple-style Call Telephone Handset Vector Icon in #30D158 (Visible only for calls) -->
+                        <!-- 1. Apple-style Call Telephone Handset Vector Icon in #30D158 (Visible only for calls) -->
                         <Viewbox x:Name="CompactCallIcon" Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,7,0" Visibility="Collapsed">
                             <Canvas Width="24" Height="24">
                                 <Path Fill="#30D158"
                                       Data="M 6.62,10.79 C 8.06,13.62 10.38,15.94 13.21,17.38 L 15.41,15.18 C 15.69,14.9 16.08,14.82 16.43,14.93 C 17.55,15.3 18.75,15.5 20,15.5 C 20.55,15.5 21,15.95 21,16.5 L 21,20 C 21,20.55 20.55,21 20,21 C 10.61,21 3,13.39 3,4 C 3,3.45 3.45,3 4,3 L 7.5,3 C 8.05,3 8.5,3.45 8.5,4 C 8.5,5.25 8.7,6.45 9.07,7.57 C 9.18,7.92 9.1,8.31 8.82,8.59 L 6.62,10.79 Z" />
                             </Canvas>
                         </Viewbox>
-
-                        <!-- Apple-style Voice / Sound Recording Microphone Vector Icon in #FF453A (Visible only for recording) -->
-                        <Viewbox x:Name="CompactRecordingMicIcon" Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,7,0" Visibility="Visible">
-                            <Canvas Width="24" Height="24">
-                                <Path Fill="#FF453A"
-                                      Data="M 12,14 C 13.66,14 15,12.66 15,11 L 15,5 C 15,3.34 13.66,2 12,2 C 10.34,2 9,3.34 9,5 L 9,11 C 9,12.66 10.34,14 12,14 Z M 19,10 C 19,13.53 16.39,16.44 13,16.93 L 13,20 L 16,20 C 16.55,20 17,20.45 17,21 C 17,21.55 16.55,22 16,22 L 8,22 C 7.45,22 7,21.55 7,21 C 7,20.45 7.45,20 8,20 L 11,20 L 11,16.93 C 7.61,16.44 5,13.53 5,10 C 5,9.45 5.45,9 6,9 C 6.55,9 7,9.45 7,10 C 7,12.76 9.24,15 12,15 C 14.76,15 17,12.76 17,10 C 17,9.45 17.45,9 18,9 C 18.55,9 19,9.45 19,10 Z" />
-                            </Canvas>
-                        </Viewbox>
-
-                        <TextBlock x:Name="CompactRecordingDurationText"
+                        <TextBlock x:Name="CompactCallDurationText"
                                    Text="00:00"
                                    FontSize="16.5"
                                    FontWeight="SemiBold"
-                                   Foreground="#FF453A"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
+                                   Foreground="#30D158"
+                                   VerticalAlignment="Center"
+                                   Visibility="Collapsed" />
 
-                    <!-- Center: Notch Space -->
-                    <Grid Grid.Column="1" />
-
-                    <!-- Right: Dynamic Live Audio Call Waveform Bars in #FF453A / #30D158 and Privacy Indicators -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- 2. Active Sound Recording (Image 2): Dynamic Red Waveform Bars on Left! -->
                         <StackPanel x:Name="RecordingWaveformBars"
                                     Orientation="Horizontal"
-                                    VerticalAlignment="Center">
+                                    VerticalAlignment="Center"
+                                    Visibility="Visible">
+                            <StackPanel.LayoutTransform>
+                                <ScaleTransform x:Name="VoiceRecordingWaveformScale" ScaleX="1" ScaleY="1" />
+                            </StackPanel.LayoutTransform>
                             <Border x:Name="RecBar1" Width="2.8" Height="4" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
                             <Border x:Name="RecBar2" Width="2.8" Height="8" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
                             <Border x:Name="RecBar3" Width="2.8" Height="14" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
@@ -811,6 +826,75 @@
                             <Border x:Name="RecBar13" Width="2.8" Height="4" CornerRadius="1.4" Background="#FF453A" VerticalAlignment="Center" />
                         </StackPanel>
 
+                        <!-- 3. Paused Sound Recording (Image 1): Flat Dotted Red Line on Left! -->
+                        <Line x:Name="VoiceRecDottedLine"
+                              X1="0" Y1="1" X2="70" Y2="1"
+                              Stroke="#FF453A"
+                              StrokeThickness="2.5"
+                              StrokeDashArray="0.6,2.2"
+                              StrokeDashCap="Round"
+                              VerticalAlignment="Center"
+                              Visibility="Collapsed" />
+                    </StackPanel>
+
+                    <!-- Center: Notch Space -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- RIGHT COLUMN -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Call Mode: Green waveform bars on the right -->
+                        <StackPanel x:Name="CallWaveformBars"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                            <Border Width="2.8" Height="4" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border Width="2.8" Height="10" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border Width="2.8" Height="15" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border Width="2.8" Height="8" CornerRadius="1.4" Background="#30D158" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                            <Border Width="2.8" Height="13" CornerRadius="1.4" Background="#30D158" VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <!-- Sound Recording Duration Timer (Red 00:05 in Image 2, 00:01 in Image 1) -->
+                        <TextBlock x:Name="CompactRecordingDurationText"
+                                   Text="00:00"
+                                   FontSize="16.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="#FF453A"
+                                   VerticalAlignment="Center" />
+
+                        <!-- Apple-style Circular Button with White Ring and Red Square (Image 1) -->
+                        <!-- Visible when paused, and on hover when active! -->
+                        <Border x:Name="VoiceRecCircleButton"
+                                Width="28" Height="28"
+                                Margin="8,0,0,0"
+                                CornerRadius="14"
+                                Background="#26FF453A"
+                                BorderBrush="White"
+                                BorderThickness="1.8"
+                                Cursor="Hand"
+                                ToolTip="Pause / Resume Recording"
+                                Visibility="Collapsed"
+                                MouseDown="VoiceRecCircleButton_MouseDown"
+                                VerticalAlignment="Center">
+                            <!-- Inside: Red Rounded Square (Image 1) or Pause Bars -->
+                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Border x:Name="VoiceRecButtonInnerSquare"
+                                        Width="10" Height="10"
+                                        CornerRadius="2"
+                                        Background="#FF453A"
+                                        Visibility="Visible" />
+                                <StackPanel x:Name="VoiceRecButtonPauseBars"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Center"
+                                            Visibility="Collapsed">
+                                    <Border Width="2.5" Height="10" CornerRadius="1" Background="#FF453A" Margin="0,0,3,0" />
+                                    <Border Width="2.5" Height="10" CornerRadius="1" Background="#FF453A" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Privacy Indicators -->
                         <StackPanel x:Name="VoicePrivacyPanel"
                                     Orientation="Horizontal"
                                     VerticalAlignment="Center"
@@ -919,18 +1003,125 @@
                 <Grid x:Name="CompactScreenRecordingView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="0">
-                    <Ellipse x:Name="ScreenRecPulseDot"
-                             Width="9" Height="9"
-                             Fill="#FF453A"
-                             HorizontalAlignment="Center"
-                             VerticalAlignment="Center" />
-                    <controls:WifiNetworkGlyph x:Name="ScreenRecordingWifiStatusGlyph"
-                                               Width="16" Height="16"
-                                               HorizontalAlignment="Right"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,12,0"
-                                               Visibility="Collapsed" />
+                      Margin="12,0,12,0"
+                      MouseEnter="CompactScreenRecordingView_MouseEnter"
+                      MouseLeave="CompactScreenRecordingView_MouseLeave">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Red Pulsing/Steady Recording Dot + Duration Timer (00:00) -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse x:Name="ScreenRecPulseDot"
+                                 Width="9" Height="9"
+                                 Fill="#FF453A"
+                                 Margin="0,0,7,0"
+                                 VerticalAlignment="Center">
+                            <Ellipse.Effect>
+                                <DropShadowEffect Color="#FF453A" BlurRadius="6" ShadowDepth="0" Opacity="0.8" />
+                            </Ellipse.Effect>
+                        </Ellipse>
+                        <TextBlock x:Name="CompactScreenRecordingDurationText"
+                                   Text="00:00"
+                                   FontSize="16.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="#FF453A"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Center: Notch Space -->
+                    <Grid Grid.Column="1" />
+
+                    <!-- Right: Live Sound Waveform Indicator OR Hover Play/Pause Button + Privacy Indicators -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Grid VerticalAlignment="Center">
+                            <!-- Dynamic Live Sound Waveform Bars (in Red #FF453A) -->
+                            <StackPanel x:Name="ScreenRecWaveformBars"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        Visibility="Visible">
+                                <Border x:Name="ScreenRecBar1" Width="2.8" Height="4" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                                <Border x:Name="ScreenRecBar2" Width="2.8" Height="8" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                                <Border x:Name="ScreenRecBar3" Width="2.8" Height="14" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                                <Border x:Name="ScreenRecBar4" Width="2.8" Height="12" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                                <Border x:Name="ScreenRecBar5" Width="2.8" Height="6" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                                <Border x:Name="ScreenRecBar6" Width="2.8" Height="13" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                                <Border x:Name="ScreenRecBar7" Width="2.8" Height="16" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                                <Border x:Name="ScreenRecBar8" Width="2.8" Height="10" CornerRadius="1.4" Background="#FF453A" Margin="0,0,2.2,0" VerticalAlignment="Center" />
+                                <Border x:Name="ScreenRecBar9" Width="2.8" Height="4" CornerRadius="1.4" Background="#FF453A" VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <!-- Paused Flat Dotted Red Line for Screen Recording -->
+                            <Line x:Name="ScreenRecDottedLine"
+                                  X1="0" Y1="1" X2="50" Y2="1"
+                                  Stroke="#FF453A"
+                                  StrokeThickness="2.5"
+                                  StrokeDashArray="0.6,2.2"
+                                  StrokeDashCap="Round"
+                                  VerticalAlignment="Center"
+                                  Visibility="Collapsed" />
+
+                            <!-- Hover Play/Pause Capsule Button -->
+                            <Border x:Name="ScreenRecPlayPauseButton"
+                                    Width="26" Height="24"
+                                    CornerRadius="12"
+                                    Background="#2AFFFFFF"
+                                    BorderBrush="#20FFFFFF"
+                                    BorderThickness="1"
+                                    Cursor="Hand"
+                                    ToolTip="Pause / Resume Screen Recording"
+                                    Visibility="Collapsed"
+                                    MouseDown="ScreenRecPlayPauseButton_MouseDown"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Center">
+                                <Viewbox Width="11" Height="11" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Canvas Width="24" Height="24">
+                                        <Path x:Name="ScreenRecPlayPauseIcon"
+                                              Fill="White"
+                                              Data="M 6,19 L 10,19 L 10,5 L 6,5 L 6,19 Z M 14,5 L 14,19 L 18,19 L 18,5 L 14,5 Z" />
+                                    </Canvas>
+                                </Viewbox>
+                            </Border>
+                        </Grid>
+
+                        <!-- Privacy Indicators (Green Camera, Orange Microphone) -->
+                        <StackPanel x:Name="ScreenRecPrivacyPanel"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="8,0,0,0"
+                                    Visibility="Collapsed">
+                            <Border x:Name="ScreenRecCameraDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#30D158"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="ScreenRecMicDot"
+                                    Width="7.5" Height="7.5"
+                                    CornerRadius="3.75"
+                                    Background="#FF9F0A"
+                                    Margin="2,0,2,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                                </Border.Effect>
+                            </Border>
+                        </StackPanel>
+
+                        <controls:WifiNetworkGlyph x:Name="ScreenRecordingWifiStatusGlyph"
+                                                   Width="16" Height="16"
+                                                   Margin="6,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="Collapsed" />
+                    </StackPanel>
                 </Grid>
 
                 <!-- 12. Night Mode Alert Mode (Orange Crescent Moon) -->
@@ -1024,12 +1215,19 @@
                 <Grid x:Name="CompactAlarmView"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"
-                      Margin="8,0,8,0"
-                      Cursor="Hand"
-                      MouseDown="CompactAlarmView_MouseDown">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      Margin="10,0,10,0"
+                      Background="Transparent"
+                      MouseEnter="CompactAlarmView_MouseEnter"
+                      MouseLeave="CompactAlarmView_MouseLeave">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- Custom Vector Orange Alarm Clock with black hands -->
-                        <Viewbox Width="24" Height="24" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                        <Viewbox x:Name="CompactAlarmIconViewbox" Width="22" Height="22" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
                             <Viewbox.RenderTransform>
                                 <RotateTransform x:Name="AlarmIconRotate" Angle="0" />
                             </Viewbox.RenderTransform>
@@ -1053,11 +1251,47 @@
                         <!-- "Alarm" Title Text in Vibrant Apple Orange (#FFA000) -->
                         <TextBlock x:Name="CompactAlarmTitleText"
                                    Text="Alarm"
-                                   FontSize="15"
+                                   FontSize="14.5"
                                    FontWeight="SemiBold"
                                    Foreground="#FFA000"
                                    VerticalAlignment="Center"
-                                   Margin="8,0,0,0" />
+                                   Margin="9,0,0,0"
+                                   Visibility="Visible" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Clean Snooze control (Zz) -->
+                        <Border x:Name="AlarmSnoozeButton"
+                                Width="28" Height="28"
+                                CornerRadius="14"
+                                Background="#26FFA000"
+                                BorderBrush="#40FFA000"
+                                BorderThickness="1"
+                                Margin="0,0,6,0"
+                                Cursor="Hand"
+                                ToolTip="Snooze (9 min)"
+                                Visibility="Visible"
+                                MouseDown="AlarmSnoozeButton_MouseDown">
+                            <TextBlock Text="Zz" Foreground="#FFA000" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+
+                        <!-- Clean Dismiss control (X) -->
+                        <Border x:Name="AlarmDismissButton"
+                                Width="28" Height="28"
+                                CornerRadius="14"
+                                Background="#26FFFFFF"
+                                BorderBrush="#20FFFFFF"
+                                BorderThickness="1"
+                                Cursor="Hand"
+                                ToolTip="Dismiss"
+                                MouseDown="AlarmDismissButton_MouseDown">
+                            <Viewbox x:Name="AlarmDismissGlyph" Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Canvas Width="20" Height="20">
+                                    <Line X1="3" Y1="3" X2="17" Y2="17" Stroke="White" StrokeThickness="2.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                    <Line X1="17" Y1="3" X2="3" Y2="17" Stroke="White" StrokeThickness="2.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                </Canvas>
+                            </Viewbox>
+                        </Border>
                     </StackPanel>
                 </Grid>
 
@@ -1166,7 +1400,7 @@
             <Grid x:Name="ExpandedContainer"
                   Opacity="0.0"
                   Visibility="Collapsed"
-                  Margin="22,10,22,10"
+                  Margin="20,12,20,12"
                   ClipToBounds="True"
                   VerticalAlignment="Center">
                 <Grid.RowDefinitions>
@@ -1179,7 +1413,7 @@
                     <!-- ============================================== -->
                     <!-- 1. MEDIA PLAYBACK VIEW (Matches Image 1)       -->
                     <!-- ============================================== -->
-                    <Grid x:Name="ViewMediaPlayback" Visibility="Visible" VerticalAlignment="Center">
+                    <Grid x:Name="ViewMediaPlayback" Visibility="Collapsed" VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -1563,9 +1797,186 @@
                             <TextBlock x:Name="RecordingDurationSubtext" Text="00:00 recorded" FontSize="12" Foreground="#FF453A" Margin="0,3,0,0" />
                         </StackPanel>
 
-                        <Border Grid.Column="2" Background="#22FF453A" CornerRadius="12" Padding="10,4,10,4" VerticalAlignment="Center">
-                            <TextBlock Text="RECORDING" FontSize="11" FontWeight="Bold" Foreground="#FF453A" />
-                        </Border>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="ExpandedVoiceRecToggleBtn" Content="Pause" Style="{StaticResource WinUI3IconButton}" Background="{DynamicResource SubtleHoverBrush}" Padding="12,5,12,5" Margin="0,0,6,0" Click="ExpandedVoiceRecToggleBtn_Click" />
+                            <Button x:Name="ExpandedVoiceRecStopBtn" Content="Stop" Style="{StaticResource WinUI3IconButton}" Background="#33FF453A" Foreground="#FF453A" Padding="12,5,12,5" Click="ExpandedVoiceRecStopBtn_Click" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- ============================================== -->
+                    <!-- 10.2. MULTI-OPERATIONS EXPANDED VIEW            -->
+                    <!-- Displays all ongoing background operations on hover -->
+                    <!-- ============================================== -->
+                    <Grid x:Name="ViewMultiOperations" Visibility="Collapsed" VerticalAlignment="Center" Margin="2,2,2,2">
+                        <StackPanel Orientation="Vertical">
+                            <!-- Row 1: Media Player Row -->
+                            <Grid x:Name="MultiOpMediaRow" Margin="0,3,0,3" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0"
+                                        Width="38" Height="38"
+                                        CornerRadius="9"
+                                        Background="{DynamicResource CardBackgroundBrush}"
+                                        BorderBrush="{DynamicResource SurfaceBorderBrush}"
+                                        BorderThickness="1"
+                                        ClipToBounds="True"
+                                        Margin="0,0,12,0"
+                                        VerticalAlignment="Center">
+                                    <Grid>
+                                        <Rectangle x:Name="MultiOpAlbumOrb" Fill="{DynamicResource AccentColorBrush}" />
+                                        <Image x:Name="MultiOpAlbumImage" Stretch="UniformToFill" Visibility="Collapsed" />
+                                        <ui:SymbolIcon x:Name="MultiOpAlbumSymbol" Symbol="MusicNote224" FontSize="16" Foreground="{DynamicResource PlayButtonForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock x:Name="MultiOpMediaTitle"
+                                               Text="Track Title"
+                                               FontSize="13.5"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock x:Name="MultiOpMediaArtist"
+                                               Text="Artist"
+                                               FontSize="11.5"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Style="{StaticResource WinUI3CircularSubtleButton}"
+                                            Width="30" Height="30"
+                                            ToolTip="Previous"
+                                            Margin="0,0,6,0"
+                                            Click="PreviousButton_Click">
+                                        <ui:SymbolIcon Symbol="Previous24" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    </Button>
+                                    <Button x:Name="MultiOpPlayPauseBtn"
+                                            Style="{StaticResource WinUI3PlayButton}"
+                                            Width="34" Height="34"
+                                            ToolTip="Play / Pause"
+                                            Margin="0,0,6,0"
+                                            Click="PlayPauseButton_Click">
+                                        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <ui:SymbolIcon x:Name="MultiOpPlayGlyph" Symbol="Play24" FontSize="13" Foreground="{DynamicResource PlayButtonForegroundBrush}" Visibility="Collapsed" />
+                                            <ui:SymbolIcon x:Name="MultiOpPauseGlyph" Symbol="Pause24" FontSize="13" Foreground="{DynamicResource PlayButtonForegroundBrush}" Visibility="Visible" />
+                                        </Grid>
+                                    </Button>
+                                    <Button Style="{StaticResource WinUI3CircularSubtleButton}"
+                                            Width="30" Height="30"
+                                            ToolTip="Next"
+                                            Click="NextButton_Click">
+                                        <ui:SymbolIcon Symbol="Next24" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Subtle Divider 1 -->
+                            <Rectangle x:Name="MultiOpDivider1" Height="1" Fill="#1FFFFFFF" Margin="0,4,0,4" Visibility="Collapsed" />
+
+                            <!-- Row 2: Timer Row -->
+                            <Grid x:Name="MultiOpTimerRow" Margin="0,3,0,3" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" Width="38" Height="38" CornerRadius="19" Background="#22FF9418" BorderBrush="#44FF9418" BorderThickness="1.5" Margin="0,0,12,0" VerticalAlignment="Center">
+                                    <ui:SymbolIcon Symbol="Timer24" FontSize="18" Foreground="#FF9418" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock x:Name="MultiOpTimerTitle"
+                                               Text="Timer"
+                                               FontSize="13.5"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock x:Name="MultiOpTimerCountdown"
+                                               Text="0:00 remaining"
+                                               FontSize="11.5"
+                                               Foreground="#FF9418"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="MultiOpTimerToggleBtn"
+                                            Content="Pause"
+                                            Style="{StaticResource WinUI3IconButton}"
+                                            Background="{DynamicResource SubtleHoverBrush}"
+                                            Padding="10,4,10,4"
+                                            FontSize="12"
+                                            FontWeight="SemiBold"
+                                            Margin="0,0,6,0"
+                                            Click="MultiOpTimerToggleBtn_Click" />
+                                    <Button x:Name="MultiOpTimerCancelBtn"
+                                            Content="Cancel"
+                                            Style="{StaticResource WinUI3IconButton}"
+                                            Background="{DynamicResource SubtleHoverBrush}"
+                                            Padding="10,4,10,4"
+                                            FontSize="12"
+                                            FontWeight="SemiBold"
+                                            Click="CompactTimerCancelBtn_Click" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Subtle Divider 2 -->
+                            <Rectangle x:Name="MultiOpDivider2" Height="1" Fill="#1FFFFFFF" Margin="0,4,0,4" Visibility="Collapsed" />
+
+                            <!-- Row 3: Recording Row (Voice or Screen) -->
+                            <Grid x:Name="MultiOpRecordingRow" Margin="0,3,0,3" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" Width="38" Height="38" CornerRadius="19" Background="#22FF453A" BorderBrush="#44FF453A" BorderThickness="1.5" Margin="0,0,12,0" VerticalAlignment="Center">
+                                    <ui:SymbolIcon Symbol="Record24" FontSize="18" Foreground="#FF453A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock x:Name="MultiOpRecordingTitle"
+                                               Text="Voice Recording"
+                                               FontSize="13.5"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock x:Name="MultiOpRecordingDuration"
+                                               Text="00:00 recorded"
+                                               FontSize="11.5"
+                                               Foreground="#FF453A"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="MultiOpRecordingToggleBtn"
+                                            Content="Pause"
+                                            Style="{StaticResource WinUI3IconButton}"
+                                            Background="{DynamicResource SubtleHoverBrush}"
+                                            Padding="10,4,10,4"
+                                            FontSize="12"
+                                            FontWeight="SemiBold"
+                                            Margin="0,0,6,0"
+                                            Click="ExpandedVoiceRecToggleBtn_Click" />
+                                    <Button x:Name="MultiOpRecordingStopBtn"
+                                            Content="Stop"
+                                            Style="{StaticResource WinUI3IconButton}"
+                                            Background="#33FF453A"
+                                            Foreground="#FF453A"
+                                            Padding="10,4,10,4"
+                                            FontSize="12"
+                                            FontWeight="SemiBold"
+                                            Click="ExpandedVoiceRecStopBtn_Click" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
                     </Grid>
 
                     <!-- ============================================== -->
@@ -1884,40 +2295,240 @@
                         </Grid>
                     </Grid>
 
+                    <!-- ============================================== -->
+                    <!-- 14. IDLE CLOCK, DATE & WEATHER CARD (Ultra-Clean & Minimal) -->
+                    <!-- ============================================== -->
+                    <Grid x:Name="ViewIdleClockWeather"
+                          Visibility="Collapsed"
+                          VerticalAlignment="Center"
+                          HorizontalAlignment="Stretch"
+                          Height="74">
+
+                        <!-- Panel 1: Live Clock, Date & Weather Display -->
+                        <Grid x:Name="IdleWeatherMainPanel" Visibility="Visible" Margin="14,0,14,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Left: Time & Date -->
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                                    <TextBlock x:Name="IdleClockTimeText"
+                                               Text="5:02"
+                                               FontSize="25"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               VerticalAlignment="Bottom" />
+                                    <TextBlock x:Name="IdleClockAmPmText"
+                                               Text="PM"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Opacity="0.75"
+                                               Margin="4,0,0,3.5"
+                                               VerticalAlignment="Bottom" />
+                                </StackPanel>
+                                <TextBlock x:Name="IdleClockDateText"
+                                           Text="Sunday, November 22"
+                                           FontSize="12"
+                                           FontWeight="Normal"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Opacity="0.85"
+                                           Margin="1,2,0,0" />
+                            </StackPanel>
+
+                            <!-- Right: Weather & Gear Icon -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Weather Info (Clicking toggles °C / °F) -->
+                                <Border Cursor="Hand"
+                                        ToolTip="Click to toggle °C / °F"
+                                        Background="Transparent"
+                                        MouseDown="WeatherTempToggle_MouseDown"
+                                        VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <!-- Weather Icon -->
+                                        <Viewbox x:Name="IdleWeatherIconViewbox" Width="28" Height="28" Margin="0,0,8,0" VerticalAlignment="Center">
+                                            <Canvas x:Name="IdleWeatherIconCanvas" Width="24" Height="24">
+                                                <Path x:Name="IdleWeatherIconPath"
+                                                      Fill="#5E5CE6"
+                                                      Data="M 12.3,10.2 C 7.5,10.2 3.6,6.3 3.6,1.5 C 3.6,1.0 3.7,0.5 3.8,0 C 1.5,1.2 0,3.6 0,6.4 C 0,10.5 3.3,13.8 7.4,13.8 C 10.2,13.8 12.6,12.3 13.8,10.0 C 13.3,10.1 12.8,10.2 12.3,10.2 Z" />
+                                            </Canvas>
+                                        </Viewbox>
+
+                                        <!-- Temp & City/Condition -->
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock x:Name="IdleWeatherTempText"
+                                                       Text="25°"
+                                                       FontSize="22"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,1,0,0">
+                                                <TextBlock x:Name="IdleWeatherLocationText"
+                                                           Text="Silchar"
+                                                           FontSize="11.5"
+                                                           FontWeight="Medium"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Opacity="0.85"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Text=" • "
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Opacity="0.5"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock x:Name="IdleWeatherConditionText"
+                                                           Text="Clear"
+                                                           FontSize="11.5"
+                                                           FontWeight="Normal"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Opacity="0.85"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Minimal Subtle Gear Button -->
+                                <Border x:Name="IdleWeatherGearButton"
+                                        Width="28" Height="28"
+                                        CornerRadius="14"
+                                        Background="#10FFFFFF"
+                                        Cursor="Hand"
+                                        ToolTip="Change Location"
+                                        VerticalAlignment="Center"
+                                        MouseDown="IdleWeatherGearButton_MouseDown">
+                                    <ui:SymbolIcon Symbol="Settings24"
+                                                   FontSize="14"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Opacity="0.75"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Panel 2: Ultra-Clean Location Edit Capsule -->
+                        <Grid x:Name="IdleWeatherSettingsPanel" Visibility="Collapsed" VerticalAlignment="Center" Margin="14,0,14,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Modern Search Pill -->
+                            <Border Grid.Column="0"
+                                    Height="34"
+                                    CornerRadius="17"
+                                    Background="#1CFFFFFF"
+                                    BorderBrush="#25FFFFFF"
+                                    BorderThickness="1"
+                                    Padding="10,0,6,0">
+                                <Grid VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <ui:SymbolIcon Grid.Column="0" Symbol="Search24" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+
+                                    <TextBox x:Name="WeatherLocationInput"
+                                             Grid.Column="1"
+                                             Height="30"
+                                             VerticalContentAlignment="Center"
+                                             FontSize="13"
+                                             FontWeight="Normal"
+                                             Foreground="{DynamicResource TextPrimaryBrush}"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                             KeyDown="WeatherLocationInput_KeyDown"
+                                             PreviewMouseDown="WeatherLocationInput_PreviewMouseDown" />
+
+                                    <!-- Auto-detect GPS button inside the search pill -->
+                                    <Border x:Name="WeatherAutoDetectButton"
+                                            Grid.Column="2"
+                                            Width="24" Height="24"
+                                            CornerRadius="12"
+                                            Background="Transparent"
+                                            Cursor="Hand"
+                                            ToolTip="Auto-detect current location"
+                                            VerticalAlignment="Center"
+                                            MouseDown="WeatherAutoDetectButton_MouseDown">
+                                        <ui:SymbolIcon Symbol="Location24" FontSize="12" Foreground="#30D158" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Save Button: Sleek Pill -->
+                            <Border x:Name="WeatherSaveButton"
+                                    Grid.Column="1"
+                                    Height="34"
+                                    Padding="14,0,14,0"
+                                    CornerRadius="17"
+                                    Background="#0A84FF"
+                                    Cursor="Hand"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    ToolTip="Save location (Enter)"
+                                    MouseDown="WeatherSaveButton_MouseDown">
+                                <TextBlock Text="Save" FontSize="12.5" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                            </Border>
+
+                            <!-- Cancel Button: Sleek Circle -->
+                            <Border x:Name="WeatherSettingsBackButton"
+                                    Grid.Column="2"
+                                    Width="34" Height="34"
+                                    CornerRadius="17"
+                                    Background="#14FFFFFF"
+                                    BorderBrush="#18FFFFFF"
+                                    BorderThickness="1"
+                                    Cursor="Hand"
+                                    ToolTip="Cancel (Esc)"
+                                    Margin="6,0,0,0"
+                                    VerticalAlignment="Center"
+                                    MouseDown="WeatherSettingsBackButton_MouseDown">
+                                <ui:SymbolIcon Symbol="Dismiss24" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
+                    </Grid>
+
                 </Grid>
+
+                <!-- Privacy Indicator Lights (Camera = Green, Microphone = Orange) in the Notch -->
+                <StackPanel x:Name="PrivacyIndicatorPanel"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,14,0"
+                            Panel.ZIndex="100"
+                            IsHitTestVisible="False"
+                            Visibility="Collapsed"
+                            Opacity="0.0">
+                    <!-- Camera Green Dot -->
+                    <Ellipse x:Name="CameraPrivacyDot"
+                             Width="7.5" Height="7.5"
+                             Fill="#30D158"
+                             Margin="2.5,0,2.5,0"
+                             Visibility="Collapsed">
+                        <Ellipse.Effect>
+                            <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                        </Ellipse.Effect>
+                    </Ellipse>
+
+                    <!-- Microphone Orange Dot -->
+                    <Ellipse x:Name="MicPrivacyDot"
+                             Width="7.5" Height="7.5"
+                             Fill="#FF9F0A"
+                             Margin="2.5,0,2.5,0"
+                             Visibility="Collapsed">
+                        <Ellipse.Effect>
+                            <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
+                        </Ellipse.Effect>
+                    </Ellipse>
+                </StackPanel>
             </Grid>
-
-            <!-- Privacy Indicator Lights (Camera = Green, Microphone = Orange) in the Notch -->
-            <StackPanel x:Name="PrivacyIndicatorPanel"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Center"
-                        Margin="0,0,16,0"
-                        IsHitTestVisible="False"
-                        Visibility="Collapsed"
-                        Opacity="0.0">
-                <!-- Camera Green Dot -->
-                <Ellipse x:Name="CameraPrivacyDot"
-                         Width="7.5" Height="7.5"
-                         Fill="#30D158"
-                         Margin="3,0,3,0"
-                         Visibility="Collapsed">
-                    <Ellipse.Effect>
-                        <DropShadowEffect Color="#30D158" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
-                    </Ellipse.Effect>
-                </Ellipse>
-
-                <!-- Microphone Orange Dot -->
-                <Ellipse x:Name="MicPrivacyDot"
-                         Width="7.5" Height="7.5"
-                         Fill="#FF9F0A"
-                         Margin="3,0,3,0"
-                         Visibility="Collapsed">
-                    <Ellipse.Effect>
-                        <DropShadowEffect Color="#FF9F0A" BlurRadius="6" ShadowDepth="0" Opacity="0.95" />
-                    </Ellipse.Effect>
-                </Ellipse>
-            </StackPanel>
 
             <!-- ========================================================================================= -->
             <!-- DRAG & DROP OPEN CLIPBOARD OVERLAY                                                        -->

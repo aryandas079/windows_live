@@ -11,6 +11,7 @@ namespace WindowsLive.Services;
 public class ScreenRecordingInfo
 {
     public bool IsRecording { get; set; }
+    public bool IsPaused { get; set; }
     public TimeSpan Duration { get; set; }
     public string AppName { get; set; } = "Screen Recording";
 }
@@ -21,14 +22,24 @@ public class ScreenRecordingService
 
     private readonly DispatcherTimer _pollTimer;
     private DateTime _recordingStartTime = DateTime.MinValue;
+    private DateTime _lastActiveResumeTime = DateTime.MinValue;
+    private TimeSpan _accumulatedDuration = TimeSpan.Zero;
     private bool _isRecording = false;
+    private bool _isPaused = false;
     private string _activeAppName = "Screen Recording";
     private bool _manualTestActive = false;
 
     public bool IsRecording => _isRecording || _manualTestActive;
-    public TimeSpan CurrentDuration => (_isRecording || _manualTestActive)
-        ? (DateTime.Now - _recordingStartTime)
-        : TimeSpan.Zero;
+    public bool IsPaused => _isPaused;
+    public TimeSpan CurrentDuration
+    {
+        get
+        {
+            if (!_isRecording && !_manualTestActive) return TimeSpan.Zero;
+            if (_isPaused) return _accumulatedDuration;
+            return _accumulatedDuration + (DateTime.Now - _lastActiveResumeTime);
+        }
+    }
     public string ActiveAppName => _activeAppName;
 
     private readonly string _snippingToolTempDir;
@@ -80,9 +91,98 @@ public class ScreenRecordingService
         if (_manualTestActive)
         {
             _recordingStartTime = DateTime.Now;
+            _lastActiveResumeTime = DateTime.Now;
+            _accumulatedDuration = TimeSpan.Zero;
+            _isPaused = false;
             _activeAppName = "Screen Recording";
         }
+        else
+        {
+            _accumulatedDuration = TimeSpan.Zero;
+            _isPaused = false;
+        }
         PollScreenRecording();
+    }
+
+    public void TogglePauseResume()
+    {
+        if (!IsRecording) return;
+        SetPaused(!_isPaused);
+        SendToggleToScreenRecorder();
+    }
+
+    private void SendToggleToScreenRecorder()
+    {
+        try
+        {
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    var procs = Process.GetProcessesByName("SnippingTool");
+                    if (procs.Length > 0)
+                    {
+                        int pid = procs[0].Id;
+                        var condPid = new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.ProcessIdProperty, pid);
+                        var elements = System.Windows.Automation.AutomationElement.RootElement.FindAll(System.Windows.Automation.TreeScope.Subtree, condPid);
+                        foreach (System.Windows.Automation.AutomationElement el in elements)
+                        {
+                            try
+                            {
+                                string name = el.Current.Name ?? string.Empty;
+                                string autoId = el.Current.AutomationId ?? string.Empty;
+                                if (name.IndexOf("Pause", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    name.IndexOf("Resume", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    autoId.IndexOf("Pause", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    autoId.IndexOf("Resume", StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    if (el.TryGetCurrentPattern(System.Windows.Automation.InvokePattern.Pattern, out object patternObj) &&
+                                        patternObj is System.Windows.Automation.InvokePattern inv)
+                                    {
+                                        inv.Invoke();
+                                        App.Log($"ScreenRecordingService: UI Automation invoked button '{name}'/'{autoId}'");
+                                        break;
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.Log($"ScreenRecordingService UI Automation error: {ex.Message}");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            App.Log($"SendToggleToScreenRecorder error: {ex.Message}");
+        }
+    }
+
+    public void SetPaused(bool paused)
+    {
+        if (_isPaused == paused) return;
+        _isPaused = paused;
+        if (_isPaused)
+        {
+            _accumulatedDuration += DateTime.Now - _lastActiveResumeTime;
+            App.Log($"ScreenRecordingService PAUSED. Duration frozen at {_accumulatedDuration.TotalSeconds:F1}s");
+        }
+        else
+        {
+            _lastActiveResumeTime = DateTime.Now;
+            App.Log("ScreenRecordingService RESUMED");
+        }
+
+        RecordingStateChanged?.Invoke(new ScreenRecordingInfo
+        {
+            IsRecording = IsRecording,
+            IsPaused = _isPaused,
+            Duration = CurrentDuration,
+            AppName = _activeAppName
+        });
     }
 
     public void StopActiveRecording()
@@ -139,17 +239,18 @@ public class ScreenRecordingService
         {
             if (_manualTestActive)
             {
-                TimeSpan duration = DateTime.Now - _recordingStartTime;
                 RecordingStateChanged?.Invoke(new ScreenRecordingInfo
                 {
                     IsRecording = true,
-                    Duration = duration,
+                    IsPaused = _isPaused,
+                    Duration = CurrentDuration,
                     AppName = _activeAppName
                 });
                 return;
             }
 
             bool isRecordingDetected = false;
+            bool isDetectedPaused = false;
             string detectedAppName = "Screen Recording";
 
             // 1. Check Windows 11 Snipping Tool active recording
@@ -168,25 +269,28 @@ public class ScreenRecordingService
                     foreach (var file in recentFiles)
                     {
                         double ageSec = (DateTime.Now - file.LastWriteTime).TotalSeconds;
-                        // File must have been touched within 2.5 seconds
-                        if (ageSec < 2.5)
+                        // File must have been touched recently or be locked by recording process
+                        if (ageSec < 2.5 || IsFileLocked(file.FullName))
                         {
                             long currLen = file.Length;
                             if (file.FullName == _lastSnippingFile)
                             {
                                 if (currLen > _lastSnippingSize)
                                 {
-                                    // File is actively growing in size: guaranteed active recording!
+                                    // File is actively growing in size: active, running recording!
                                     _lastSnippingSize = currLen;
                                     _lastSnippingTime = DateTime.Now;
                                     isRecordingDetected = true;
+                                    isDetectedPaused = false;
                                     detectedAppName = "Snipping Tool";
                                     break;
                                 }
-                                else if ((DateTime.Now - _lastSnippingTime).TotalSeconds < 2.5 && IsFileLocked(file.FullName))
+                                else if (IsFileLocked(file.FullName))
                                 {
-                                    // Grace period between write flushes
+                                    // Locked without growth for >= 2.0s indicates paused recording
+                                    double noGrowth = (DateTime.Now - _lastSnippingTime).TotalSeconds;
                                     isRecordingDetected = true;
+                                    isDetectedPaused = noGrowth >= 2.0;
                                     detectedAppName = "Snipping Tool";
                                     break;
                                 }
@@ -199,6 +303,7 @@ public class ScreenRecordingService
                                 if (IsFileLocked(file.FullName))
                                 {
                                     isRecordingDetected = true;
+                                    isDetectedPaused = false;
                                     detectedAppName = "Snipping Tool";
                                     break;
                                 }
@@ -224,7 +329,7 @@ public class ScreenRecordingService
                     foreach (var file in recentFiles)
                     {
                         double ageSec = (DateTime.Now - file.LastWriteTime).TotalSeconds;
-                        if (ageSec < 2.5 && IsFileLocked(file.FullName))
+                        if ((ageSec < 2.5 || IsFileLocked(file.FullName)) && IsFileLocked(file.FullName))
                         {
                             long currLen = file.Length;
                             if (file.FullName == _lastCapturesFile)
@@ -234,12 +339,15 @@ public class ScreenRecordingService
                                     _lastCapturesSize = currLen;
                                     _lastCapturesTime = DateTime.Now;
                                     isRecordingDetected = true;
+                                    isDetectedPaused = false;
                                     detectedAppName = "Xbox Game Bar";
                                     break;
                                 }
-                                else if ((DateTime.Now - _lastCapturesTime).TotalSeconds < 2.5)
+                                else
                                 {
+                                    double noGrowth = (DateTime.Now - _lastCapturesTime).TotalSeconds;
                                     isRecordingDetected = true;
+                                    isDetectedPaused = noGrowth >= 2.0;
                                     detectedAppName = "Xbox Game Bar";
                                     break;
                                 }
@@ -250,6 +358,7 @@ public class ScreenRecordingService
                                 _lastCapturesSize = currLen;
                                 _lastCapturesTime = DateTime.Now;
                                 isRecordingDetected = true;
+                                isDetectedPaused = false;
                                 detectedAppName = "Xbox Game Bar";
                                 break;
                             }
@@ -329,16 +438,24 @@ public class ScreenRecordingService
                 if (!_isRecording)
                 {
                     _isRecording = true;
+                    _isPaused = false;
                     _recordingStartTime = DateTime.Now;
+                    _lastActiveResumeTime = DateTime.Now;
+                    _accumulatedDuration = TimeSpan.Zero;
                     _activeAppName = detectedAppName;
                     App.Log($"Screen recording started by '{_activeAppName}'");
                 }
 
-                TimeSpan duration = DateTime.Now - _recordingStartTime;
+                if (isDetectedPaused != _isPaused)
+                {
+                    SetPaused(isDetectedPaused);
+                }
+
                 RecordingStateChanged?.Invoke(new ScreenRecordingInfo
                 {
                     IsRecording = true,
-                    Duration = duration,
+                    IsPaused = _isPaused,
+                    Duration = CurrentDuration,
                     AppName = _activeAppName
                 });
             }
@@ -347,10 +464,13 @@ public class ScreenRecordingService
                 if (_isRecording)
                 {
                     _isRecording = false;
+                    _isPaused = false;
+                    _accumulatedDuration = TimeSpan.Zero;
                     App.Log("Screen recording ended");
                     RecordingStateChanged?.Invoke(new ScreenRecordingInfo
                     {
                         IsRecording = false,
+                        IsPaused = false,
                         Duration = TimeSpan.Zero,
                         AppName = _activeAppName
                     });

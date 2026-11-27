@@ -10,13 +10,18 @@ public class AlarmService
 {
     public event Action<bool, string>? AlarmStateChanged;
     public event Action<TimeSpan>? SnoozeStarted;
+    public event Action<TimeSpan>? SnoozeTick;
 
     private readonly DispatcherTimer _snoozeTimer;
     private bool _isRinging = false;
+    private bool _isSnoozed = false;
+    private DateTime _snoozeEndTime = DateTime.MinValue;
     private string _currentTitle = "Alarm";
     private uint? _activeNotificationId = null;
 
     public bool IsRinging => _isRinging;
+    public bool IsSnoozed => _isSnoozed;
+    public TimeSpan SnoozeRemaining => _isSnoozed && _snoozeEndTime > DateTime.Now ? _snoozeEndTime - DateTime.Now : TimeSpan.Zero;
     public string CurrentTitle => _currentTitle;
     public uint? ActiveNotificationId => _activeNotificationId;
 
@@ -32,6 +37,7 @@ public class AlarmService
     public void TriggerAlarm(string title = "Alarm", uint? notifId = null)
     {
         _isRinging = true;
+        _isSnoozed = false;
         string cleaned = UwpResourceResolver.Clean(title, "Alarm");
         _currentTitle = string.IsNullOrWhiteSpace(cleaned) ? "Alarm" : cleaned;
         _activeNotificationId = notifId;
@@ -49,10 +55,12 @@ public class AlarmService
         if (!_isRinging) return;
 
         _isRinging = false;
+        _isSnoozed = true;
+        _snoozeEndTime = DateTime.Now.AddMinutes(minutes);
         App.Log($"AlarmService: Snoozed alarm '{_currentTitle}' for {minutes} min");
         AlarmStateChanged?.Invoke(false, _currentTitle);
 
-        _snoozeTimer.Interval = TimeSpan.FromMinutes(minutes);
+        _snoozeTimer.Interval = TimeSpan.FromSeconds(1);
         _snoozeTimer.Start();
         SnoozeStarted?.Invoke(TimeSpan.FromMinutes(minutes));
     }
@@ -62,9 +70,10 @@ public class AlarmService
     /// </summary>
     public void Dismiss()
     {
-        if (!_isRinging && !_snoozeTimer.IsEnabled) return;
+        if (!_isRinging && !_isSnoozed) return;
 
         _isRinging = false;
+        _isSnoozed = false;
         _snoozeTimer.Stop();
         App.Log($"AlarmService: Dismissed alarm '{_currentTitle}'");
         AlarmStateChanged?.Invoke(false, _currentTitle);
@@ -72,7 +81,22 @@ public class AlarmService
 
     private void OnSnoozeTick(object? sender, EventArgs e)
     {
-        _snoozeTimer.Stop();
-        TriggerAlarm(_currentTitle, _activeNotificationId);
+        if (!_isSnoozed)
+        {
+            _snoozeTimer.Stop();
+            return;
+        }
+
+        var remaining = _snoozeEndTime - DateTime.Now;
+        if (remaining <= TimeSpan.Zero)
+        {
+            _snoozeTimer.Stop();
+            _isSnoozed = false;
+            TriggerAlarm(_currentTitle, _activeNotificationId);
+        }
+        else
+        {
+            SnoozeTick?.Invoke(remaining);
+        }
     }
 }

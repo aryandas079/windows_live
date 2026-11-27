@@ -36,7 +36,7 @@ public class WindowsClockWatcherService
     private static readonly Regex TimeRegex = new Regex(@"(?<!\d)\d{1,2}:\d{2}(?::\d{2})?(?!\d)", RegexOptions.Compiled);
 
     public WindowsClockTimerInfo? ActiveTimer => _activeTimer;
-    public bool HasActiveTimer => _activeTimer != null && _activeTimer.IsRunning && _activeTimer.RemainingTime.TotalSeconds > 0;
+    public bool HasActiveTimer => _activeTimer != null && _activeTimer.RemainingTime.TotalSeconds > 0;
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);

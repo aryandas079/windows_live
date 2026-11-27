@@ -94,11 +94,33 @@ public class PrivacyIndicatorService
         PollPrivacyStatus();
     }
 
+    private static readonly string[] CameraProcessNames =
+    {
+        "WindowsCamera", "Camera", "CameraApp", "obs64", "obs32", "vMix64", "vMix", "ManyCam", "SplitCam"
+    };
+
+    private static bool CheckActiveCameraProcesses()
+    {
+        foreach (var name in CameraProcessNames)
+        {
+            try
+            {
+                var procs = Process.GetProcessesByName(name);
+                if (procs.Length > 0)
+                {
+                    return true;
+                }
+            }
+            catch { }
+        }
+        return false;
+    }
+
     private void PollPrivacyStatus()
     {
         try
         {
-            bool cameraInUse = _simulatedCamera || CheckRegistryStore(WebcamPaths);
+            bool cameraInUse = _simulatedCamera || CheckActiveCameraProcesses() || CheckRegistryStore(WebcamPaths);
             bool micInUse = _simulatedMicrophone || _wasapiMicActive || CheckRegistryStore(MicPaths);
 
             if (cameraInUse != IsCameraInUse || micInUse != IsMicrophoneInUse)

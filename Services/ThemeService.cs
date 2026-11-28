@@ -1,7 +1,6 @@
 using System;
 using System.Windows.Media;
 using Microsoft.Win32;
-using Windows.UI.ViewManagement;
 
 namespace WindowsLive.Services;
 
@@ -27,7 +26,9 @@ public class ThemeService
 
     public ThemeService()
     {
+        App.Log("ThemeService constructor started");
         UpdateTheme();
+        App.Log("ThemeService initial UpdateTheme completed");
         SystemEvents.UserPreferenceChanged += (s, e) =>
         {
             if (e.Category == UserPreferenceCategory.General || e.Category == UserPreferenceCategory.Color)
@@ -39,6 +40,7 @@ public class ThemeService
 
     public void UpdateTheme()
     {
+        App.Log("ThemeService.UpdateTheme started");
         // 1. Check Light vs Dark theme and Transparency settings
         bool isLight = false;
         bool transparency = true;
@@ -66,33 +68,27 @@ public class ThemeService
         IsDarkTheme = true;
         TransparencyEnabled = transparency;
 
-        // 2. Fetch system accent color
+        // 2. Fetch system accent color directly from Windows Registry
         Color accent = Color.FromRgb(0, 120, 215); // Fallback Windows Blue
         try
         {
-            var uiSettings = new UISettings();
-            var winColor = uiSettings.GetColorValue(UIColorType.Accent);
-            accent = Color.FromArgb(winColor.A, winColor.R, winColor.G, winColor.B);
-        }
-        catch
-        {
-            try
+            using var dwmKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM");
+            if (dwmKey != null)
             {
-                using var dwmKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM");
-                if (dwmKey != null)
+                var col = dwmKey.GetValue("AccentColor") ?? dwmKey.GetValue("ColorizationColor");
+                if (col is int abgr)
                 {
-                    var col = dwmKey.GetValue("AccentColor");
-                    if (col is int abgr)
-                    {
-                        byte a = 255;
-                        byte r = (byte)(abgr & 0xFF);
-                        byte g = (byte)((abgr >> 8) & 0xFF);
-                        byte b = (byte)((abgr >> 16) & 0xFF);
-                        accent = Color.FromArgb(a, r, g, b);
-                    }
+                    byte a = 255;
+                    byte r = (byte)(abgr & 0xFF);
+                    byte g = (byte)((abgr >> 8) & 0xFF);
+                    byte b = (byte)((abgr >> 16) & 0xFF);
+                    accent = Color.FromArgb(a, r, g, b);
                 }
             }
-            catch { }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"ThemeService: registry accent read failed: {ex.Message}");
         }
 
         AccentColor = accent;
@@ -137,6 +133,7 @@ public class ThemeService
         PlayButtonForegroundBrush.Freeze();
         CircleButtonBackgroundBrush.Freeze();
 
+        App.Log("ThemeService.UpdateTheme finished successfully");
         ThemeChanged?.Invoke();
     }
 }
